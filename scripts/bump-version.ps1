@@ -16,7 +16,7 @@ $root = Split-Path -Parent $PSScriptRoot
 $versionFile = Join-Path $root "VERSION.md"
 $pluginFile = Join-Path $root ".codebuddy-plugin\plugin.json"
 
-$line0 = Get-Content -LiteralPath $versionFile -TotalCount 1
+$line0 = Get-Content -LiteralPath $versionFile -TotalCount 1 -Encoding utf8
 if ($line0 -notmatch '^VERSION=(\d+)\.(\d+)\.(\d+)$') {
   throw "VERSION.md 首行格式错误（应为 VERSION=x.y.z）：$line0"
 }
@@ -32,7 +32,7 @@ switch ($Part) {
 $new = "$major.$minor.$patch"
 
 # 1) 更新 VERSION.md 首行
-$content = Get-Content -LiteralPath $versionFile -Raw
+$content = Get-Content -LiteralPath $versionFile -Raw -Encoding utf8
 $content = $content -replace '^VERSION=\d+\.\d+\.\d+', "VERSION=$new"
 if ($Message -ne "") {
   $date = Get-Date -Format "yyyy-MM-dd"
@@ -42,7 +42,7 @@ if ($Message -ne "") {
 [IO.File]::WriteAllText($versionFile, $content, (New-Object Text.UTF8Encoding($false)))
 
 # 2) 同步 plugin.json 的 version 字段
-$plugin = Get-Content -LiteralPath $pluginFile -Raw | ConvertFrom-Json
+$plugin = Get-Content -LiteralPath $pluginFile -Raw -Encoding utf8 | ConvertFrom-Json
 $plugin.version = $new
 $json = $plugin | ConvertTo-Json -Depth 10
 [IO.File]::WriteAllText($pluginFile, $json, (New-Object Text.UTF8Encoding($false)))

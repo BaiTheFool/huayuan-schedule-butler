@@ -1,12 +1,19 @@
+VERSION=0.10.2
+
 # 华园日程管家 · 版本记录
 
 > 本文件是版本的**单一事实源**。机器可读行固定为第一行：`VERSION=x.y.z`。
 > 发版流程：改代码 → `powershell -ExecutionPolicy Bypass -File scripts\bump-version.ps1 -Message "<一句话变更>"`（自动 patch+1 并同步 `plugin.json`）→ 跑 `node golden-path\check.js` → 提交。
 > 规则：版本号一律由脚本递增，**不要手动改** VERSION.md 与 plugin.json 的版本号；确需大/中版本时用 `-Part major|minor`。
 
-VERSION=0.10.0
-
 ## 变更日志（新→旧）
+
+### 0.10.2 · 2026-10-28 · 共同开发指南整合与测试基线修复
+- 新增 `CONTRIBUTING.md`（共同开发指南）到仓库，并把其协作规范（分支/PR/测试门禁/打包/版本规则/隐私红线）整合进 `AGENTS.md`，新增「开发者自更新契约」硬要求。
+- 补齐 `golden-path/fixtures/preferences.json`：修复上游遗留基线缺口，`check.js` 47/49 → 49/49、`check-v081.js` 6/9 → 9/9（详见 ERROR_LOG #11/#12）。
+- `check-performance.js` 技能数断言 5 → 6（v0.10.0 新增 `huayuan-campus-manual` 的正当同步）。
+- `scripts/bump-version.ps1` 修复读取编码（VERSION.md / plugin.json 补 `-Encoding utf8`），发版链路首次实测通过。
+- `ERROR_LOG.md` 追加 #12；README 版本说明同步。
 
 ### 0.10.0 · 2026-10-28 · 知识库与工程治理
 - 新增内置技能 `huayuan-campus-manual`：接入《华南理工生存手册》（CC0）知识库 46 份知识文件 + 校区地图/转诊单图片，覆盖作息、校历、校巴时刻、食堂、校区地图与周边、学业规则（绩点/考试/转专业）、就医医保、课外竞赛、毕业去向、新生入门。

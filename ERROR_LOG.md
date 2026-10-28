@@ -91,9 +91,16 @@
 ### #11 · 黄金路径基线 47/49（上游 v0.9.0 原版即失败，非本分支改动引入） · 0.9.0
 - 现象：`node golden-path\check.js` 输出 `GOLDEN_PATH:FAIL 47/49`，两项失败：① 偏好落盘断言期望 `daily_limit_min=180`，实际为 `240`；② 「周六 14:00-16:00 羽毛球固定事项」断言未通过。
 - 根因：上游仓库 641bdd7（v0.9.0 发布提交）自身基线不一致——`check.js` 第 158-162 行断言上限 180 且 fixture 规格（GOLDEN-PATH.md）写 180，但当前代码默认值为 240（`preferences.js` 默认 `daily_limit_min=240`）；且 `golden-path\fixtures\` 目录没有 `preferences.json`，第 2 步用例实际由默认值生成，v0.6.0 起「不再静默生成成套偏好」后羽毛球固定事项也不再默认产生。用干净克隆（未做任何改动）重跑同样 47/49，证明与 0.10.0 新增内容无关。
-- 解决（待定，需项目所有者/上游拍板）：方案 A 改 `check.js` 断言与 GOLDEN-PATH.md 规格为 240；方案 B 在 fixtures 提供 preferences.json 并在用例中显式写入；方案 C 回上游修复。
+- 解决（**已解决，采用方案 B，见 #12**）：方案 A 改 `check.js` 断言与 GOLDEN-PATH.md 规格为 240；方案 B 在 fixtures 提供 preferences.json 并在用例中显式写入；方案 C 回上游修复。
 - 验证：`git status --short` 确认 golden-path/ 未被本分支改动。
 - 预防：发版回归若出现与「基线未动」相关的失败，先查上游一致性，不要为了通过而临时改断言。
+
+### #12 · 补齐 fixtures/preferences.json 并同步 check-performance 技能数 · 0.10.2
+- 现象：按 CONTRIBUTING §8 跑全量门禁时三个套件不绿：`check.js` 47/49（同 #11）、`check-v081.js` 6/9（第 3 组「当前短空档直接开始」3 项全挂）、`check-performance.js` 6/7（「Skills 数量为 5」失败，实际 6）。
+- 根因：① `golden-path/fixtures/preferences.json` 缺失（GOLDEN-PATH.md 第一节明确该文件应在 fixtures/，但从未入库）——所有 `--prefs` 用例静默回退到默认偏好（上限 240、运动周一/三/五 17:00-18:00、晚餐 17:30-18:20），导致 #11 两项失败，且周三 17:20 被运动占住、check-v081 短空档用例失败；② `check-performance.js` 第 31 行断言技能数 5，而 v0.10.0 有意新增第 6 个技能 `huayuan-campus-manual` 后未同步该断言。
+- 解决：① 新建 `golden-path/fixtures/preferences.json`（虚构角色「小林」：上限 180 / 单块 90 / 休息 60 / 周六 14:00-16:00 羽毛球固定；晚餐 17:40-18:20、运动仅周一/周五，保证周三 17:20-17:40 短空档可用——check-v081 第 3 组依赖，同时不破坏 check.js 第 6 步周四 18:20「晚餐已结束」的前提）；② `check-performance.js` 断言 5→6（配套同步测试，属 v0.10.0 行为的正当更新，非放宽断言）。
+- 验证：全量门禁全绿——`GOLDEN_PATH:PASS 49/49`、`V060:PASS 32/32`、`WIDGET:PASS 32/32`、`V081:PASS 9/9`、`ACTIVITIES:PASS 6/6`、`PERFORMANCE:PASS 7/7`、`ECOURSE_UX:PASS 36/36`、`LIVE_DASHBOARD_SMOKE` exit 0、`SELF_CHECK:PASS 33/33`、`ACTIVITY_SELF_CHECK:PASS 8/8`。
+- 预防：新增技能/偏好字段时必须同步检查依赖 fixtures 的用例；fixtures 目录与 GOLDEN-PATH.md 的文件清单要保持一致；改功能后按 CONTRIBUTING §7 五处检查（生产脚本/JSON 结构/页面读取/排程逻辑/对应测试）。
 
 ---
 

@@ -9,7 +9,7 @@
 5. 由维护者合并到 `main`；
 6. 打包并安装成 WorkBuddy 专家测试。
 
-当前版本：`0.9.0`  
+当前版本：`0.10.2`  
 仓库：<https://github.com/BaiTheFool/huayuan-schedule-butler>  
 主分支：`main`
 
@@ -97,11 +97,19 @@ huayuan-schedule-butler/
 │  ├─ huayuan-task-card/
 │  ├─ timeline-brief/
 │  ├─ huayuan-dashboard-widget/
-│  └─ huayuan-live-dashboard/
+│  ├─ huayuan-live-dashboard/
+│  └─ huayuan-campus-manual/   校园生存手册知识库（CC0，46 份知识文件）
+├─ scripts/
+│  ├─ bump-version.ps1         版本递增（VERSION.md + plugin.json 自动同步）
+│  └─ error-log.js             运行时错误日志（logs/errors.jsonl）
+├─ logs/                       运行时日志目录
 ├─ golden-path/
 ├─ README.md
 ├─ GOLDEN-PATH.md
+├─ AGENTS.md                   后来 Agent 的交接入口（必读）
 ├─ CONTRIBUTING.md
+├─ ERROR_LOG.md                踩坑档案（人工维护，后来者必读）
+├─ VERSION.md                  版本单一事实源 + 变更日志
 └─ .gitignore
 ```
 
@@ -412,6 +420,8 @@ git diff
 git add <文件1> <文件2>
 ```
 
+注意：**唯一例外**是 `golden-path/fixtures/preferences.json`——它是黄金路径离线回归的虚构样例偏好（文件内有 `_note` 声明），已在 `.gitignore` 显式放行；除此之外任何位置的 `preferences.json`（真实用户偏好）一律禁止提交。
+
 提交信息使用简短、明确的格式：
 
 ```text
@@ -543,13 +553,20 @@ huayuan-schedule-butler-v2
 - 新增用户可见功能：`0.x.0`
 - 大幅重构或协议变更：`x.0.0`
 
-每次升版本至少同步：
+发版动作统一用脚本，**不要手改版本号**：
 
-1. `.codebuddy-plugin/plugin.json`
-2. `README.md` 的版本说明
-3. 相关测试或新增回归
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts\bump-version.ps1 -Message "<一句话变更>"
+```
 
-不要只改 README 里的版本号而漏改 `plugin.json`。
+脚本自动递增 `VERSION.md`（单一事实源）与 `.codebuddy-plugin/plugin.json` 的版本号。之后每次升版本至少同步：
+
+1. `.codebuddy-plugin/plugin.json`（脚本已同步）
+2. `VERSION.md` 变更日志（脚本已追加）
+3. `README.md` 的版本说明（手动补一行）
+4. 相关测试或新增回归
+
+不要只改 README 里的版本号而漏改 `plugin.json`；`VERSION.md` 与 `plugin.json` 的版本号必须一致。
 
 ---
 
@@ -560,7 +577,9 @@ huayuan-schedule-butler-v2
 - 微信公众号和班级群属于私域，暂不做不稳定自动抓取。
 - 学院官网模板很多，活动栏目需要持续验证。
 - Chrome 是当前主链路，其他浏览器回退仍需完善。
-- 当前开发版本是 `0.9.0`；本地版本和开放平台审核版本可能不同步。
+- `golden-path` 全量测试当前**全部通过**（`GOLDEN_PATH:PASS 49/49`）。历史上的基线缺口（上游 v0.9.0 遗留：fixtures 缺 `preferences.json`、技能数断言 5→6）已在 0.10.1 修复并记录于 `ERROR_LOG.md` #11/#12。修复这类问题时**不要**删断言或改预期来"通过"，先按 #12 的做法补真实 fixture / 同步正确断言。
+- 当前开发版本是 `0.10.2`；本地版本和开放平台审核版本可能不同步。
+- 文档维护契约：`AGENTS.md`（Agent 交接）与 `CONTRIBUTING.md`（团队协作）必须由开发者自行保持与代码同步，发现过时直接改。
 
 ---
 

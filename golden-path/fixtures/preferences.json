@@ -1,0 +1,64 @@
+{
+  "_note": "黄金路径固定样例偏好（虚构角色「小林」，不对应任何真实学生）。与 GOLDEN-PATH.md 第一节表格一致：每日学习上限 180 分钟、单次连续学习 ≤90 分钟、每日休息 60 分钟、周六 14:00-16:00 羽毛球不可占用、23:30 前睡觉。晚餐 17:40-18:20、运动仅周一/周五，保证周三 17:20-17:40 短空档可用（check-v081 第 3 组依赖）。",
+  "version": 4,
+  "daily": {
+    "wake": "07:00",
+    "sleep": "23:30",
+    "day_start": "07:30",
+    "day_end": "22:50"
+  },
+  "meals": [
+    { "key": "breakfast", "label": "早餐", "start": "07:00", "end": "07:30", "protected": false },
+    { "key": "lunch", "label": "午餐", "start": "12:00", "end": "12:40", "protected": true },
+    { "key": "dinner", "label": "晚餐", "start": "17:40", "end": "18:20", "protected": true }
+  ],
+  "exercise": {
+    "enabled": true,
+    "days": [1, 5],
+    "start": "17:00",
+    "end": "18:00",
+    "note": "隔天运动一次（周一、周五）"
+  },
+  "rest": {
+    "enabled": true,
+    "daily_minutes": 60,
+    "preferred": ["13:00-13:40", "21:30-22:00"]
+  },
+  "fixed_events": [
+    {
+      "title": "羽毛球",
+      "day": 6,
+      "start": "14:00",
+      "end": "16:00",
+      "movable": "fixed",
+      "source": "user_explicit",
+      "confirmation_state": "confirmed",
+      "note": "周六固定羽毛球，不可占用"
+    }
+  ],
+  "study": {
+    "intensity": "balanced",
+    "daily_limit_min": 180,
+    "weekday_daily_limit_min": 180,
+    "weekend_daily_limit_min": 180,
+    "buffer_min": 20,
+    "max_continuous_minutes": 90,
+    "max_study_blocks_per_day": 4,
+    "evening_latest_end": "22:30",
+    "evening_study_minutes": 60,
+    "preferred_study_periods": ["09:00-11:30", "14:30-17:00", "19:00-22:00"]
+  },
+  "weekend": {
+    "wake": "08:30",
+    "sleep": "23:30",
+    "prefer_morning_study": true
+  },
+  "campus": null,
+  "college": null,
+  "pending": [],
+  "provenance": {
+    "source": "user_explicit",
+    "confirmation_state": "confirmed",
+    "confirmed_at": "2026-08-31T00:00:00.000Z"
+  }
+}

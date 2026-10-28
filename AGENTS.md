@@ -1,17 +1,20 @@
 # 华园日程管家 · Agent 交接指南
 
-> **后来接手的任何智能体/开发者，开工前必须先读本文件**，再按需读 `README.md`（给人看的完整说明）、`GOLDEN-PATH.md`（回归基线）、`ERROR_LOG.md`（踩坑档案）、`VERSION.md`（版本单一事实源）。
+> **后来接手的任何智能体/开发者，开工前必须先读本文件**，再按需读 `CONTRIBUTING.md`（团队共同开发规范）、`README.md`（给人看的完整说明）、`GOLDEN-PATH.md`（回归基线）、`ERROR_LOG.md`（踩坑档案）、`VERSION.md`（版本单一事实源）。
 > 本文件与 game-hub 的 `DEVELOPER_AGENT.md`、nexus 的 `AGENTS.md` 同一套工程治理思路：先立规矩，再动手，做完必须维护文档。
+> **开发者自更新契约（硬要求）**：凡参与开发的人或 Agent，任务完成前必须自行检查并更新受影响的文档（本文档 / `CONTRIBUTING.md` / `ERROR_LOG.md` / `VERSION.md` / README）。**文档不自更 = 任务未完成。**
 
 ## 0. 铁律（违反即返工）
 
 1. **版本号只准脚本改**：发版用 `scripts\bump-version.ps1`（自动递增 VERSION.md 与 plugin.json），禁止手改版本号。
 2. **遇到问题必须留档**：新问题解决后追加 `ERROR_LOG.md`（编号往下排）；运行时可复用 `scripts\error-log.js` 写 `logs/errors.jsonl`。
-3. **改完必须跑回归**：`node golden-path\check.js`（49 项断言）必须全过；改了哪块就重跑对应 `check-*.js`（见 GOLDEN-PATH.md 第五节）。
+3. **改完必须跑回归**：`node golden-path\check.js` 及受影响 `check-*.js` 必须全过（当前全绿：49/49 等，见 `CONTRIBUTING.md` §8 清单）；**禁止删断言、跳过测试或改预期来"通过"**，失败先修根因（补 fixture 或同步正确断言，范例见 `ERROR_LOG.md` #12）。
 4. **只读学校数据，不替用户做决定**：不自动提交作业/报名/缴费/改学校系统；登录由用户本人完成。
 5. **敏感信息不落盘**：账号密码、验证码、Cookie、Token、学号、身份证、手机号、邮箱一律不保存不回显；页面正文不落盘。
 6. **发现文档与代码不符**：以代码为准并修正本文档，不要将错就错。
 7. **知识库更新必须记档**：同步上游手册后更新 `skills/huayuan-campus-manual/knowledge/000-知识库索引.md` 的同步日期，并在 ERROR_LOG.md 记录 diff。
+8. **协作流程按 `CONTRIBUTING.md`**：多人协作时禁止直接提交 main，必须在独立分支开发、跑完全部测试、经 review 后合并（详见第 6 节）。
+9. **文档自更新**：改了什么，就同步更新本文档 / CONTRIBUTING.md / ERROR_LOG.md / VERSION.md / README 中受影响的部分；留给后来者的过时信息 = 任务没做完。
 
 ## 1. 这是什么
 
@@ -39,7 +42,8 @@ huayuan-schedule-butler/
 │  ├─ bump-version.ps1                # ★ 版本递增（改 VERSION.md + plugin.json）
 │  └─ error-log.js                    # ★ 运行时错误日志（logs/errors.jsonl）
 ├─ logs/                              # 运行时日志（errors.jsonl），.gitkeep 占位
-├─ AGENTS.md                          # ★ 本文件
+├─ AGENTS.md                          # ★ 本文件（Agent 交接入口）
+├─ CONTRIBUTING.md                    # ★ 团队共同开发指南（分支/PR/测试/打包/版本规则）
 ├─ ERROR_LOG.md                       # ★ 踩坑档案（人工维护）
 ├─ GOLDEN-PATH.md                     # 演示脚本 + 验收检查表
 ├─ README.md                          # 完整用户/开发者说明
@@ -93,18 +97,58 @@ node scripts\error-log.js --stat
 | 修复了问题 | `ERROR_LOG.md` 追加一条（模板见该文件顶部） |
 | 发了新版本 | `scripts\bump-version.ps1 -Message "..."`（自动 VERSION.md + plugin.json） |
 | 同步了手册知识库 | `knowledge/000-知识库索引.md` 同步日期 + ERROR_LOG.md 记录 diff |
+| 改了团队协作流程 / 分支规范 / 测试清单 | `CONTRIBUTING.md` 对应章节 |
 | 改了本文件相关事实 | 直接修正 AGENTS.md，不要留「这里可能不对」 |
+| 任何改动完成后 | 自查上述清单，未更新的项补齐（**自更新 = 任务完成条件**） |
 
-## 6. 交付标准（每次任务结束回复用户时）
+## 6. 共同开发规范（来自 CONTRIBUTING.md，团队协作必读）
+
+> 完整版见仓库根 `CONTRIBUTING.md`。以下为硬要点，冲突时以 `CONTRIBUTING.md` 为准。
+
+### 6.1 分支与提交纪律
+- **禁止直接提交 main**：多人协作时每个任务一条独立分支，前缀 `feature/` `fix/` `test/` `docs/` `refactor/`；一个分支只解决一个问题。
+- 开工前先同步：`git switch main` → `git pull --ff-only`（本地与上游分叉时用 `git merge origin/main`）→ `git switch -c <前缀>/<任务>`。
+- 提交信息格式：`feat: ...` / `fix: ...` / `test: ...` / `docs: ...` / `refactor: ...`，一句话说清。
+
+### 6.2 修改前与修改后
+- 修改前：先完整读 `CONTRIBUTING.md` → `README.md` → 相关 `SKILL.md`；要改排程再读 `GOLDEN-PATH.md` 与对应测试；**先说明准备改哪些文件，再动手**。
+- 修改后：跑第 3 节全部测试门禁，完整贴命令与结果；失败先修根因，禁止删断言/跳测试/改预期。
+
+### 6.3 真实平台测试规则
+- 每人用自己的学校账号与本地浏览器 Profile；登录由本人完成；遇到验证码/扫码/二次认证停下交本人。
+- 不把浏览器 Profile、Cookies、运行结果发给别人或提交到 Git；测试只验证"是否读到"与字段结构，不传播个人课表/作业/姓名。
+
+### 6.4 提交前检查与 PR
+- `git status` / `git diff` 确认无 `.env`、`preferences.json`、`user-overrides.json`、`config.json`、`huayuan-output/`、浏览器 Profile、Cookie/Token、真实课表与姓名、临时文件。
+- 只 `git add` 本任务相关文件；PR 目标 `main`，描述按「改了什么 / 为什么需要 / 如何验证 / 测试结果 / 风险与未完成项」五段写，至少一名队友 review 后合并。
+
+### 6.5 打包与版本
+- 源码入库不提交 ZIP：`git archive --format=zip --prefix=huayuan-schedule-butler/ --output=..\huayuan-schedule-butler.zip HEAD`（不含 `.git`、`huayuan-output/`、Profile）。
+- 版本规则：修 bug `0.9.x` / 新功能 `0.x.0` / 重构 `x.0.0`；发版走 `scripts\bump-version.ps1 -Message "..."`，同步 `plugin.json`（脚本）、`VERSION.md`（脚本）、`README.md` 版本说明、相关测试。
+
+## 7. 开发者自更新契约（硬要求）
+
+> 这份契约是「把文档交给后来者」的保证。**参与开发的人或 Agent 都必须遵守，不自更 = 任务未完成。**
+
+1. **完成任务前必须自查**：本次改动影响到了哪些文档（AGENTS.md / CONTRIBUTING.md / ERROR_LOG.md / VERSION.md / README / 知识库索引），把该更新的部分更新掉，不留"这里可能不对"。
+2. **踩坑必须追加**：遇到并解决的问题 → `ERROR_LOG.md` 文末按模板追加（编号往下排），不要只记在脑子里或回复里。
+3. **规范变更必须同步**：改了分支/测试/打包/版本等协作流程 → 同步更新 `CONTRIBUTING.md` 对应章节。
+4. **结构变更必须同步**：新增/改名/删除文件或技能 → 更新本文档目录地图与 `CONTRIBUTING.md` 目录图；技能注册 → `plugin.json` + `agents/*.md` frontmatter。
+5. **发现过时直接改**：发现本文件或 CONTRIBUTING 与代码不符 → 以代码为准修正文档，而不是忽略或备注"待修"。
+6. **发版必须留痕**：每次升版本 → `VERSION.md` 变更日志 + `README.md` 版本说明 + ERROR_LOG 如需。
+7. **交付时声明**：最终回复里说明本次更新了哪些文档（见第 8 节交付标准）。
+
+## 8. 交付标准（每次任务结束回复用户时）
 
 最终回复必须说明：
 1. 改了什么（文件级）；
 2. 为什么（根因，若为 bug 修复）；
 3. 怎么验证（`node golden-path\check.js` 结果 / 定向回归 / 实测结论）；
 4. 新版本号（如发版）与路径；
-5. 是否新增了 `ERROR_LOG.md` / `logs/errors.jsonl` 条目。
+5. 是否新增了 `ERROR_LOG.md` / `logs/errors.jsonl` 条目；
+6. **本次自更新了哪些文档**（AGENTS.md / CONTRIBUTING.md / VERSION.md / README / 知识库索引）。
 
-## 7. 常见坑（详见 ERROR_LOG.md）
+## 9. 常见坑（详见 ERROR_LOG.md）
 
 - 教务菜单 `target="_blank"` → 必须接管新标签（#01）。
 - 表格视图星期错位 → 表头水平中心对齐（#03）。
