@@ -21,7 +21,7 @@
 「华园日程管家（本科生）」是一个 **CodeBuddy/WorkBuddy Agent 型专家插件**（`plugin.json` 里 `expertType: agent`）：
 
 - 把华南理工大学本科生散落在 **教务系统、eCourse、雨课堂、校园门户** 的课表/作业/考试/通知，统一整理成**可追溯、可修改、可解释**的日程。
-- 内置 5 个技能 + 新增 `huayuan-campus-manual`（校园知识库）：`huayuan-task-card`（任务卡）、`huayuan-browser-session`（浏览器读取）、`timeline-brief`（时间轴）、`huayuan-dashboard-widget`（对话内卡片）、`huayuan-live-dashboard`（外部网页驾驶舱）、`huayuan-campus-manual`（生存手册知识库）。
+- 内置 7 个技能：`huayuan-task-card`（任务卡）、`huayuan-browser-session`（浏览器读取）、`timeline-brief`（时间轴）、`huayuan-dashboard-widget`（对话内卡片）、`huayuan-live-dashboard`（外部网页驾驶舱）、`huayuan-campus-manual`（生存手册知识库）、`huayuan-score-advisor`（绩点与操行分顾问，官方 2026 手册口径 + 计分工具）。
 - 演示与发版基线：`golden-path/check.js`（49 项断言，离线、不登录、样例数据全虚构）。
 
 ## 2. 目录地图
@@ -36,7 +36,8 @@ huayuan-schedule-butler/
 │  ├─ timeline-brief/                 # 纯文本时间轴（≤8 行）
 │  ├─ huayuan-dashboard-widget/       # show_widget 内嵌卡片
 │  ├─ huayuan-live-dashboard/         # 外部网页驾驶舱（public/ + scripts/）
-│  └─ huayuan-campus-manual/          # ★ 校园生存手册知识库（knowledge/ + SKILL.md）
+│  ├─ huayuan-campus-manual/          # ★ 校园生存手册知识库（knowledge/ + SKILL.md）
+│  └─ huayuan-score-advisor/          # ★ 绩点与操行分顾问（官方手册口径 + gpa/conduct 计分工具）
 ├─ golden-path/                       # 回归基线：check.js + check-vXXX.js + fixtures/（虚构样例）
 ├─ scripts/
 │  ├─ bump-version.ps1                # ★ 版本递增（改 VERSION.md + plugin.json）
@@ -65,6 +66,7 @@ node golden-path\check-widget.js      # Widget
 node golden-path\check-v060.js        # 可视化路径
 node golden-path\check-performance.js # 性能
 node golden-path\check-activities.js  # 校园活动
+node golden-path\check-score.js       # 绩点/操行分计分工具（0.11.0）
 
 # 单步脚本（示例）
 node skills\huayuan-browser-session\scripts\first-run.js --wizard --login

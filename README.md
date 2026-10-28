@@ -21,6 +21,8 @@
 - 完整演示脚本、固定样例与预期输出：[`GOLDEN-PATH.md`](GOLDEN-PATH.md)
 - 一条命令复跑黄金路径：`node golden-path\check.js`（49 项断言，离线、不用登录）
 
+> 版本 0.11.0 新增**绩点与操行分顾问**：内置技能 `huayuan-score-advisor` 依据官方《2026 本科生手册》整理绩点两类算法（百分制平均学分绩点 / 四分制 GPA 动态转换）、综合测评 H=0.7X+0.1C+0.2S 与操行评定细则、奖学金与推免门槛，并提供两个计分工具（`gpa-calculator.js` 算绩点/学位/反推目标，`conduct-calculator.js` 算综合测评与操行分），新增回归门禁 `golden-path\check-score.js`（16 项，全绿）。
+>
 > 版本 0.10.2 新增**共同开发指南与工程治理闭环**：仓库加入 `CONTRIBUTING.md`（分支/PR/测试门禁/打包/版本规则/隐私红线），其协作规范已整合进 `AGENTS.md` 并新增**开发者自更新契约**（文档与代码不符时以代码为准、直接修正，不自更=任务未完成）；补齐 `golden-path/fixtures/preferences.json`，全量测试门禁首次全绿（`GOLDEN_PATH:PASS 49/49`、`V081:PASS 9/9`、`PERFORMANCE:PASS 7/7` 等，见 `ERROR_LOG.md` #11/#12）；`bump-version.ps1` 发版链路实测通过。
 >
 > 版本 0.10.0 新增**校园生存手册知识库**：内置技能 `huayuan-campus-manual` 接入开源《华南理工生存手册》（CC0）46 份知识文件 + 校区地图/转诊单图片，覆盖作息、校历、校巴时刻、食堂、校区地图与周边、学业规则（绩点/考试/转专业）、就医医保、课外竞赛、毕业去向、新生入门；并新增版本号控制（`VERSION.md` + `scripts\bump-version.ps1`）、报错日志（`ERROR_LOG.md` + `scripts\error-log.js`）与 Agent 交接指南（`AGENTS.md`）。版本记录见 `VERSION.md`。
@@ -329,6 +331,20 @@ node skills/huayuan-dashboard-widget/scripts/build-widget.js --self-check       
 - 涉及具体数字/规则时标注「手册数据，以官方最新通知为准」；时效敏感项（校巴、作息、校历、转专业、医保）提示学期更新
 - 校区地图在 `knowledge\assets\maps\`，转诊单/转诊须知在 `knowledge\assets\medical\`
 - 上游同步机制与未收录章节回源路径见索引文件「同步机制」一节
+
+## 内置技能 huayuan-score-advisor（绩点与操行分顾问）
+
+回答**绩点/GPA/操行分/综合测评/奖学金门槛/推免成绩**类问题，并支持计分：
+
+- 依据官方《2026 本科生手册》：《学籍管理办法（2026 年修订）》（绩点第 39 条）、《本科生综合测评及奖励办法（2025 年修订）》（H=0.7X+0.1C+0.2S 与操行 C1/C2）、《推免办法（2026 年修订）》（综合评价 = 百分制绩点×85% + 社会服务×5% + 科研潜质×10%）、《学士学位授予实施细则》（GPA ≥ 2.0）
+- 知识文件：`knowledge/000-索引.md` 速查定位 → 绩点规则 / 综合测评与操行分 / 奖学金与评优 / 推免测算 / 提分建议
+- 计分工具：
+  - `gpa-calculator.js`：百分制平均学分绩点、四分制 GPA（按班级排名动态转换或等级直给）、学位检查、`--target-percent` 反推剩余课程所需平均分
+  - `conduct-calculator.js`：综合测评总积分 H、学业 X、操行 C1/C2、德智体美劳 S、奖学金阈值提示
+- 自检：`node skills\huayuan-score-advisor\scripts\gpa-calculator.js --self-check`（19 项）、`conduct-calculator.js --self-check`（13 项）；回归门禁 `node golden-path\check-score.js`（16 项）
+- 隐私：真实成绩只在用户本机计算，不落盘到项目产物；所有样例均为虚构
+
+> 与 `huayuan-campus-manual`（社区版生存手册）的分工：本技能以官方手册条文为准，两者冲突时以本技能 + 学校最新官方通知为准，差异记入 `ERROR_LOG.md`。
 
 ## 平台支持矩阵
 

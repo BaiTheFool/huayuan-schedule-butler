@@ -1,6 +1,6 @@
 {
     "name":  "huayuan-schedule-butler-v2",
-    "version":  "0.10.2",
+    "version":  "0.11.0",
     "description":  "Unifies SCUT undergraduate course schedules, assignments, exams and notices into explainable, editable task cards and day/week plans.",
     "author":  {
                    "name":  "华园日程管家项目组",
@@ -15,7 +15,8 @@
                    "./skills/timeline-brief",
                    "./skills/huayuan-dashboard-widget",
                    "./skills/huayuan-live-dashboard",
-                   "./skills/huayuan-campus-manual"
+                   "./skills/huayuan-campus-manual",
+                   "./skills/huayuan-score-advisor"
                ],
     "expertType":  "agent",
     "agentName":  "huayuan-schedule-butler",

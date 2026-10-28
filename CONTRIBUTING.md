@@ -9,7 +9,7 @@
 5. 由维护者合并到 `main`；
 6. 打包并安装成 WorkBuddy 专家测试。
 
-当前版本：`0.10.2`  
+当前版本：`0.11.0`  
 仓库：<https://github.com/BaiTheFool/huayuan-schedule-butler>  
 主分支：`main`
 
@@ -98,7 +98,8 @@ huayuan-schedule-butler/
 │  ├─ timeline-brief/
 │  ├─ huayuan-dashboard-widget/
 │  ├─ huayuan-live-dashboard/
-│  └─ huayuan-campus-manual/   校园生存手册知识库（CC0，46 份知识文件）
+│  ├─ huayuan-campus-manual/   校园生存手册知识库（CC0，46 份知识文件）
+│  └─ huayuan-score-advisor/   绩点与操行分顾问（官方手册口径 + gpa/conduct 计分工具）
 ├─ scripts/
 │  ├─ bump-version.ps1         版本递增（VERSION.md + plugin.json 自动同步）
 │  └─ error-log.js             运行时错误日志（logs/errors.jsonl）
@@ -299,6 +300,7 @@ git switch -c feature/activity-filter
 | 修改活动抓取 | `activity-feed.js`、`colleges.js` |
 | 修改网页页面 | `huayuan-live-dashboard/public/` |
 | 修改网页数据接口 | `dashboard-server.js` |
+| 修改绩点/GPA/操行分/综合测评口径或计分 | `huayuan-score-advisor/scripts/`（计分脚本 + `knowledge/` 常量表双份同步） |
 | 修改平台展示 | `.codebuddy-plugin/plugin.json` |
 | 增加回归 | `golden-path/` |
 
@@ -323,6 +325,7 @@ node golden-path/check-widget.js
 node golden-path/check-v081.js
 node golden-path/check-activities.js
 node golden-path/check-performance.js
+node golden-path/check-score.js
 node skills/huayuan-live-dashboard/test/smoke.js
 node skills/huayuan-browser-session/scripts/manage-items.js --self-check
 node skills/huayuan-browser-session/scripts/activity-feed.js --self-check
@@ -342,6 +345,7 @@ node golden-path/check-ecourse-ux.js
 - `V081:PASS`
 - `ACTIVITIES:PASS`
 - `PERFORMANCE:PASS`
+- `SCORE_GATE:PASS`
 - `LIVE_DASHBOARD_SMOKE:PASS`
 - `SELF_CHECK:PASS`
 
@@ -577,7 +581,8 @@ powershell -ExecutionPolicy Bypass -File scripts\bump-version.ps1 -Message "<一
 - 微信公众号和班级群属于私域，暂不做不稳定自动抓取。
 - 学院官网模板很多，活动栏目需要持续验证。
 - Chrome 是当前主链路，其他浏览器回退仍需完善。
-- `golden-path` 全量测试当前**全部通过**（`GOLDEN_PATH:PASS 49/49`）。历史上的基线缺口（上游 v0.9.0 遗留：fixtures 缺 `preferences.json`、技能数断言 5→6）已在 0.10.1 修复并记录于 `ERROR_LOG.md` #11/#12。修复这类问题时**不要**删断言或改预期来"通过"，先按 #12 的做法补真实 fixture / 同步正确断言。
+- `golden-path` 全量测试当前**全部通过**（`GOLDEN_PATH:PASS 49/49`、`SCORE_GATE:PASS 16/16` 等）。历史上的基线缺口（上游 v0.9.0 遗留：fixtures 缺 `preferences.json`、技能数断言 5→6）已在 0.10.1 修复并记录于 `ERROR_LOG.md` #11/#12。修复这类问题时**不要**删断言或改预期来"通过"，先按 #12 的做法补真实 fixture / 同步正确断言。
+- `huayuan-score-advisor` 计分口径基于《2026 本科生手册》官方条文（学籍管理办法 2026 修订第 39 条等）；**各院（系）综合测评实施细则可在校级办法基础上微调加分认定**，计分结果以院（系）细则与官方最新通知为准。四分制 GPA 的动态转换需要课程班排名，只有分数时工具会标记无法精算。
 - 当前开发版本是 `0.10.2`；本地版本和开放平台审核版本可能不同步。
 - 文档维护契约：`AGENTS.md`（Agent 交接）与 `CONTRIBUTING.md`（团队协作）必须由开发者自行保持与代码同步，发现过时直接改。
 

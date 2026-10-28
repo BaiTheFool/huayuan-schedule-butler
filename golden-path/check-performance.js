@@ -28,7 +28,7 @@ check(
   `${Buffer.byteLength(browserSkill)} B`
 );
 check('maxTurns 不超过 30', /maxTurns:\s*30\b/.test(agent));
-check('Skills 数量为 6', plugin.skills.length === 6, String(plugin.skills.length));
+check('Skills 数量为 7', plugin.skills.length === 7, String(plugin.skills.length));
 check(
   '普通“现在该干什么”不自动 Widget',
   /不自动生成 Widget/.test(agent)
