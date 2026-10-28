@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>华园日程驾驶舱</title>
+  <link rel="stylesheet" href="/styles.css" />
+</head>
+<body>
+  <main>
+    <header>
+      <div>
+        <span class="eyebrow">HUAYUAN / LIVE DASHBOARD</span>
+        <h1>下一步，<em>已经在左边等你。</em></h1>
+      </div>
+      <span class="status" id="status"><i></i>正在读取</span>
+    </header>
+
+    <nav class="page-nav" aria-label="驾驶舱页面">
+      <a class="active" href="/" aria-current="page">今日安排</a>
+      <a href="/todo.html">全部待办</a>
+      <a href="/activities.html">可参与事项</a>
+    </nav>
+
+    <aside id="syncNudge" class="sync-nudge">
+      <span>正在读取最近一次平台同步时间…</span>
+      <a href="/todo.html">查看清单与刷新指令 →</a>
+    </aside>
+
+    <section class="focus-card">
+      <span class="label">唯一第一动作</span>
+      <h2 id="firstAction">正在整理最新安排…</h2>
+      <p id="firstHint"></p>
+    </section>
+
+    <section class="grid">
+      <article class="panel">
+        <div class="panel-title"><h3>接下来</h3><span id="timestamp">--:--</span></div>
+        <ol id="timeline" class="timeline"></ol>
+      </article>
+      <article class="panel">
+        <div class="panel-title"><h3>需要你决定</h3><span id="pendingBadge">0 条</span></div>
+        <ul id="pending" class="pending"></ul>
+      </article>
+    </section>
+
+    <section class="prompt-panel">
+      <div>
+        <span class="eyebrow">NEXT MESSAGE</span>
+        <h3>下一步可以这样问</h3>
+        <p>输入仍在左侧 WorkBuddy 对话区完成。点击右侧可复制指令。</p>
+      </div>
+      <div id="prompts" class="prompts"></div>
+    </section>
+
+    <footer>
+      <span>只读驾驶舱 · 不提交作业、不报名、不缴费</span>
+      <span id="source"></span>
+    </footer>
+  </main>
+  <script src="/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,20 @@
+{
+  "_note": "黄金路径固定样例雨课堂待办（虚构）。",
+  "status": "OK",
+  "summary": { "failed": 0, "auth_expired": false },
+  "courses": [
+    {
+      "ok": true,
+      "classroom_name": "大学英语（样例）",
+      "tasks": [
+        {
+          "name": "第 8 讲 随堂练习（样例）",
+          "score_deadline": "2026-11-06 23:59",
+          "type": 1,
+          "is_expired": false,
+          "estimated_minutes": 75
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,71 @@
+{
+  "_note": "黄金路径固定样例课表（虚构数据，课程名与教室均为样例，不对应任何真实学生）。第 1 周周一 = 2026-08-31，因此第 10 周 = 2026-11-02 ~ 11-08。",
+  "status": "READ_OK",
+  "semester": {
+    "raw": "2026-2027-1",
+    "label": "2026-2027学年第一学期",
+    "first_week_start": "2026-08-31"
+  },
+  "campus": { "key": "wushan", "label": "五山校区" },
+  "courses": [
+    {
+      "course": "高等数学（样例）",
+      "course_code": null,
+      "teacher": "样例教师",
+      "weekday": 1,
+      "weekday_name": "星期一",
+      "periods": [1, 2],
+      "period_text": "1-2节",
+      "start_time": "08:00",
+      "end_time": "09:40",
+      "time_note": "08:00-09:40（按五山校区作息换算）",
+      "weeks": { "raw": "1-16周", "ranges": [[1, 16]], "list": [1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16], "parity": null, "count": 16 },
+      "classroom": "330201",
+      "campus": "五山校区",
+      "credit": null,
+      "extraction": "dom-table",
+      "pending_fields": [],
+      "source_excerpt": "高等数学（样例）周数：1-16周 校区:五山校区 上课地点：330201（样例数据）"
+    },
+    {
+      "course": "生产运作管理（样例）",
+      "course_code": null,
+      "teacher": "样例教师",
+      "weekday": 3,
+      "weekday_name": "星期三",
+      "periods": [5, 6],
+      "period_text": "5-6节",
+      "start_time": "14:30",
+      "end_time": "16:10",
+      "time_note": "14:30-16:10（按五山校区作息换算）",
+      "weeks": { "raw": "1-16周", "ranges": [[1, 16]], "list": [1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16], "parity": null, "count": 16 },
+      "classroom": "330502",
+      "campus": "五山校区",
+      "credit": null,
+      "extraction": "dom-table",
+      "pending_fields": [],
+      "source_excerpt": "生产运作管理（样例）周数：1-16周 校区:五山校区 上课地点：330502（样例数据）"
+    },
+    {
+      "course": "大学英语（样例）",
+      "course_code": null,
+      "teacher": "样例教师",
+      "weekday": 5,
+      "weekday_name": "星期五",
+      "periods": [3, 4],
+      "period_text": "3-4节",
+      "start_time": "10:00",
+      "end_time": "11:40",
+      "time_note": "10:00-11:40（按五山校区作息换算）",
+      "weeks": { "raw": "1-16周", "ranges": [[1, 16]], "list": [1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16], "parity": null, "count": 16 },
+      "classroom": "450103",
+      "campus": "五山校区",
+      "credit": null,
+      "extraction": "dom-table",
+      "pending_fields": [],
+      "source_excerpt": "大学英语（样例）周数：1-16周 校区:五山校区 上课地点：450103（样例数据）"
+    }
+  ],
+  "summary": { "courses": 3, "sessions": 3 },
+  "pending": []
+}

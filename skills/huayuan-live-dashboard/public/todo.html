@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>全部待办 · 华园日程管家</title>
+  <link rel="stylesheet" href="/styles.css" />
+</head>
+<body>
+  <main class="todo-page">
+    <header>
+      <div>
+        <span class="eyebrow">HUAYUAN / TODO LIST</span>
+        <h1>所有要做的事，<em>一张清单。</em></h1>
+      </div>
+      <span class="status" id="status"><i></i>正在读取</span>
+    </header>
+
+    <nav class="page-nav" aria-label="驾驶舱页面">
+      <a href="/">今日安排</a>
+      <a class="active" href="/todo.html" aria-current="page">全部待办</a>
+      <a href="/activities.html">可参与事项</a>
+    </nav>
+
+    <section id="syncCard" class="sync-card">
+      <div>
+        <span class="eyebrow">定期刷新</span>
+        <h2 id="syncTitle">检查平台数据是否最新</h2>
+        <p id="syncMessage">正在读取最近一次同步时间…</p>
+      </div>
+      <button id="copySyncPrompt" class="copy-primary" type="button">复制刷新指令</button>
+    </section>
+
+    <section class="summary-grid" aria-label="待办统计">
+      <article class="stat"><b id="countP0">0</b><span>P0 必须优先</span></article>
+      <article class="stat"><b id="countP1">0</b><span>P1 本周推进</span></article>
+      <article class="stat"><b id="countP2">0</b><span>P2 时间充裕</span></article>
+      <article class="stat"><b id="countOverdue">0</b><span>已过期未完成</span></article>
+    </section>
+
+    <section class="panel todo-panel">
+      <div class="panel-title">
+        <h3>当前待办</h3>
+        <span id="todoUpdated">--:--</span>
+      </div>
+      <div id="todoGroups" class="todo-groups"></div>
+    </section>
+
+    <section class="grid">
+      <article class="panel">
+        <div class="panel-title"><h3>已过期未完成</h3><span id="overdueBadge">0 条</span></div>
+        <ul id="overdue" class="pending"></ul>
+      </article>
+      <article class="panel">
+        <div class="panel-title"><h3>数据提醒</h3><span id="pendingBadge">0 条</span></div>
+        <ul id="pending" class="pending"></ul>
+      </article>
+    </section>
+
+    <section class="prompt-panel">
+      <div>
+        <span class="eyebrow">NEXT MESSAGE</span>
+        <h3>下一步可以这样问</h3>
+        <p>在左侧 WorkBuddy 对话区发送。点击可复制，不会自动发送。</p>
+      </div>
+      <div id="prompts" class="prompts"></div>
+    </section>
+
+    <footer>
+      <span>只读待办页 · 建议每周刷新一次 · 不修改学校系统</span>
+      <span id="source"></span>
+    </footer>
+  </main>
+  <script src="/todo.js"></script>
+</body>
+</html>
+

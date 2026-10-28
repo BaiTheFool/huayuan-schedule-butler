@@ -1,0 +1,68 @@
+{
+  "name": "huayuan-schedule-butler-v2",
+  "version": "0.9.0",
+  "description": "Unifies SCUT undergraduate course schedules, assignments, exams and notices into explainable, editable task cards and day/week plans.",
+  "author": {
+    "name": "华园日程管家项目组",
+    "email": "wtm430181@qq.com"
+  },
+  "agents": [
+    "./agents/huayuan-schedule-butler.md"
+  ],
+  "skills": [
+    "./skills/huayuan-task-card",
+    "./skills/huayuan-browser-session",
+    "./skills/timeline-brief",
+    "./skills/huayuan-dashboard-widget",
+    "./skills/huayuan-live-dashboard"
+  ],
+  "expertType": "agent",
+  "agentName": "huayuan-schedule-butler",
+  "displayName": {
+    "en": "Huayuan Schedule Butler (Undergraduate)",
+    "zh": "华园日程管家（本科生）"
+  },
+  "profession": {
+    "en": "Huayuan Undergraduate Academic Planner",
+    "zh": "华园本科生日程规划助理"
+  },
+  "displayDescription": {
+    "en": "Unifies timetable, assignments and campus opportunities into explainable plans, plus current-action guidance, rescheduling and a split-screen dashboard.",
+    "zh": "聚合多平台课表、作业、校园通知与可参与活动，按作息生成可解释日程；支持“现在干什么”、临时重排和三页分屏驾驶舱。"
+  },
+  "avatar": "avatars/expert.png",
+  "categoryId": "09-OperationsHR",
+  "defaultInitPrompt": {
+    "zh": "请告诉我你能帮我做什么，并引导我完成首次初始化",
+    "en": "Show me what you can do and guide me through first-time setup"
+  },
+  "plugin": "huayuan-schedule-butler-v2",
+  "tags": [
+    {
+      "en": "Schedule Planning",
+      "zh": "日程规划"
+    },
+    {
+      "en": "Academic Task Tracking",
+      "zh": "学业任务追踪"
+    },
+    {
+      "en": "Multi-source Consolidation",
+      "zh": "多源信息整合"
+    }
+  ],
+  "quickPrompts": [
+    {
+      "zh": "请告诉我你能帮我做什么，并引导我完成首次初始化",
+      "en": "Show me what you can do and guide me through first-time setup"
+    },
+    {
+      "zh": "我现在该干什么？请给出唯一的第一动作和接下来的安排",
+      "en": "What should I do right now? Give me the single next action and the following schedule"
+    },
+    {
+      "zh": "我要临时加一门课、一项作业或一段休息，请帮我重排本周计划",
+      "en": "Add a temporary class, assignment, or rest block, and reschedule my week"
+    }
+  ]
+}

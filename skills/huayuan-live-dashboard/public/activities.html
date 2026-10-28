@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>可参与事项 · 华园日程管家</title>
+  <link rel="stylesheet" href="/styles.css" />
+</head>
+<body>
+  <main class="activities-page">
+    <header>
+      <div>
+        <span class="eyebrow">HUAYUAN / OPPORTUNITIES</span>
+        <h1>别错过，<em>现在能参加什么。</em></h1>
+      </div>
+      <span class="status" id="status"><i></i>正在读取</span>
+    </header>
+
+    <nav class="page-nav" aria-label="驾驶舱页面">
+      <a href="/">今日安排</a>
+      <a href="/todo.html">全部待办</a>
+      <a class="active" href="/activities.html" aria-current="page">可参与事项</a>
+    </nav>
+
+    <section id="refreshCard" class="sync-card">
+      <div>
+        <span class="eyebrow">活动现场</span>
+        <h2 id="refreshTitle">检查最新活动公告</h2>
+        <p id="refreshMessage">正在读取校团委、学生工作处、软件学院与就业在线。</p>
+      </div>
+      <div class="activity-actions">
+        <button id="refreshActivities" class="copy-primary" type="button">立即刷新</button>
+        <button id="copyActivityPrompt" class="copy-secondary" type="button">复制刷新指令</button>
+      </div>
+    </section>
+
+    <section class="summary-grid activity-summary" aria-label="活动统计">
+      <article class="stat"><b id="countAll">0</b><span>当前可参与</span></article>
+      <article class="stat"><b id="countDeadline">0</b><span>有明确截止</span></article>
+      <article class="stat"><b id="countSources">0</b><span>公开来源</span></article>
+      <article class="stat"><b id="countFailed">0</b><span>读取失败</span></article>
+    </section>
+
+    <section class="activity-toolbar" id="scopeFilters" aria-label="来源范围筛选"></section>
+    <section class="activity-toolbar" id="filters" aria-label="活动类型筛选"></section>
+
+    <section class="panel activities-panel">
+      <div class="panel-title">
+        <h3>当前可参与</h3>
+        <span id="activityUpdated">--:--</span>
+      </div>
+      <div id="activityItems" class="activity-items"></div>
+    </section>
+
+    <section class="panel source-panel">
+      <div class="panel-title"><h3>来源状态</h3><span>只读公开网页</span></div>
+      <ul id="sourceList" class="source-list"></ul>
+    </section>
+
+    <section class="panel warning-panel">
+      <div class="panel-title"><h3>核验提醒</h3><span id="warningCount">0 条</span></div>
+      <ul id="activityWarnings" class="pending"></ul>
+    </section>
+
+    <footer>
+      <span>活动信息以原通知为准 · 不自动报名 · 不收集账号密码</span>
+      <span id="sourceUpdated"></span>
+    </footer>
+  </main>
+  <script src="/activities.js"></script>
+</body>
+</html>
+

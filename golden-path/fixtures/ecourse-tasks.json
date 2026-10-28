@@ -1,0 +1,19 @@
+{
+  "_note": "黄金路径固定样例任务（虚构）。状态 READ_PARTIAL：列表声明 3 条，其中 2 条没解析出内容，必须标「待确认」，不能说成「没有作业」。",
+  "status": "READ_PARTIAL",
+  "summary": { "total": 3, "submitted": 0, "unfinished": 1, "unparsed": 2, "failed": 0 },
+  "tasks": [
+    {
+      "title": "第 6 章作业（样例）",
+      "course": "生产运作管理（样例）",
+      "task_type": "作业",
+      "deadline": "2026-11-05 23:59",
+      "estimated_minutes": 120,
+      "source": "eCourse",
+      "source_excerpt": "第 6 章作业 截止 2026-11-05 23:59（样例数据）"
+    }
+  ],
+  "unparsed_records": [
+    { "course": "生产运作管理（样例）", "note": "列表共 3 条，2 条标题未解析" }
+  ]
+}

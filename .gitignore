@@ -1,0 +1,41 @@
+# Runtime output and personal state
+huayuan-output/
+profiles/
+output/
+dist/
+
+# Local configuration or generated plans
+config.json
+preferences.json
+user-overrides.json
+user-state.json
+live-dashboard.json
+now.json
+plan.json
+schedule-analysis.json
+activity-feed.json
+onboarding-report.json
+*.session-*.json
+*-captures/
+rain-captures*/
+jw-captures/
+
+# Browser and test artifacts
+*.log
+*.tmp
+*.pid
+.tmp*/
+test-results/
+playwright-report/
+node_modules/
+__pycache__/
+*.pyc
+
+# Archives are published separately through GitHub Releases
+*.zip
+
+# OS/editor files
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
