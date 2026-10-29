@@ -9,11 +9,16 @@
  */
 
 const assert = require('assert');
+const fs = require('fs');
+const os = require('os');
+const path = require('path');
+const { spawnSync } = require('child_process');
 const R = require('../scripts/route-engine.js');
 const DATA = require('../data/campus-data.js');
 const T = require('../scripts/timetable-import.js');
 const TP = require('../scripts/task-planner.js');
 const EXAMS = require('../data/exam-catalog.js');
+const REAL_SHAPE = require('./fixtures/jw-university-town.json');
 
 let passed = 0;
 const failures = [];
@@ -48,6 +53,34 @@ check('POI 数据完整，且每个 POI 都能接入步行图', () => {
   }
 });
 
+check('校园楼栋目录包含教学区、学院楼和公共设施，并可按字段搜索', () => {
+  assert.ok(DATA.LOCATIONS.length >= 75, `地点只有 ${DATA.LOCATIONS.length} 个`);
+  const names = DATA.LOCATIONS.map((item) => item.name).join(' ');
+  for (const keyword of ['A1 教学楼', 'A6 教学楼', 'B3 计算机学院', 'B7 软件学院', 'T1 礼堂', '图书馆', 'C11 宿舍', 'C17 宿舍', 'D5 宿舍', 'G17 宿舍', 'E3 学生宿舍']) {
+    assert.ok(names.includes(keyword), `缺少 ${keyword}`);
+  }
+  const app = fs.readFileSync(path.join(__dirname, '..', 'public', 'app.js'), 'utf8');
+  assert.match(app, /locationSearchText/);
+  assert.match(app, /\.includes\(target\)/);
+});
+
+check('从楼栋目录选择起点后，路线使用所选楼栋名称', () => {
+  const location = DATA.LOCATIONS.find((item) => item.id === 'b7');
+  const plan = R.planDay({
+    date: '2026-10-29',
+    gps: {
+      lat: location.lat,
+      lng: location.lng,
+      coord: location.coord,
+      simulated: true,
+      label: location.name,
+    },
+  });
+  assert.strictEqual(plan.ok, true);
+  assert.strictEqual(plan.gps.label, 'B7 软件学院');
+  assert.ok(plan.blocks.some((block) => block.title === '从B7 软件学院出发'));
+});
+
 check('教务课表导入：识别大学城、课程数和当前教学周', () => {
   const result = T.summarizeTimetable(DATA.DEMO_TIMETABLE, { date: '2026-10-29' });
   assert.strictEqual(result.ok, true);
@@ -62,6 +95,33 @@ check('教务课表导入：五山课表被拒绝，不硬套大学城', () => {
   const result = T.summarizeTimetable(require('../../../golden-path/fixtures/jw-timetable.json'), { date: '2026-10-29' });
   assert.strictEqual(result.ok, false);
   assert.strictEqual(result.error, 'CAMPUS_UNSUPPORTED');
+});
+
+check('教务课表导入：真实大学城结构不被“广州国际校区”参考标签误伤', () => {
+  const result = T.summarizeTimetable(REAL_SHAPE, { date: '2026-10-30' });
+  assert.strictEqual(result.ok, true);
+  assert.strictEqual(result.campus.key, 'university_town');
+  assert.strictEqual(result.summary.total, 3);
+});
+
+check('真实大学城课表能生成完整路线，且晚餐前保留有效通勤', () => {
+  const plan = R.planDay({ date: '2026-10-30', timetable: REAL_SHAPE, weekNumber: 10, preset: 'balanced' });
+  assert.strictEqual(plan.ok, true);
+  assert.strictEqual(plan.validation.ok, true, plan.validation.issues.join('；'));
+  assert.deepStrictEqual(
+    plan.blocks.filter((block) => block.type === 'class').map((block) => block.title),
+    ['高级语言程序设计(C++)(上)', '学术英语（一）', '习近平新时代中国特色社会主义思想概论']
+  );
+  assert.ok(
+    plan.blocks.filter((block) => block.type === 'walk').every((block) => block.duration_min >= 1),
+    '不应生成 0 分钟步行块'
+  );
+  const dinner = plan.blocks.find((block) => block.title.startsWith('晚餐'));
+  const dinnerWalk = plan.blocks.find(
+    (block) => block.type === 'walk' && dinner && block.end <= dinner.start
+  );
+  assert.ok(dinner, '真实课表日应保留晚餐');
+  assert.ok(dinnerWalk, '晚餐前应有通勤块');
 });
 
 check('教务课表导入：坏 JSON / 空课程有明确错误', () => {
@@ -315,6 +375,55 @@ check('一天内所有可移动块都在 07:00–24:00 之间', () => {
     assert.ok(b.start_min >= 7 * 60, `${b.title} 开始过早`);
     assert.ok(b.end_min <= 24 * 60, `${b.title} 结束过晚`);
   }
+});
+
+check('命令行默认不静默使用示例课表', () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'huayuan-route-noarg-'));
+  const result = spawnSync(
+    process.execPath,
+    [
+      path.join(__dirname, '..', 'scripts', 'day-route.js'),
+      '--date',
+      '2026-10-30',
+      '--output-dir',
+      path.join(dir, 'out'),
+    ],
+    {
+      cwd: dir,
+      encoding: 'utf8',
+      env: { ...process.env, HUAYUAN_ROUTE_SEARCH_ROOT: dir },
+    }
+  );
+  assert.strictEqual(result.status, 4, result.stderr);
+  assert.match(result.stderr, /NO_TIMETABLE/);
+  assert.strictEqual(fs.existsSync(path.join(dir, 'out', 'day-route.json')), false);
+});
+
+check('命令行无参数可自动发现真实课表并完成校验', () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'huayuan-route-auto-'));
+  fs.writeFileSync(path.join(dir, 'jw-timetable.json'), JSON.stringify(REAL_SHAPE), 'utf8');
+  const outDir = path.join(dir, 'out');
+  const result = spawnSync(
+    process.execPath,
+    [path.join(__dirname, '..', 'scripts', 'day-route.js'), '--date', '2026-10-30', '--output-dir', outDir],
+    {
+      cwd: dir,
+      encoding: 'utf8',
+      env: { ...process.env, HUAYUAN_ROUTE_SEARCH_ROOT: dir },
+    }
+  );
+  assert.strictEqual(result.status, 0, result.stderr || result.stdout);
+  const output = JSON.parse(fs.readFileSync(path.join(outDir, 'day-route.json'), 'utf8'));
+  assert.strictEqual(output.validation.ok, true);
+  assert.ok(output.blocks.some((block) => block.type === 'class'));
+});
+
+check('路线页面默认日期使用当天，不再写死演示日期', () => {
+  const app = fs.readFileSync(path.join(__dirname, '..', 'public', 'app.js'), 'utf8');
+  const html = fs.readFileSync(path.join(__dirname, '..', 'public', 'index.html'), 'utf8');
+  assert.match(app, /date:\s*todayIso\(\)/);
+  assert.doesNotMatch(app, /date:\s*'2026-10-29'/);
+  assert.doesNotMatch(html, /value="2026-10-29"/);
 });
 
 console.log('');

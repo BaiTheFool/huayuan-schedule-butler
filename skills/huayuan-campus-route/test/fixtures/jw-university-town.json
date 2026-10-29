@@ -1,0 +1,49 @@
+{
+  "status": "READ_OK",
+  "campus": {
+    "key": "university_town",
+    "label": "大学城校区 / 广州国际校区",
+    "campus_text": "大学城校区"
+  },
+  "courses": [
+    {
+      "course": "高级语言程序设计(C++)(上)",
+      "weekday": 5,
+      "start_time": "08:50",
+      "end_time": "10:25",
+      "weeks": {
+        "raw": "1-16周",
+        "ranges": [[1, 16]],
+        "list": [10]
+      },
+      "classroom": "A3-101",
+      "campus": "大学城校区"
+    },
+    {
+      "course": "学术英语（一）",
+      "weekday": 5,
+      "start_time": "10:40",
+      "end_time": "12:15",
+      "weeks": {
+        "raw": "1-16周",
+        "ranges": [[1, 16]],
+        "list": [10]
+      },
+      "classroom": "A2-201",
+      "campus": "大学城校区"
+    },
+    {
+      "course": "习近平新时代中国特色社会主义思想概论",
+      "weekday": 5,
+      "start_time": "15:45",
+      "end_time": "17:20",
+      "weeks": {
+        "raw": "1-16周",
+        "ranges": [[1, 16]],
+        "list": [10]
+      },
+      "classroom": "A3-301",
+      "campus": "大学城校区"
+    }
+  ]
+}

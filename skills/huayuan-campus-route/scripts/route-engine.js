@@ -421,6 +421,8 @@
       lng,
       coord: 'GCJ-02',
       accuracy: Number(gps.accuracy) || null,
+      label: gps.label ? String(gps.label).slice(0, 80) : null,
+      simulated: Boolean(gps.simulated),
       nearest_poi: nearest ? nearest.poi.id : null,
       nearest_distance: nearest ? Math.round(nearest.distance) : null,
       distance_to_center: Math.round(distance),
@@ -443,6 +445,11 @@
     const list = [];
     for (const course of courses) {
       if (Number(course.weekday) !== weekday) continue;
+      const courseCampus = String(course.campus || '').trim();
+      if (/五山|广州国际|国际校区/.test(courseCampus)) {
+        warnings.push(`课程「${course.course || '未命名'}」在${courseCampus}，不属于大学城路线，已跳过`);
+        continue;
+      }
       if (weekNumber && course.weeks) {
         const weeks = course.weeks.list || [];
         if (Array.isArray(weeks) && weeks.length && !weeks.includes(Number(weekNumber))) continue;
@@ -616,6 +623,56 @@
     return best;
   }
 
+  function resolveCampusScope(timetable) {
+    const campus = timetable && timetable.campus;
+    const campusObject = campus && typeof campus === 'object' ? campus : {};
+    const campusString = typeof campus === 'string' ? campus : '';
+    const key = String(campusObject.key || '').trim();
+    const campusText = String(campusObject.campus_text || campusString || '').trim();
+    const label = String(campusObject.label || '').trim();
+    const courseCampuses = Array.from(
+      new Set(
+        ((timetable && timetable.courses) || [])
+          .map((course) => String((course && course.campus) || '').trim())
+          .filter(Boolean)
+      )
+    );
+
+    const isUniversityTown = (value) => /大学城|university[_ -]?town/i.test(String(value || ''));
+    const isOtherCampus = (value) => /五山|广州国际|国际校区/.test(String(value || ''));
+    const explicitUniversityTown =
+      isUniversityTown(key) || isUniversityTown(campusText) || courseCampuses.some(isUniversityTown);
+    const explicitOther = [key, campusText, ...courseCampuses].filter(Boolean).some(isOtherCampus);
+
+    if (explicitUniversityTown) {
+      const warnings = [];
+      if (explicitOther) {
+        warnings.push('课表同时带有其他校区信息；本项目只处理大学城课程，其他校区课程会被跳过');
+      }
+      return { supported: true, ambiguous: false, label: '大学城校区', warnings };
+    }
+    if (explicitOther) {
+      return { supported: false, ambiguous: false, label: campusText || label || '非大学城校区', warnings: [] };
+    }
+    if (isUniversityTown(label)) {
+      return {
+        supported: true,
+        ambiguous: true,
+        label: '大学城校区',
+        warnings: ['课表标题含大学城校区，但没有明确校区字段；已按大学城处理，请确认课程教室'],
+      };
+    }
+    if (isOtherCampus(label)) {
+      return { supported: false, ambiguous: false, label, warnings: [] };
+    }
+    return {
+      supported: true,
+      ambiguous: true,
+      label: campusText || label || '未识别校区',
+      warnings: ['课表没有明确校区字段；本项目只按大学城校区处理，请确认课程教室'],
+    };
+  }
+
   function planDay(options) {
     const opts = options || {};
     const parts = dateParts(opts.date || new Date());
@@ -642,26 +699,16 @@
     const gps = resolveGps(opts.gps);
 
     const timetable = opts.timetable || DEMO_TIMETABLE;
-    const campus = timetable.campus || {};
-    const campusText = Array.from(
-      new Set(
-        [
-          typeof campus === 'string' ? campus : campus.label,
-          campus.key,
-          ...((timetable.courses || []).map((course) => course.campus)),
-        ]
-          .filter(Boolean)
-          .map(String)
-      )
-    ).join(' ');
-    if (campusText.includes('五山') || campusText.includes('广州国际') || campusText.includes('国际校区')) {
+    const campusScope = resolveCampusScope(timetable);
+    warnings.push(...campusScope.warnings);
+    if (!campusScope.supported) {
       return {
         ok: false,
         error: 'CAMPUS_UNSUPPORTED',
-        message: `这份课表不是大学城校区（读到：${campusText || '未知校区'}）。当前路线数据只覆盖大学城校区，未生成路线，避免把别的校区教室硬套到大学城。`,
+        message: `本项目只服务华南理工大学大学城校区；这份课表显示为「${campusScope.label}」，未生成路线，避免把其他校区教室硬套到大学城。`,
         meta: { date: parts.iso, day_name: parts.day_name, campus: CAMPUS },
         blocks: [],
-        warnings: ['只支持大学城校区；五山与广州国际校区需要另一套 POI 与步行图'],
+        warnings: ['项目范围仅限大学城校区，不提供其他校区的路线数据'],
       };
     }
 
@@ -697,14 +744,18 @@
       blocks.push({
         id: 'gps-start',
         type: 'place',
-        title: '从当前位置出发',
-        subtitle: `距${POI_MAP.get(gps.nearest_poi).name}约 ${gps.nearest_distance} m`,
+        title: gps.label ? `从${gps.label}出发` : '从当前位置出发',
+        subtitle: gps.label
+          ? `${gps.label} · 接入${POI_MAP.get(gps.nearest_poi).name}步行网络（约 ${gps.nearest_distance} m）`
+          : `距${POI_MAP.get(gps.nearest_poi).name}约 ${gps.nearest_distance} m`,
         poiId: gps.nearest_poi,
         start: null,
         end: null,
         locked: false,
         source: '[定位]',
-        reason: '起点来自手机定位，只在本地计算，不上传',
+        reason: gps.simulated
+          ? '起点由你在楼栋列表中选择，只在本地计算'
+          : '起点来自设备定位，只在本地计算，不上传',
         gps: true,
       });
     }
@@ -734,13 +785,18 @@
       warnings.push('早餐时间被课程挤掉，今天没有排早餐；可以在课间买个面包');
     }
 
-    // 午餐
-    const lunchFrom = Math.max(11 * 60 + 30, (lastClassEndingBefore(classes, 12 * 60 + 20) || { end: 11 * 60 + 30 }).end + 12);
+    // 午餐：先给上一节课到饭堂留出真实通勤时间，避免饭后与步行块重叠。
+    const lunchAnchor = lastClassEndingBefore(classes, 13 * 60 + 20);
+    const lunchVenue = nearestPoi(['canteen1', 'canteen2'], lunchAnchor ? lunchAnchor.poiId : startPoiId);
+    const lunchTravel = lunchAnchor && lunchVenue
+      ? pathFor(lunchAnchor.poiId, lunchVenue.id, { ...travelOpts, at: lunchAnchor.end }).minutes + 3
+      : 12;
+    const lunchFrom = Math.max(11 * 60 + 30, (lunchAnchor ? lunchAnchor.end : 11 * 60 + 30) + lunchTravel);
     const lunchStart = findSlot(occupiedFrom(blocks), lunchFrom, 14 * 60 - 10, 40);
     let lunch = null;
     if (lunchStart !== null) {
       const morning = lastClassEndingBefore(classes, lunchStart) || { poiId: startPoiId };
-      const venue = nearestPoi(['canteen1', 'canteen2'], morning.poiId);
+      const venue = lunchVenue || nearestPoi(['canteen1', 'canteen2'], morning.poiId);
       lunch = {
         id: 'lunch',
         type: 'meal',
@@ -759,14 +815,20 @@
       warnings.push('午餐没有找到 40 分钟空档，可能被课程或实验挤占，请人工确认');
     }
 
-    // 晚餐
+    // 晚餐：从最后一节课结束并走到饭堂之后再开始。
     const eveningClass = firstClassStartingAfter(classes, 18 * 60);
     const dinnerTo = eveningClass ? Math.min(19 * 60 + 10, eveningClass.start - 20) : 19 * 60 + 10;
-    const dinnerStart = findSlot(occupiedFrom(blocks), 17 * 60 + 20, dinnerTo, 40);
+    const dinnerAnchor = lastClassEndingBefore(classes, dinnerTo);
+    const dinnerAnchorPoi = dinnerAnchor ? dinnerAnchor.poiId : startPoiId;
+    const dinnerVenue = nearestPoi(['canteen1', 'canteen2'], dinnerAnchorPoi);
+    const dinnerTravel = dinnerAnchor && dinnerVenue
+      ? pathFor(dinnerAnchorPoi, dinnerVenue.id, { ...travelOpts, at: dinnerAnchor.end }).minutes + 3
+      : 8;
+    const dinnerFrom = Math.max(17 * 60 + 20, (dinnerAnchor ? dinnerAnchor.end : 17 * 60 + 20) + dinnerTravel);
+    const dinnerStart = findSlot(occupiedFrom(blocks), dinnerFrom, dinnerTo, 40);
     let dinner = null;
     if (dinnerStart !== null) {
-      const anchorPoi = eveningClass ? eveningClass.poiId : 'library';
-      const venue = nearestPoi(['canteen1', 'canteen2'], anchorPoi);
+      const venue = dinnerVenue || nearestPoi(['canteen1', 'canteen2'], dinnerAnchorPoi);
       dinner = {
         id: 'dinner',
         type: 'meal',
@@ -776,7 +838,7 @@
         poiId: venue ? venue.id : 'canteen2',
         start: dinnerStart,
         end: dinnerStart + 40,
-        locked: true,
+        locked: false,
         source: '[偏好]',
         reason: eveningClass ? `晚课在 ${POI_MAP.get(eveningClass.poiId).short}，先吃饭再过去` : '按作息固定晚餐，给晚上留出完整空档',
       };
@@ -1151,26 +1213,31 @@
             tight = true;
             warnings.push(`${clock(block.start)} ${POI_MAP.get(block.poiId).short} 前的通勤时间不足，已压缩前一项并标记为紧凑`);
           }
-          withTravel.push({
-            id: `walk-${withTravel.length + 1}`,
-            type: 'walk',
-            title: mode === 'bike' ? '骑行' : '步行',
-            subtitle: `${POI_MAP.get(previous.poiId) ? POI_MAP.get(previous.poiId).short : '当前位置'} → ${POI_MAP.get(block.poiId).short}`,
-            poiId: null,
-            start: walkStart,
-            end: Math.min(walkEnd, block.start),
-            locked: false,
-            source: '[路线]',
-            reason: `约 ${leg.distance} m，${mode === 'bike' ? '骑行' : '步行'} ${leg.minutes} 分钟${travelFactorText(opts)}`,
-            leg: {
-              from: previous.poiId,
-              to: block.poiId,
-              distance: leg.distance,
-              minutes: leg.minutes,
-              points: leg.points,
-              tight,
-            },
-          });
+          walkEnd = Math.min(walkEnd, block.start);
+          if (walkEnd - walkStart >= 1) {
+            withTravel.push({
+              id: `walk-${withTravel.length + 1}`,
+              type: 'walk',
+              title: mode === 'bike' ? '骑行' : '步行',
+              subtitle: `${POI_MAP.get(previous.poiId) ? POI_MAP.get(previous.poiId).short : '当前位置'} → ${POI_MAP.get(block.poiId).short}`,
+              poiId: null,
+              start: walkStart,
+              end: walkEnd,
+              locked: false,
+              source: '[路线]',
+              reason: `约 ${leg.distance} m，${mode === 'bike' ? '骑行' : '步行'} ${leg.minutes} 分钟${travelFactorText(opts)}`,
+              leg: {
+                from: previous.poiId,
+                to: block.poiId,
+                distance: leg.distance,
+                minutes: leg.minutes,
+                points: leg.points,
+                tight,
+              },
+            });
+          } else {
+            warnings.push(`${clock(block.start)} ${POI_MAP.get(block.poiId).short} 前没有可用通勤时间，已省略无效步行块`);
+          }
         }
       }
       withTravel.push(block);

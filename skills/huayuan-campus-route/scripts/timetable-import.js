@@ -49,12 +49,49 @@
   }
 
   function resolveCampus(raw) {
+    const campus = raw && raw.campus;
+    const campusObject = campus && typeof campus === 'object' ? campus : {};
+    const campusString = typeof campus === 'string' ? campus : '';
+    const key = String(campusObject.key || '').trim();
+    const campusText = String(campusObject.campus_text || campusString || '').trim();
+    const label = String(campusObject.label || '').trim();
+    const courseCampuses = Array.from(
+      new Set(
+        ((raw && raw.courses) || [])
+          .map((course) => String((course && course.campus) || '').trim())
+          .filter(Boolean)
+      )
+    );
     const text = campusTextOf(raw);
-    if (/五山|广州国际|国际校区/.test(text)) {
-      return { key: 'unsupported', label: text.trim(), supported: false, text };
+    const isUniversityTown = (value) => /大学城|university[_ ]?town/i.test(String(value || ''));
+    const isOtherCampus = (value) => /五山|广州国际|国际校区/.test(String(value || ''));
+    const explicitUniversityTown =
+      isUniversityTown(key) || isUniversityTown(campusText) || courseCampuses.some(isUniversityTown);
+    const explicitOther = [key, campusText, ...courseCampuses].filter(Boolean).some(isOtherCampus);
+
+    if (explicitUniversityTown) {
+      return {
+        key: 'university_town',
+        label: '大学城校区',
+        supported: true,
+        text,
+        warning: explicitOther ? '课表同时带有其他校区信息；本项目只处理大学城课程' : null,
+      };
     }
-    if (/大学城|university[_ ]?town/i.test(text)) {
-      return { key: 'university_town', label: '大学城校区', supported: true, text };
+    if (explicitOther) {
+      return { key: 'unsupported', label: campusText || label || text.trim(), supported: false, text };
+    }
+    if (isUniversityTown(label)) {
+      return {
+        key: 'university_town',
+        label: '大学城校区',
+        supported: true,
+        text,
+        warning: '课表标题含大学城校区，但没有明确校区字段；请确认课程教室',
+      };
+    }
+    if (isOtherCampus(label)) {
+      return { key: 'unsupported', label: label || text.trim(), supported: false, text };
     }
     return { key: 'unknown', label: text.trim() || '未识别校区', supported: true, text };
   }
@@ -107,11 +144,12 @@
       return {
         ok: false,
         error: 'CAMPUS_UNSUPPORTED',
-        message: `这份课表是 ${campus.label}，当前路线只覆盖大学城校区，未导入。`,
+        message: `本项目只服务大学城校区；这份课表是 ${campus.label}，未导入。`,
         campus,
-        warnings: ['五山/广州国际校区需要另一套 POI 与步行图'],
+        warnings: ['项目范围仅限大学城校区，不提供其他校区的 POI 与步行图'],
       };
     }
+    if (campus.warning) warnings.push(campus.warning);
     if (campus.key === 'unknown') {
       warnings.push('课表没写校区；教室名按 A1–A5 匹配，请确认这份课表确实是大学城校区');
     }

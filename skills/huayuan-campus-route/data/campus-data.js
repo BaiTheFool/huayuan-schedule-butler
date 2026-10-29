@@ -352,6 +352,145 @@
     },
   ];
 
+  // 可搜索的校园地点目录。除路线核心 POI 外，补充 OSM 已标注的学院楼和公共设施；
+  // OSM 坐标为 WGS-84，选为起点后会由路线引擎换算为 GCJ-02。
+  const EXTRA_LOCATIONS = [
+    { id: 'a6', name: 'A6 教学楼', short: 'A6', aliases: ['公共教学楼A6'], group: '教学楼', lat: 23.05178, lng: 113.40558 },
+    { id: 'b1', name: 'B1 国际教育学院', short: 'B1', aliases: ['国际教育学院'], group: '学院楼', lat: 23.0478760, lng: 113.4043451 },
+    { id: 'b2', name: 'B2 行政楼', short: 'B2', aliases: ['行政楼', '办公楼'], group: '行政楼', lat: 23.0460156, lng: 113.4031569 },
+    { id: 'b3', name: 'B3 计算机学院', short: 'B3', aliases: ['计算机学院', '计算机科学与工程学院', '计算机学院后座'], group: '学院楼', lat: 23.0478540, lng: 113.4032530 },
+    { id: 'b4', name: 'B4 环境工程学院', short: 'B4', aliases: ['环境学院', '环境与能源学院'], group: '学院楼', lat: 23.0470254, lng: 113.4027287 },
+    { id: 'b5', name: 'B5 现代服务业研究院', short: 'B5', aliases: ['现代服务业研究院'], group: '学院楼', lat: 23.0482250, lng: 113.4025269 },
+    { id: 'b6', name: 'B6 生物工程学院', short: 'B6', aliases: ['生物学院', '生物科学与工程学院'], group: '学院楼', lat: 23.0473939, lng: 113.4019891 },
+    { id: 'b7', name: 'B7 软件学院', short: 'B7', aliases: ['软件学院', 'IBM技术研究华南节点'], group: '学院楼', lat: 23.0486003, lng: 113.4018758 },
+    { id: 'b8', name: 'B8 软件实践中心', short: 'B8', aliases: ['软件实践中心'], group: '实验楼', lat: 23.0477542, lng: 113.4013232 },
+    { id: 'b9', name: 'B9 政治与公共管理学院', short: 'B9', aliases: ['政治学院', '公共管理学院'], group: '学院楼', lat: 23.0503551, lng: 113.4018442 },
+    { id: 'b10', name: 'B10 经济与贸易学院', short: 'B10', aliases: ['经贸学院', '经济与金融学院'], group: '学院楼', lat: 23.0514001, lng: 113.4019585 },
+    { id: 'b11', name: 'B11 设计与艺术学院', short: 'B11', aliases: ['设计学院', '艺术学院'], group: '学院楼', lat: 23.0525298, lng: 113.4023521 },
+    { id: 'b12', name: 'B12 国家重点实验室', short: 'B12', aliases: ['国家重点实验室', '实验室'], group: '实验楼', lat: 23.0445607, lng: 113.4016908 },
+    { id: 't1', name: 'T1 礼堂', short: 'T1', aliases: ['礼堂', '学术大讲堂'], group: '公共设施', lat: 23.0494009, lng: 113.4014257 },
+    { id: 'computer-center', name: '计算中心', short: '计算中心', aliases: ['机房', '计算中心楼'], group: '实验楼', lat: 23.0492722, lng: 113.4022813 },
+    { id: 'physics-center', name: '大学物理实验中心', short: '物理实验中心', aliases: ['物理实验', '实验中心'], group: '实验楼', lat: 23.0488810, lng: 113.4028972 },
+    { id: 'swimming', name: '游泳馆', short: '游泳馆', aliases: ['游泳池'], group: '运动场馆', lat: 23.0520883, lng: 113.3993430 },
+    { id: 'music-hall', name: '音乐厅', short: '音乐厅', aliases: ['学术报告厅'], group: '公共设施', lat: 23.0487072, lng: 113.3995187 },
+    ...['C2', 'C3', 'C4', 'C5', 'C6', 'C7', 'C8', 'C9', 'C10', 'C12', 'C13', 'C14', 'C15', 'C16', 'C17'].map((code) => ({
+      id: code.toLowerCase(),
+      name: `${code} 宿舍`,
+      short: code,
+      aliases: [`${code}栋`, `${code}宿舍楼`, '生活区'],
+      group: '宿舍',
+      lat: {
+        C1: 23.04683, C2: 23.04690, C3: 23.04728, C4: 23.04782, C5: 23.04780,
+        C6: 23.04870, C7: 23.04872, C8: 23.04945, C9: 23.04995, C10: 23.05084,
+        C11: 23.05093, C12: 23.05170, C13: 23.05218, C14: 23.05236, C15: 23.05246,
+        C16: 23.05200, C17: 23.05157,
+      }[code],
+      lng: {
+        C1: 113.40196, C2: 113.40045, C3: 113.40102, C4: 113.40000, C5: 113.40072,
+        C6: 113.40068, C7: 113.39985, C8: 113.40015, C9: 113.40018, C10: 113.40130,
+        C11: 113.40064, C12: 113.39938, C13: 113.39992, C14: 113.40055, C15: 113.40113,
+        C16: 113.40125, C17: 113.40082,
+      }[code],
+      coord: 'gcj02',
+      source: '校园地图资料汇编与官方导览图（区域位置）',
+      coord_confidence: 'low',
+    })),
+    ...['D1', 'D2', 'D3', 'D4', 'D5'].map((code, index) => ({
+      id: code.toLowerCase(),
+      name: `${code} 宿舍`,
+      short: code,
+      aliases: [`${code}栋`, `${code}宿舍楼`, '生活区'],
+      group: '宿舍',
+      lat: 23.04638 + index * 0.00055,
+      lng: 113.40218 + index * 0.00010,
+      coord: 'gcj02',
+      source: '校园地图资料汇编与官方导览图（区域位置）',
+      coord_confidence: 'low',
+    })),
+    ...['G2', 'G3', 'G4', 'G5', 'G6', 'G7', 'G8', 'G9', 'G10', 'G11', 'G12', 'G13', 'G14', 'G15', 'G16', 'G17'].map((code, index) => ({
+      id: code.toLowerCase(),
+      name: `${code} 宿舍`,
+      short: code,
+      aliases: [`${code}栋`, `${code}宿舍楼`, 'G区宿舍', '生活区'],
+      group: '宿舍',
+      lat: 23.05185 + Math.floor(index / 4) * 0.00022,
+      lng: 113.40140 + (index % 4) * 0.00016,
+      coord: 'gcj02',
+      source: '校园地图资料汇编（生活区 G 区，具体门牌待现场确认）',
+      coord_confidence: 'low',
+    })),
+    ...['E1', 'E2', 'E3'].map((code, index) => ({
+      id: code.toLowerCase(),
+      name: `${code} 学生宿舍`,
+      short: code,
+      aliases: [`${code}栋`, '2025年新宿舍', '生活区'],
+      group: '宿舍',
+      lat: 23.05210 + index * 0.00012,
+      lng: 113.40170 + index * 0.00014,
+      coord: 'gcj02',
+      source: '校园地图资料汇编（2025年10月投入使用，具体位置待现场确认）',
+      coord_confidence: 'low',
+    })),
+    { id: 'numeric-dorms', name: '数字编号宿舍（1–200栋）', short: '数字宿舍', aliases: ['1栋', '100栋', '200栋', '生活区数字楼'], group: '宿舍', lat: 23.0491, lng: 113.4008, coord: 'gcj02', source: '校园地图资料汇编（生活区）', coord_confidence: 'low' },
+    { id: 'academic-hall', name: '学术大讲堂', short: '学术大讲堂', aliases: ['大讲堂'], group: '公共设施', lat: 23.04725, lng: 113.40470, coord: 'gcj02', source: '官方校园导览图', coord_confidence: 'medium' },
+    { id: 'international-center', name: '国际学术中心', short: '国际学术中心', aliases: ['国际中心'], group: '公共设施', lat: 23.05225, lng: 113.40350, coord: 'gcj02', source: '官方校园导览图', coord_confidence: 'low' },
+    { id: 'wensu-pavilion', name: '文溯阁', short: '文溯阁', aliases: ['自习空间', '学生活动空间'], group: '公共设施', lat: 23.04715, lng: 113.40495, coord: 'gcj02', source: '校园地图资料汇编', coord_confidence: 'low' },
+    { id: 'wenyuan-pavilion', name: '文渊阁', short: '文渊阁', aliases: ['自习空间', '学生活动空间'], group: '公共设施', lat: 23.04705, lng: 113.40515, coord: 'gcj02', source: '校园地图资料汇编', coord_confidence: 'low' },
+    { id: 'moon-lake', name: '月湖', short: '月湖', aliases: ['湖心岛', '景观水系'], group: '公共设施', lat: 23.0490, lng: 113.4070, coord: 'gcj02', source: '校园地图资料汇编', coord_confidence: 'low' },
+    { id: 'qin-lake', name: '沁湖 / 琴湖', short: '琴湖', aliases: ['沁湖', '韵湖', '湖心岛'], group: '公共设施', lat: 23.0464, lng: 113.4064, coord: 'gcj02', source: '校园地图资料汇编', coord_confidence: 'low' },
+    { id: 'south-field', name: '南操场', short: '南操场', aliases: ['运动场', '南区田径场'], group: '运动场馆', lat: 23.04485, lng: 113.4037, coord: 'gcj02', source: '校园地图资料汇编', coord_confidence: 'low' },
+  ];
+
+  const EXTRA_LOCATION_ALIAS_OVERRIDES = {
+    b1: ['环境科学与工程学院', '国际教育学院', '创新创业与合作中心'],
+    b2: ['机械与汽车工程学院', '金融工程研究中心', '船舶研究', '行政楼'],
+    b3: ['计算机科学与工程学院', '计算机学院', '生物科学与工程学院', '计算机学院后座'],
+    b4: ['设计学院', '化学与化工学院实验中心', '计量中心', '环境工程学院'],
+    b5: ['软件学院', '轻工与食品学院实验中心', '现代服务业研究院'],
+    b6: ['经济与贸易学院', '经济与金融学院', '生物工程学院'],
+    b7: ['外国语学院', '新闻与传播学院', '软件学院'],
+    b8: ['土木与交通学院', '软件实践中心'],
+    b9: ['电子信息学院', '政治与公共管理学院'],
+    b10: ['自动化科学与工程学院', '国家人体组织功能重建工程技术研究中心', '高分子材料工程学院实验室', '经济与金融学院'],
+    b11: ['艺术学院', '设计学院', '设计与艺术学院'],
+    b12: ['国家重点实验室', '国家人体组织功能重建工程技术研究中心', '分析测试中心'],
+  };
+
+  const EXTRA_LOCATION_RECORDS = EXTRA_LOCATIONS.map((item) => ({
+    ...item,
+    aliases: Array.from(new Set([...(item.aliases || []), ...(EXTRA_LOCATION_ALIAS_OVERRIDES[item.id] || [])])),
+    coord: item.coord || 'wgs84',
+    source: item.source || 'OpenStreetMap',
+    coord_confidence: item.coord_confidence || 'medium',
+  }));
+
+  const LOCATION_ALIAS_OVERRIDES = {
+    library: ['T3', 'T3图书馆', '华工图书馆'],
+    c1: ['C1栋', 'C1宿舍楼', '西区宿舍'],
+    c11: ['C11栋', 'C11宿舍楼', '南校区学生公寓'],
+    a1: ['A1栋', '公共教学楼A1', '国际教育学院', '创新创业与合作中心'],
+    a2: ['A2栋', '公共教学楼A2', '行政楼'],
+    a3: ['A3栋', '公共教学楼A3', '计算机科学与工程学院', '计算机学院'],
+    a4: ['A4栋', '公共教学楼A4'],
+    a5: ['A5栋', '公共教学楼A5'],
+  };
+
+  const LOCATIONS = [
+    ...POIS.map((poi) => ({
+      id: poi.id,
+      name: poi.name,
+      short: poi.short,
+      aliases: [...(poi.tags || []), poi.category, ...(LOCATION_ALIAS_OVERRIDES[poi.id] || [])],
+      group: poi.category,
+      lat: poi.lat,
+      lng: poi.lng,
+      coord: 'gcj02',
+      source: poi.coord_source || '校园路线 POI',
+      coord_confidence: poi.coord_confidence || 'medium',
+    })),
+    ...EXTRA_LOCATION_RECORDS,
+  ].sort((a, b) => a.name.localeCompare(b.name, 'zh-CN'));
+
   /** 步行网络：POI 与路口节点。边为双向，长度按球面距离 × 绕行系数。 */
   const WALK_NODES = [
     // 路口 / 广场
@@ -536,6 +675,7 @@
   return {
     CAMPUS,
     POIS,
+    LOCATIONS,
     WALK_NODES,
     WALK_EDGES,
     PRESETS,

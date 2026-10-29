@@ -12,6 +12,9 @@ const token = 'self-check-token';
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'huayuan-live-dashboard-'));
 const nowPath = path.join(dir, 'now.json');
 const activityPath = path.join(dir, 'activity-feed.json');
+const timetableDir = path.join(dir, 'history', '2026-10-30');
+const timetablePath = path.join(timetableDir, 'jw-timetable.json');
+const preferencesPath = path.join(dir, 'preferences.json');
 
 fs.writeFileSync(
   nowPath,
@@ -57,6 +60,41 @@ fs.writeFileSync(
   }),
   'utf8'
 );
+fs.mkdirSync(timetableDir, { recursive: true });
+fs.writeFileSync(
+  timetablePath,
+  JSON.stringify({
+    status: 'READ_OK',
+    campus: {
+      key: 'university_town',
+      label: '大学城校区 / 广州国际校区',
+      campus_text: '大学城校区',
+    },
+    courses: [
+      {
+        course: '高级语言程序设计(C++)(上)',
+        weekday: 5,
+        start_time: '08:50',
+        end_time: '10:25',
+        weeks: { raw: '1-16周', list: [10], ranges: [[1, 16]] },
+        classroom: 'A3-101',
+        campus: '大学城校区',
+      },
+    ],
+  }),
+  'utf8'
+);
+fs.writeFileSync(
+  preferencesPath,
+  JSON.stringify({
+    major: '软件工程',
+    daily: { wake: '07:30', sleep: '23:30', day_start: '08:00', day_end: '22:30' },
+    study: { daily_limit: 180, max_continuous: 90, buffer_minutes: 10 },
+    meals: [],
+    fixed_events: [],
+  }),
+  'utf8'
+);
 
 const child = spawn(
   process.execPath,
@@ -80,42 +118,82 @@ async function wait() {
 (async () => {
   try {
     await wait();
+    let passed = 0;
+    const check = (condition, message) => {
+      assert.ok(condition, message);
+      passed += 1;
+    };
     const home = await fetch(`http://127.0.0.1:${port}/`);
     const html = await home.text();
-    assert.equal(home.status, 200);
-    assert.match(html, /下一步可以这样问/);
-    assert.match(html, /全部待办/);
+    check(home.status === 200, '首页返回 200');
+    check(/CAMPUS DAY ROUTE/.test(html), '首页采用路线 UI');
+    check(/id="map"/.test(html), '首页包含校园地图');
+    check(/id="wStudy"/.test(html) && /id="wPlay"/.test(html) && /id="wSport"/.test(html), '首页包含三类权重条');
+    check(/今日安排/.test(html) && /全部待办/.test(html) && /可参与事项/.test(html), '三个标签全部存在');
+    check(/dashboardBriefAction/.test(html), '保留第一动作摘要');
+    check(/导入教务课表/.test(html) && /本地文件/.test(html), '课表入口区分教务读取和本地文件');
+    check(/id="locationSearch"/.test(html) && /id="locationResults"/.test(html), '首页包含可搜索楼栋选择器');
+    check(/设备定位/.test(html) && !/手机定位/.test(html), '定位文案使用设备而非手机');
+    const shellCss = await (await fetch(`http://127.0.0.1:${port}/dashboard-shell.css`)).text();
+    const sharedCss = await (await fetch(`http://127.0.0.1:${port}/styles.css`)).text();
+    check(/\.huayuan-page-nav\s*\{[^}]*position:\s*sticky/s.test(shellCss), '今日页三标签吸顶');
+    check(/\.page-nav\s*\{[^}]*position:\s*sticky/s.test(sharedCss), '待办与活动页三标签吸顶');
+    for (const pathName of ['/route-assets/styles.css', '/route-assets/app.js', '/route-data/campus-data.js', '/route-scripts/route-engine.js', '/dashboard-shell.css', '/dashboard-bridge.js']) {
+      const asset = await fetch(`http://127.0.0.1:${port}${pathName}`);
+      check(asset.status === 200, `${pathName} 可访问`);
+    }
+    const routeApp = await (await fetch(`http://127.0.0.1:${port}/route-assets/app.js`)).text();
+    check(/api\/timetable\/refresh/.test(routeApp) && /重新导入课表/.test(routeApp), '课表按钮调用教务读取并切换文案');
+    check(/function filterLocations/.test(routeApp) && /\.includes\(target\)/.test(routeApp), '楼栋搜索按字段包含关系过滤');
+    check(/pointerdown/.test(routeApp) && /picker\.contains/.test(routeApp), '下拉栏只在选择器外点击时关闭');
+    check(/scheduleLocationPosition/.test(routeApp) && /addEventListener\('scroll', scheduleLocationPosition/.test(routeApp), '页面滚动时下拉栏跟随输入框定位');
+    const todoScript = await (await fetch(`http://127.0.0.1:${port}/todo.js`)).text();
+    const activityScript = await (await fetch(`http://127.0.0.1:${port}/activities.js`)).text();
+    check(/execCommand\('copy'\)/.test(todoScript), '待办复制有本地降级');
+    check(/execCommand\('copy'\)/.test(activityScript), '活动复制有本地降级');
     const todoPage = await fetch(`http://127.0.0.1:${port}/todo.html`);
     const todoHtml = await todoPage.text();
-    assert.equal(todoPage.status, 200);
-    assert.match(todoHtml, /所有要做的事/);
-    assert.match(todoHtml, /复制刷新指令/);
+    check(todoPage.status === 200, '待办页返回 200');
+    check(/所有要做的事/.test(todoHtml), '待办页保留');
+    check(/复制刷新指令/.test(todoHtml), '待办页保留刷新指令');
     const activitiesPage = await fetch(`http://127.0.0.1:${port}/activities.html`);
     const activitiesHtml = await activitiesPage.text();
-    assert.equal(activitiesPage.status, 200);
-    assert.match(activitiesHtml, /现在能参加什么/);
-    assert.match(activitiesHtml, /复制刷新指令/);
+    check(activitiesPage.status === 200, '活动页返回 200');
+    check(/现在能参加什么/.test(activitiesHtml), '活动页保留');
+    check(/复制刷新指令/.test(activitiesHtml), '活动页保留刷新指令');
     const response = await fetch(`http://127.0.0.1:${port}/api/dashboard`);
     const data = await response.json();
-    assert.equal(data.ok, true);
-    assert.equal(data.service, 'huayuan-live-dashboard');
-    assert.equal(data.api_version, 3);
-    assert.match(data.now.first_action.headline, /先去上课/);
-    assert.ok(data.prompts.length >= 2 && data.prompts.length <= 3);
-    assert.match(data.prompts.join(' '), /待确认|小步骤|30 分钟/);
-    assert.equal(data.todo.total, 1);
-    assert.equal(data.todo.groups[0].items[0].title, '第 6 章作业');
-    assert.equal(typeof data.sync.age_days, 'number');
-    assert.match(data.sync.prompt, /刷新我的校园待办/);
-    assert.equal(data.activities.items[0].title, '第一届校园AI智能体创新应用大赛');
-    assert.match(data.activities.prompt, /刷新校园活动/);
+    check(data.ok === true, '驾驶舱 API 正常');
+    check(data.service === 'huayuan-live-dashboard', '服务名正确');
+    check(data.api_version === 4, 'API 版本为 4');
+    check(/先去上课/.test(data.now.first_action.headline), '第一动作保留');
+    check(data.prompts.length >= 2 && data.prompts.length <= 3, '提示语数量正确');
+    check(/待确认|小步骤|30 分钟/.test(data.prompts.join(' ')), '提示语内容保留');
+    check(data.todo.total === 1, '待办总数正确');
+    check(data.todo.groups[0].items[0].title === '第 6 章作业', 'P0 待办保留');
+    check(typeof data.sync.age_days === 'number', '同步状态保留');
+    check(/刷新我的校园待办/.test(data.sync.prompt), '刷新指令保留');
+    check(data.activities.items[0].title === '第一届校园AI智能体创新应用大赛', '活动数据保留');
+    check(/刷新校园活动/.test(data.activities.prompt), '活动刷新指令保留');
     const activitiesApi = await fetch(`http://127.0.0.1:${port}/api/activities`);
     const activitiesData = await activitiesApi.json();
-    assert.equal(activitiesData.activities.items.length, 1);
+    check(activitiesData.activities.items.length === 1, '活动 API 保留');
+    const routeContext = await fetch(`http://127.0.0.1:${port}/api/route-context`);
+    const routeData = await routeContext.json();
+    check(routeData.ok === true, '路线上下文 API 正常');
+    check(routeData.timetable_available === true, '真实课表自动接入首页');
+    check(routeData.timetable_course_count === 1, '真实课表从历史子目录自动发现');
+    check(routeData.tasks.length === 1, '主任务池自动接入路线');
+    check(routeData.major === '软件工程', '专业偏好自动接入路线');
+    const timetableStatus = await fetch(`http://127.0.0.1:${port}/api/timetable/status`);
+    const statusData = await timetableStatus.json();
+    check(timetableStatus.status === 200 && statusData.status === 'IDLE', '教务刷新状态接口正常');
+    const deniedTimetable = await fetch(`http://127.0.0.1:${port}/api/timetable/refresh`, { method: 'POST' });
+    check(deniedTimetable.status === 403, '教务刷新接口需要同源动作头');
 
     const denied = await fetch(`http://127.0.0.1:${port}/api/shutdown`, { method: 'POST' });
-    assert.equal(denied.status, 403);
-    console.log('LIVE_DASHBOARD_SMOKE:PASS 20/20');
+    check(denied.status === 403, '关闭接口需要令牌');
+    console.log(`LIVE_DASHBOARD_SMOKE:PASS ${passed}/${passed}`);
   } finally {
     child.kill();
   }

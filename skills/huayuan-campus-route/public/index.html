@@ -30,7 +30,7 @@
       <div class="top-actions">
         <div class="date-chip">
           <span class="dot"></span>
-          <input id="dateInput" type="date" value="2026-10-29" aria-label="选择日期" />
+          <input id="dateInput" type="date" value="" aria-label="选择日期" />
           <span id="topDate">周四</span>
         </div>
         <button class="btn ghost" id="exportBtn" type="button">导出 Markdown</button>
@@ -38,8 +38,11 @@
       </div>
     </header>
 
+    <!-- HUAYUAN_PAGE_NAV -->
+
     <main class="layout">
       <aside class="panel" aria-label="控制与时间轴">
+        <!-- HUAYUAN_DASHBOARD_BRIEF -->
         <section class="control-card">
           <div class="eyebrow">CAMPUS DAY ROUTE</div>
           <h1>今天怎么走？</h1>
@@ -54,10 +57,30 @@
             <div class="profile-line">
               <span class="profile-label">课表</span>
               <button type="button" class="mini-btn" id="importTimetableBtn">导入教务课表</button>
+              <button type="button" class="link-btn" id="pickTimetableFileBtn">本地文件</button>
               <button type="button" class="link-btn" id="demoTimetableBtn">用示例</button>
               <input id="timetableFile" type="file" accept=".json,application/json" hidden />
             </div>
             <div class="profile-status" id="timetableStatus">当前：示例课表（虚构）</div>
+          </div>
+
+          <div class="location-picker">
+            <span class="location-label">我现在在</span>
+            <div class="location-command">
+              <input
+                id="locationSearch"
+                type="text"
+                role="combobox"
+                aria-autocomplete="list"
+                aria-expanded="false"
+                aria-controls="locationResults"
+                autocomplete="off"
+                placeholder="搜索楼栋，如 C11、B3、图书馆"
+              />
+              <button type="button" class="mini-btn" id="useLocationBtn">设为起点</button>
+            </div>
+            <div class="location-results" id="locationResults" role="listbox" hidden></div>
+            <div class="location-selected" id="locationSelected">未选择楼栋 · 可搜索 82 个校园地点；也可使用设备定位</div>
           </div>
 
           <div class="field">
@@ -108,7 +131,7 @@
 
           <div class="actions">
             <button type="button" class="btn primary" id="generateBtn">生成今日路线</button>
-            <button type="button" class="btn location" id="gpsBtn">📍 定位我</button>
+            <button type="button" class="btn location" id="gpsBtn">📍 设备定位</button>
           </div>
           <div class="sub-actions">
             <button type="button" class="link-btn" id="simGpsBtn">模拟在图书馆</button>

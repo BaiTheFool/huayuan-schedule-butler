@@ -11,7 +11,7 @@
     return;
   }
 
-  const { CAMPUS, POIS, WALK_NODES, WALK_EDGES, PRESETS } = DATA;
+  const { CAMPUS, POIS, LOCATIONS = POIS, WALK_NODES, WALK_EDGES, PRESETS } = DATA;
   const POI = new Map(POIS.map((p) => [p.id, p]));
   const NODE = new Map([...POIS, ...WALK_NODES].map((n) => [n.id, n]));
 
@@ -41,6 +41,22 @@
     gate: '校门',
   };
 
+  const LOCATION_GROUP_LABEL = {
+    study: '学习空间',
+    meal: '食堂',
+    sport: '运动场馆',
+    play: '休闲地点',
+    class: '教学楼',
+    dorm: '宿舍',
+    service: '校园服务',
+    gate: '校门',
+    学院楼: '学院楼',
+    行政楼: '行政楼',
+    实验楼: '实验楼',
+    公共设施: '公共设施',
+    运动场馆: '运动场馆',
+  };
+
   const BUILDINGS = [
     { id: 'a1', w: 38, h: 48 },
     { id: 'a2', w: 38, h: 48 },
@@ -55,17 +71,31 @@
     { id: 'gym', w: 56, h: 40 },
   ];
 
+  function todayIso() {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  }
+
+  function emptyTimetable() {
+    return {
+      campus: { key: 'university_town', label: '大学城校区', campus_text: '大学城校区' },
+      courses: [],
+    };
+  }
+
   const state = {
-    date: '2026-10-29',
+    date: todayIso(),
     preset: 'balanced',
     weights: { study: 46, play: 22, sport: 32 },
     weather: { condition: 'cloudy', temperature: 26, source: 'manual' },
     major: '',
-    timetable: null,
+    timetable: emptyTimetable(),
     timetableInfo: null,
-    timetableSource: 'demo',
+    timetableSource: 'missing',
+    preferences: null,
     exams: null,
     examPlan: null,
+    externalTasks: [],
     manualTasks: [],
     doneTaskIds: [],
     tasks: [],
@@ -74,6 +104,9 @@
     avoidCrowd: false,
     mode: 'walk',
     gps: null,
+    selectedLocation: null,
+    activeLocationIndex: -1,
+    visibleLocations: [],
     plan: null,
     selected: null,
   };
@@ -293,6 +326,31 @@
     };
   }
 
+  function normalizeExternalTasks(list) {
+    return (Array.isArray(list) ? list : [])
+      .map((task, index) => {
+        if (!task || !String(task.title || '').trim()) return null;
+        const sourceList = Array.isArray(task.sources) ? task.sources.filter(Boolean) : [];
+        const source = task.source || sourceList[0] || '平台';
+        const due = task.due || task.deadline || task.due_date || null;
+        const title = String(task.title).trim().slice(0, 100);
+        return {
+          id: String(task.id || `dashboard-${source}-${title}-${due || index}`).slice(0, 160),
+          title,
+          course: task.course ? String(task.course).slice(0, 80) : null,
+          due,
+          due_date: task.due_date || (due ? String(due).slice(0, 10) : null),
+          priority: /^P[0-3]$/.test(String(task.priority || '').toUpperCase()) ? String(task.priority).toUpperCase() : 'P2',
+          estimated_minutes: Math.max(10, Math.min(480, Number(task.estimated_minutes) || 60)),
+          source: `dashboard:${source}`,
+          source_label: source,
+          done: Boolean(task.done),
+          external: true,
+        };
+      })
+      .filter(Boolean);
+  }
+
   function refreshTasks() {
     if (!TASK) {
       state.tasks = [];
@@ -307,7 +365,8 @@
       : { tasks: [], exams: [], warnings: [] };
     const manual = TASK.normalizeManualTasks(state.manualTasks);
     const done = new Set(state.doneTaskIds);
-    state.tasks = TASK.mergeTasks(plan.tasks, manual).map((task) => ({
+    const external = normalizeExternalTasks(state.externalTasks);
+    state.tasks = TASK.mergeTasks(plan.tasks, [...external, ...manual]).map((task) => ({
       ...task,
       done: Boolean(task.done) || done.has(task.id),
     }));
@@ -336,6 +395,7 @@
       avoidCrowd: state.avoidCrowd,
       gps: state.gps,
       timetable: state.timetable || undefined,
+      preferences: state.preferences || undefined,
       weekNumber: state.timetableInfo ? state.timetableInfo.week_number : null,
       major: state.major || undefined,
       tasks: tasksForRoute(),
@@ -344,6 +404,13 @@
     if (!plan.ok) {
       state.plan = null;
       toast(plan.message || '没有生成路线');
+      return;
+    }
+    if (!plan.validation.ok) {
+      state.plan = null;
+      renderWarnings(plan);
+      $('mapSummary').textContent = '路线校验未通过，已停止展示无效安排';
+      toast(`路线校验失败：${plan.validation.issues.join('；')}`);
       return;
     }
 
@@ -360,9 +427,11 @@
     $('dayMeta').textContent = `${plan.meta.major ? `${plan.meta.major} · ` : ''}${plan.meta.preset_name} · ${countClasses(plan)} 节课 · ${uniqueStops} 个地点 · ${plan.summary.tasks_scheduled || 0} 项任务`;
     $('mapSummary').innerHTML = `<b>${uniqueStops} 个地点</b> · ${plan.stops.length} 段停留 · 步行 ${(plan.summary.walk_meters / 1000).toFixed(1)} km / ${plan.summary.walk_minutes} 分钟 · 自习 ${fmtShort(plan.summary.study_minutes)} · 运动 ${plan.summary.sport_minutes} 分钟${plan.summary.task_minutes ? ` · 任务 ${plan.summary.task_minutes} 分钟` : ''}`;
     $('gpsState').textContent = state.gps
-      ? state.gps.simulated
-        ? '起点：模拟定位'
-        : `已使用手机定位（本地${state.gps.accuracy ? `，约 ±${state.gps.accuracy} m` : ''}）`
+      ? state.gps.label
+        ? `起点：${state.gps.label}`
+        : state.gps.simulated
+          ? '起点：模拟定位'
+        : `已使用设备定位（本地${state.gps.accuracy ? `，约 ±${state.gps.accuracy} m` : ''}）`
       : '未使用定位';
 
     if (state.selected && !POI.has(state.selected)) state.selected = null;
@@ -566,9 +635,14 @@
     $('poiTags').innerHTML = (poi.tags || []).map((tag) => `<span>${esc(tag)}</span>`).join('');
     $('poiNav').href = `https://uri.amap.com/marker?position=${poi.lng},${poi.lat}&name=${encodeURIComponent(poi.name)}&coordinate=gaode&callnative=1`;
     $('poiStart').onclick = () => {
-      state.gps = { lat: poi.lat, lng: poi.lng, coord: 'gcj02', accuracy: 0, simulated: true };
-      $('clearGpsBtn').hidden = false;
-      replan(true);
+      const location = LOCATIONS.find((item) => item.id === poi.id);
+      if (location) {
+        applySelectedLocation(location);
+      } else {
+        state.gps = { lat: poi.lat, lng: poi.lng, coord: 'gcj02', accuracy: 0, simulated: true, label: poi.name };
+        $('clearGpsBtn').hidden = false;
+        replan(true);
+      }
     };
   }
 
@@ -616,26 +690,151 @@
     toast.timer = setTimeout(() => el.classList.remove('show'), 3600);
   }
 
+  function normalizeLocationSearch(value) {
+    return String(value || '').toLowerCase().replace(/[\s_\-—·（）()]/g, '');
+  }
+
+  function locationSearchText(location) {
+    return [
+      location.name,
+      location.short,
+      location.group,
+      LOCATION_GROUP_LABEL[location.group] || '',
+      ...(location.aliases || []),
+    ]
+      .filter(Boolean)
+      .join(' ');
+  }
+
+  function filterLocations(query) {
+    const target = normalizeLocationSearch(query);
+    if (!target) return LOCATIONS;
+    return LOCATIONS.filter((location) => normalizeLocationSearch(locationSearchText(location)).includes(target));
+  }
+
+  function positionLocationResults() {
+    const input = $('locationSearch');
+    const box = $('locationResults');
+    if (!input || !box || box.hidden) return;
+    const rect = input.getBoundingClientRect();
+    if (rect.bottom < 0 || rect.top > window.innerHeight) {
+      hideLocationResults();
+      return;
+    }
+    const dropdownHeight = Math.min(230, window.innerHeight - 20);
+    const showAbove = window.innerHeight - rect.bottom < 180 && rect.top > 180;
+    box.style.left = `${Math.max(8, rect.left)}px`;
+    box.style.width = `${Math.max(220, rect.width)}px`;
+    box.style.maxHeight = `${dropdownHeight}px`;
+    box.style.top = showAbove ? `${Math.max(8, rect.top - dropdownHeight - 5)}px` : `${rect.bottom + 5}px`;
+  }
+
+  let locationPositionFrame = null;
+  function scheduleLocationPosition() {
+    if (locationPositionFrame !== null) cancelAnimationFrame(locationPositionFrame);
+    locationPositionFrame = requestAnimationFrame(() => {
+      locationPositionFrame = null;
+      positionLocationResults();
+    });
+  }
+
+  function renderLocationResults() {
+    const input = $('locationSearch');
+    const box = $('locationResults');
+    state.visibleLocations = filterLocations(input.value);
+    state.activeLocationIndex = Math.min(
+      Math.max(state.activeLocationIndex, 0),
+      Math.max(0, state.visibleLocations.length - 1)
+    );
+    box.hidden = false;
+    positionLocationResults();
+    input.setAttribute('aria-expanded', 'true');
+    box.innerHTML = state.visibleLocations.length
+      ? state.visibleLocations
+          .map((location, index) => {
+            const group = LOCATION_GROUP_LABEL[location.group] || location.group || '校园地点';
+            const confidence = location.coord_confidence === 'high' ? '精确定位' : '位置约值';
+            return `<button type="button" role="option" class="location-option ${index === state.activeLocationIndex ? 'active' : ''}" data-location-id="${esc(location.id)}" aria-selected="${index === state.activeLocationIndex}">
+              <span><b>${esc(location.name)}</b><small>${esc(group)}${location.aliases && location.aliases.length ? ` · ${esc(location.aliases.slice(0, 2).join(' / '))}` : ''}</small></span>
+              <em>${esc(confidence)}</em>
+            </button>`;
+          })
+          .join('')
+      : '<div class="task-empty">没有匹配的楼栋，试试楼栋编号或“软件学院”</div>';
+    box.querySelectorAll('[data-location-id]').forEach((button) => {
+      button.addEventListener('click', (event) => {
+        event.preventDefault();
+        const location = LOCATIONS.find((item) => item.id === button.dataset.locationId);
+        if (location) applySelectedLocation(location);
+      });
+    });
+  }
+
+  function hideLocationResults() {
+    $('locationResults').hidden = true;
+    $('locationSearch').setAttribute('aria-expanded', 'false');
+  }
+
+  function applySelectedLocation(location) {
+    state.selectedLocation = location;
+    state.gps = {
+      lat: location.lat,
+      lng: location.lng,
+      coord: location.coord || 'gcj02',
+      accuracy: 0,
+      simulated: true,
+      label: location.name,
+      location_id: location.id,
+    };
+    $('locationSearch').value = location.name;
+    $('locationSelected').className = 'location-selected ok';
+    $('locationSelected').textContent = `起点：${location.name} · 已按校园步行网络计算`;
+    $('clearGpsBtn').hidden = false;
+    hideLocationResults();
+    replan(true);
+  }
+
+  function useLocationFromSearch() {
+    const input = $('locationSearch');
+    const exact = LOCATIONS.find(
+      (location) =>
+        normalizeLocationSearch(location.name) === normalizeLocationSearch(input.value) ||
+        normalizeLocationSearch(location.short) === normalizeLocationSearch(input.value)
+    );
+    const active = state.visibleLocations[state.activeLocationIndex];
+    const location = exact || active || filterLocations(input.value)[0];
+    if (!location) {
+      toast('没有找到这个楼栋，请换一个编号或学院名称');
+      return;
+    }
+    applySelectedLocation(location);
+  }
+
   function requestGps() {
     if (!navigator.geolocation) {
       toast('这个浏览器不支持定位。可以用「模拟在图书馆」体验路线。');
       return;
     }
-    toast('正在读取定位…如果浏览器询问，请允许一次');
+    toast('正在读取设备定位…如果浏览器询问，请允许一次');
     navigator.geolocation.getCurrentPosition(
       (pos) => {
+        state.selectedLocation = null;
+        $('locationSelected').className = 'location-selected';
+        $('locationSelected').textContent = '起点：设备实时定位';
+        $('locationSearch').value = '';
         state.gps = {
           lat: pos.coords.latitude,
           lng: pos.coords.longitude,
           accuracy: Math.round(pos.coords.accuracy || 0),
           coord: 'wgs84',
+          label: '设备定位',
         };
         $('clearGpsBtn').hidden = false;
         replan(true);
       },
       (error) => {
         const text = error.code === 1 ? '你拒绝了定位授权' : error.code === 3 ? '定位超时' : '定位失败';
-        toast(`${text}。可以点「模拟在图书馆」看效果，定位不会上传。`);
+        toast(`${text}。可以直接在「我现在在」里选择楼栋，定位不会上传。`);
       },
       { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 }
     );
@@ -715,6 +914,10 @@
     const input = $('majorInput');
     if (input && document.activeElement !== input) input.value = state.major || '';
     $('brandSub').textContent = state.major ? `${state.major} · 大学城校区` : '大学城校区 · 校园路线';
+    const importButton = $('importTimetableBtn');
+    if (importButton && importButton.dataset.busy !== '1') {
+      importButton.textContent = state.timetableInfo ? '重新导入课表' : '导入教务课表';
+    }
 
     const status = $('timetableStatus');
     status.className = 'profile-status';
@@ -723,14 +926,24 @@
       const info = state.timetableInfo;
       const s = info.summary;
       const week = s.week_number ? ` · 第 ${s.week_number} 周` : ' · 周次未识别';
-      status.textContent = `已导入 ${s.active}/${s.total} 门本周课程${week} · ${info.campus.label}`;
+      const source =
+        state.timetableSource === 'dashboard'
+          ? '驾驶舱真实课表'
+          : state.timetableSource === 'imported'
+            ? '手动导入课表'
+            : state.timetableSource;
+      status.textContent = `${source} · ${s.active}/${s.total} 门本周课程${week} · ${info.campus.label}`;
       if (info.warnings && info.warnings.length) {
         status.classList.add('warn');
         status.title = info.warnings.join('；');
       } else {
         status.classList.add('ok');
       }
+    } else if (state.timetableSource === 'missing') {
+      status.classList.add('warn');
+      status.textContent = '尚未读取教务课表；当前只展示不含课程的基础路线，可从驾驶舱同步、手动导入或点“用示例”';
     } else {
+      status.classList.add('warn');
       status.textContent = '当前：示例课表（虚构）；导入教务课表后按真实课程排';
     }
   }
@@ -788,12 +1001,19 @@
           .map((task) => {
             const st = TASK.taskStatus(task, now);
             const due = task.due ? task.due.replace('T', ' ') : '无截止';
-            const source = task.source === 'exam' ? '考试' : '手动';
+            const source = task.external
+              ? task.source_label || '主任务池'
+              : task.source === 'exam'
+                ? '考试'
+                : '手动';
+            const control = task.external
+              ? '<span class="task-lock" title="请回到左侧对话区标记完成">只读</span>'
+              : `<input type="checkbox" data-task-check ${task.done ? 'checked' : ''} aria-label="完成 ${esc(task.title)}" />`;
             return `<div class="task-item ${task.done ? 'done' : ''}" data-task-id="${esc(task.id)}">
-              <input type="checkbox" data-task-check ${task.done ? 'checked' : ''} aria-label="完成 ${esc(task.title)}" />
+              ${control}
               <div>
                 <div class="task-title">${esc(task.title)}</div>
-                <div class="task-meta">[${source}] ${due} · 预计 ${task.estimated_minutes} 分钟${task.course ? ` · ${esc(task.course)}` : ''}</div>
+                <div class="task-meta">[${esc(source)}] ${esc(due)} · 预计 ${task.estimated_minutes} 分钟${task.course ? ` · ${esc(task.course)}` : ''}</div>
               </div>
               <div class="task-side">
                 <span class="task-due ${st.key}">${esc(st.label)}</span>
@@ -1007,6 +1227,136 @@
     if (result.ok) state.timetableInfo = result;
   }
 
+  function applyTimetable(raw, source) {
+    if (!TBL) return { ok: false, error: 'TIMETABLE_MODULE_MISSING', message: '课表导入模块没加载' };
+    const result = TBL.summarizeTimetable(raw, { date: state.date });
+    if (!result.ok) return result;
+    state.timetable = result.timetable;
+    state.timetableInfo = result;
+    state.timetableSource = source;
+    return result;
+  }
+
+  async function loadDashboardContext(forceTimetable = false) {
+    if (window.location.protocol === 'file:') return false;
+    const response = await fetch('/api/route-context', { cache: 'no-store' });
+    if (!response.ok) return false;
+    const data = await response.json();
+    if (!data || data.ok === false) return false;
+    state.preferences = data.preferences || null;
+    state.externalTasks = Array.isArray(data.tasks) ? data.tasks : [];
+    if (data.major && !state.major) {
+      state.major = String(data.major).slice(0, 40);
+      const input = $('majorInput');
+      if (input && document.activeElement !== input) input.value = state.major;
+    }
+    if (data.timetable && (forceTimetable || (state.timetableSource !== 'imported' && state.timetableSource !== 'demo'))) {
+      const result = applyTimetable(data.timetable, 'dashboard');
+      if (!result.ok) {
+        const status = $('timetableStatus');
+        status.className = 'profile-status err';
+        status.textContent = `驾驶舱课表读取失败：${result.message || result.error}`;
+      }
+    }
+    return true;
+  }
+
+  async function refreshDashboardContext() {
+    try {
+      const loaded = await loadDashboardContext();
+      if (loaded) replan(false);
+    } catch (error) {
+      // 独立打开页面时没有驾驶舱 API，继续使用当前数据源。
+    }
+  }
+
+  async function copyText(text) {
+    try {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        await navigator.clipboard.writeText(text);
+        return true;
+      }
+    } catch {
+      // Use the local textarea fallback below.
+    }
+    const area = document.createElement('textarea');
+    area.value = text;
+    area.style.position = 'fixed';
+    area.style.opacity = '0';
+    document.body.appendChild(area);
+    area.select();
+    const copied = document.execCommand('copy');
+    area.remove();
+    return copied;
+  }
+
+  async function useTimetablePromptFallback() {
+    const prompt =
+      '重新导入我的教务课表：只读取教务系统「信息查询 → 个人课表查询」，更新本地 jw-timetable.json，然后重新打开网页驾驶舱。不要读取成绩、选课或个人资料。';
+    try {
+      const copied = await copyText(prompt);
+      if (!copied) throw new Error('copy failed');
+      toast('已复制教务读取指令，请粘贴到左侧对话发送');
+    } catch {
+      toast('复制失败，请手动打开“本地文件”或检查剪贴板权限');
+    }
+  }
+
+  async function pollTimetableRefresh(button) {
+    const response = await fetch('/api/timetable/status', { cache: 'no-store' });
+    const data = await response.json();
+    if (data.status === 'RUNNING') {
+      button.textContent = '正在读取教务课表…';
+      setTimeout(() => pollTimetableRefresh(button), 1200);
+      return;
+    }
+    button.disabled = false;
+    delete button.dataset.busy;
+    if (data.status === 'SUCCESS') {
+      const loaded = await loadDashboardContext(true);
+      if (loaded) {
+        renderProfile();
+        replan(true);
+        toast('教务课表已更新，首页已自动生效');
+      } else {
+        toast('教务读取完成，但没有找到可用的 jw-timetable.json');
+      }
+    } else {
+      renderProfile();
+      toast(`教务课表读取失败：${data.message || data.status || '未知错误'}`);
+    }
+  }
+
+  async function importTimetableFromJw() {
+    if (window.location.protocol === 'file:') {
+      await useTimetablePromptFallback();
+      return;
+    }
+    const button = $('importTimetableBtn');
+    button.disabled = true;
+    button.dataset.busy = '1';
+    button.textContent = '正在连接教务…';
+    try {
+      const response = await fetch('/api/timetable/refresh', {
+        method: 'POST',
+        headers: { 'X-Huayuan-Action': 'refresh-timetable' },
+      });
+      if (response.status === 409) {
+        toast('教务课表正在读取，请稍候');
+      } else if (!response.ok && response.status !== 202) {
+        throw new Error(`HTTP ${response.status}`);
+      } else {
+        toast('已启动教务课表读取；需要登录时会打开专用 Chrome 窗口');
+      }
+      pollTimetableRefresh(button);
+    } catch (error) {
+      button.disabled = false;
+      delete button.dataset.busy;
+      renderProfile();
+      await useTimetablePromptFallback();
+    }
+  }
+
   function handleTimetableFile(file) {
     if (!file) return;
     if (!TBL) {
@@ -1015,7 +1365,14 @@
     }
     const reader = new FileReader();
     reader.onload = () => {
-      const result = TBL.parseTimetableText(reader.result, { date: state.date });
+      let raw;
+      try {
+        raw = JSON.parse(String(reader.result || '').replace(/^\uFEFF/, ''));
+      } catch (error) {
+        toast(`课表 JSON 解析失败：${error.message}`);
+        return;
+      }
+      const result = applyTimetable(raw, 'imported');
       if (!result.ok) {
         toast(result.message || '课表导入失败');
         const status = $('timetableStatus');
@@ -1023,9 +1380,6 @@
         status.textContent = `导入失败：${result.message || result.error}`;
         return;
       }
-      state.timetable = result.timetable;
-      state.timetableInfo = result;
-      state.timetableSource = 'imported';
       renderProfile();
       replan(true);
       const s = result.summary;
@@ -1059,13 +1413,8 @@
         saveMajor();
       }
     });
-    $('importTimetableBtn').addEventListener('click', () => {
-      if (!TBL) {
-        toast('课表导入模块没加载，无法解析文件');
-        return;
-      }
-      $('timetableFile').click();
-    });
+    $('importTimetableBtn').addEventListener('click', importTimetableFromJw);
+    $('pickTimetableFileBtn').addEventListener('click', () => $('timetableFile').click());
     $('timetableFile').addEventListener('change', (e) => {
       const file = e.target.files && e.target.files[0];
       handleTimetableFile(file);
@@ -1129,16 +1478,57 @@
     });
 
     $('generateBtn').addEventListener('click', () => replan(true));
+    $('locationSearch').addEventListener('focus', () => {
+      state.activeLocationIndex = 0;
+      renderLocationResults();
+    });
+    $('locationSearch').addEventListener('input', () => {
+      state.activeLocationIndex = 0;
+      renderLocationResults();
+    });
+    $('locationSearch').addEventListener('keydown', (event) => {
+      if (event.isComposing) return;
+      if (event.key === 'Escape') {
+        hideLocationResults();
+        return;
+      }
+      if (event.key === 'Enter') {
+        event.preventDefault();
+        useLocationFromSearch();
+        return;
+      }
+      if (event.key !== 'ArrowDown' && event.key !== 'ArrowUp') return;
+      event.preventDefault();
+      if (!state.visibleLocations.length) renderLocationResults();
+      const delta = event.key === 'ArrowDown' ? 1 : -1;
+      state.activeLocationIndex =
+        (state.activeLocationIndex + delta + state.visibleLocations.length) % state.visibleLocations.length;
+      renderLocationResults();
+      const active = $('locationResults').querySelector('.location-option.active');
+      if (active) active.scrollIntoView({ block: 'nearest' });
+    });
+    $('useLocationBtn').addEventListener('click', useLocationFromSearch);
+    $('locationResults').addEventListener('pointerdown', (event) => {
+      event.stopPropagation();
+    });
+    document.addEventListener('pointerdown', (event) => {
+      const picker = document.querySelector('.location-picker');
+      if (picker && event.target instanceof Node && !picker.contains(event.target)) hideLocationResults();
+    });
+    window.addEventListener('scroll', scheduleLocationPosition, true);
+    window.addEventListener('resize', scheduleLocationPosition);
     $('gpsBtn').addEventListener('click', requestGps);
     $('simGpsBtn').addEventListener('click', () => {
-      const poi = POI.get('library');
-      state.gps = { lat: poi.lat, lng: poi.lng, coord: 'gcj02', accuracy: 0, simulated: true };
-      $('clearGpsBtn').hidden = false;
-      replan(true);
+      const location = LOCATIONS.find((item) => item.id === 'library');
+      if (location) applySelectedLocation(location);
     });
     $('clearGpsBtn').addEventListener('click', () => {
       state.gps = null;
+      state.selectedLocation = null;
       $('clearGpsBtn').hidden = true;
+      $('locationSearch').value = '';
+      $('locationSelected').className = 'location-selected';
+      $('locationSelected').textContent = '未选择楼栋 · 可搜索 82 个校园地点；也可使用设备定位';
       replan(false);
     });
 
@@ -1269,8 +1659,8 @@
   if (params.get('major')) state.major = String(params.get('major')).trim().slice(0, 40);
   if (params.get('date') && /^\d{4}-\d{2}-\d{2}$/.test(params.get('date'))) {
     state.date = params.get('date');
-    $('dateInput').value = state.date;
   }
+  $('dateInput').value = state.date;
   $('todoDate').value = state.date;
   const presetParam = params.get('preset');
   const presetFromUrl = PRESETS.find((item) => item.id === presetParam);
@@ -1283,8 +1673,13 @@
     };
   }
   if (params.get('gps') === 'library') {
+    const libraryLocation = LOCATIONS.find((item) => item.id === 'library');
     const lib = POI.get('library');
-    state.gps = { lat: lib.lat, lng: lib.lng, coord: 'gcj02', accuracy: 0, simulated: true };
+    state.selectedLocation = libraryLocation || null;
+    state.gps = { lat: lib.lat, lng: lib.lng, coord: 'gcj02', accuracy: 0, simulated: true, label: '图书馆' };
+    $('locationSearch').value = '图书馆';
+    $('locationSelected').className = 'location-selected ok';
+    $('locationSelected').textContent = '起点：图书馆 · 已按校园步行网络计算';
     $('clearGpsBtn').hidden = false;
   }
   const weatherParam = params.get('weather');
@@ -1305,6 +1700,8 @@
     });
     bind();
     replan(false);
+    refreshDashboardContext();
+    setInterval(refreshDashboardContext, 30000);
     if (params.get('exams') === 'demo') loadDemoExams();
     if (params.get('openTasks') === '1') openTaskSection();
     if (state.reminders) {

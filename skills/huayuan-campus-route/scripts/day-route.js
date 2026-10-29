@@ -44,15 +44,38 @@ function readJson(file) {
 }
 
 function findLatestTimetable(startDir) {
-  const roots = [path.join(startDir, 'huayuan-output'), path.join(process.cwd(), 'huayuan-output')];
+  const configuredHome = process.env.HUAYUAN_HOME || path.join(os.homedir(), '.workbuddy', 'huayuan-schedule-butler');
+  const searchOverride = process.env.HUAYUAN_ROUTE_SEARCH_ROOT;
+  const roots = searchOverride
+    ? [path.resolve(searchOverride)]
+    : [
+        path.join(startDir, 'huayuan-output'),
+        startDir,
+        path.join(process.cwd(), 'huayuan-output'),
+        configuredHome,
+        path.join(os.homedir(), 'WorkBuddy'),
+      ];
   let best = null;
   for (const root of roots) {
     if (!fs.existsSync(root)) continue;
-    for (const name of fs.readdirSync(root)) {
-      const candidate = path.join(root, name, 'jw-timetable.json');
-      if (!fs.existsSync(candidate)) continue;
-      const stat = fs.statSync(candidate);
-      if (!best || stat.mtimeMs > best.mtimeMs) best = { file: candidate, mtimeMs: stat.mtimeMs };
+    const pending = [{ dir: root, depth: 0 }];
+    while (pending.length) {
+      const current = pending.shift();
+      let entries;
+      try {
+        entries = fs.readdirSync(current.dir, { withFileTypes: true });
+      } catch {
+        continue;
+      }
+      for (const entry of entries) {
+        const candidate = path.join(current.dir, entry.name);
+        if (entry.isFile() && entry.name === 'jw-timetable.json') {
+          const stat = fs.statSync(candidate);
+          if (!best || stat.mtimeMs > best.mtimeMs) best = { file: candidate, mtimeMs: stat.mtimeMs };
+        } else if (entry.isDirectory() && current.depth < 4) {
+          pending.push({ dir: candidate, depth: current.depth + 1 });
+        }
+      }
     }
   }
   return best ? best.file : null;
@@ -75,7 +98,7 @@ function parseGps(text) {
 }
 
 function main() {
-  const demo = has('--demo') || !has('--timetable');
+  const demo = has('--demo');
   const date = arg('--date', null);
   const preset = arg('--preset', 'balanced');
   const mode = arg('--mode', 'walk');
@@ -116,6 +139,12 @@ function main() {
   let timetableSource = 'demo';
   let preferences = null;
   let preferencesSource = 'defaults';
+
+  if (demo && has('--timetable')) {
+    console.error('CONFLICTING_SOURCE: --demo 与 --timetable 不能同时使用');
+    process.exitCode = 2;
+    return;
+  }
 
   if (!demo) {
     const file = arg('--timetable', null) || findLatestTimetable(process.cwd());
@@ -202,6 +231,12 @@ function main() {
     return;
   }
 
+  if (!plan.validation.ok) {
+    console.error(`VALIDATION_FAILED: ${plan.validation.issues.join('；')}`);
+    process.exitCode = 5;
+    return;
+  }
+
   const baseDir = outDirArg
     ? path.resolve(String(outDirArg))
     : path.join(process.cwd(), 'huayuan-output', `route-${plan.meta.date}-${timestamp()}`);
@@ -230,10 +265,6 @@ function main() {
   }
   if (plan.meta.weather_advice && plan.meta.weather_advice.length) {
     console.log(`WEATHER: ${plan.meta.weather.label} ${plan.meta.weather.temperature}°C · ${plan.meta.weather_advice.join('；')}`);
-  }
-  if (!plan.validation.ok) {
-    console.log(`VALIDATION_FAILED: ${plan.validation.issues.join('；')}`);
-    process.exitCode = 5;
   }
 }
 

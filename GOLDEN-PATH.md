@@ -268,9 +268,9 @@ node golden-path\check.js --keep --work .\tmp   # 保留产物，便于逐页对
 
 ---
 
-## 附：大学城一日路线（可选加分演示）
+## 附：大学城一日路线（网页驾驶舱“今日安排”首页）
 
-主线七步之外，如果评委问“能不能按食堂、图书馆、热水时间排一天的走路路线”，用这一条单独演示，**不要挤进主线**：
+主线七步之外，如果评委问“能不能按食堂、图书馆、热水时间排一天的走路路线”，直接打开网页驾驶舱：第一页就是路线 UI，第二个标签是全部待办，第三个标签是可参与事项。离线演示必须明确使用 `--demo`：
 
 ```powershell
 node skills\huayuan-campus-route\scripts\day-route.js --demo --date 2026-10-29 --preset balanced --output-dir .\tmp\route-demo
@@ -288,7 +288,7 @@ node skills\huayuan-campus-route\scripts\day-route.js --demo --date 2026-10-29 -
 验收点：
 
 - 课表是**虚构样例**，必须说“这是样例数据”；
-- 五山课表会被明确拒绝（`CAMPUS_UNSUPPORTED`），不硬套大学城；
+- 项目只服务大学城；`campus.key=university_town` 会优先于“大学城校区 / 广州国际校区”这类组合展示标签，不会误拒真实课表；
 - 热水、门禁、图书馆时间是官方来源；饭堂/体育馆时段标“以现场为准”；
 - 天气是手动选择或 Open-Meteo 实时值，页面/Markdown 标明来源；小雨会把运动改体育馆，高温/污染取消露天跑步；
 - 页面可以填专业、导入 `jw-timetable.json`；导入时五山课表会被拒绝，缺时间/缺周次会标待确认；
@@ -296,4 +296,4 @@ node skills\huayuan-campus-route\scripts\day-route.js --demo --date 2026-10-29 -
 - 地图是示意图，不是导航底图；
 - 手机定位只在用户点击后读取，本地换算，不上传。
 
-页面演示：双击 `skills\huayuan-campus-route\public\index.html`，切“运动 / 玩咖”，拖权重，选“小雨”看运动是否改体育馆，选“高温/污染”看是否取消露天跑步，点“模拟在图书馆”。
+页面演示：运行 `launch-dashboard.js` 打开 `/`，切“运动 / 玩咖”，拖权重，选“小雨”看运动是否改体育馆，选“高温/污染”看是否取消露天跑步，点“模拟在图书馆”；随后切换 `/todo.html` 和 `/activities.html`，确认三个标签都在。
