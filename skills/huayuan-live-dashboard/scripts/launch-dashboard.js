@@ -8,7 +8,7 @@ const { spawn, spawnSync } = require('child_process');
 const DEFAULT_PORT = 4318;
 const MAX_PORT = 4338;
 const SERVICE = 'huayuan-live-dashboard';
-const REQUIRED_API_VERSION = 3;
+const REQUIRED_API_VERSION = 4;
 const stateDir =
   process.env.HUAYUAN_HOME || path.join(os.homedir(), '.workbuddy', 'huayuan-schedule-butler');
 const statePath = path.join(stateDir, 'live-dashboard.json');

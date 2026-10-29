@@ -11,6 +11,41 @@ function esc(value) {
     .replace(/'/g, '&#39;');
 }
 
+async function copyText(text) {
+  try {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      await navigator.clipboard.writeText(text);
+      return true;
+    }
+  } catch {
+    // Use the local textarea fallback below.
+  }
+  const area = document.createElement('textarea');
+  area.value = text;
+  area.style.position = 'fixed';
+  area.style.opacity = '0';
+  document.body.appendChild(area);
+  area.select();
+  const copied = document.execCommand('copy');
+  area.remove();
+  return copied;
+}
+
+function showCopyToast(message, ok = true) {
+  let toast = document.getElementById('copyToast');
+  if (!toast) {
+    toast = document.createElement('div');
+    toast.id = 'copyToast';
+    toast.className = 'copy-toast';
+    document.body.appendChild(toast);
+  }
+  toast.textContent = message;
+  toast.dataset.ok = ok ? '1' : '0';
+  toast.classList.add('show');
+  clearTimeout(showCopyToast.timer);
+  showCopyToast.timer = setTimeout(() => toast.classList.remove('show'), 1800);
+}
+
 function sourceText(item) {
   return (item.sources || [])
     .filter(Boolean)
@@ -24,6 +59,7 @@ function itemHtml(item, index) {
     sourceText(item) ? `来源 ${sourceText(item)}` : null,
     item.deadline_display ? `截止 ${item.deadline_display}` : null,
     item.estimated_minutes ? `预计 ${item.estimated_minutes} 分钟` : null,
+    item.deferred_until ? `延后至 ${item.deferred_until}，仍保留在待办` : null,
   ].filter(Boolean);
   const reasons = Array.isArray(item.confirm_reasons) ? item.confirm_reasons : [];
   return `<li class="todo-item">
@@ -52,11 +88,19 @@ function render(data) {
   $('#syncMessage').textContent = sync.message || '向左侧发送刷新指令即可重读各平台。';
   const syncButton = $('#copySyncPrompt');
   syncButton.onclick = async () => {
-    await navigator.clipboard.writeText(sync.prompt || '刷新我的校园待办。');
-    syncButton.textContent = '已复制';
-    setTimeout(() => {
-      syncButton.textContent = '复制刷新指令';
-    }, 1200);
+    try {
+      const copied = await copyText(sync.prompt || '刷新我的校园待办。');
+      if (!copied) throw new Error('copy failed');
+      syncButton.textContent = '已复制';
+      showCopyToast('刷新指令已复制，请到左侧对话粘贴发送');
+    } catch {
+      syncButton.textContent = '复制失败';
+      showCopyToast('复制失败，请手动选中指令复制', false);
+    } finally {
+      setTimeout(() => {
+        syncButton.textContent = '复制刷新指令';
+      }, 1400);
+    }
   };
 
   const byKey = Object.fromEntries(groups.map((group) => [group.key, group.items || []]));
@@ -105,12 +149,18 @@ function render(data) {
   document.querySelectorAll('[data-prompt-index]').forEach((button) => {
     const prompt = prompts[Number(button.dataset.promptIndex)];
     button.addEventListener('click', async () => {
-      await navigator.clipboard.writeText(prompt);
-      const badge = button.querySelector('b');
-      badge.textContent = '已复制';
-      setTimeout(() => {
-        badge.textContent = '复制';
-      }, 1200);
+      try {
+        const copied = await copyText(prompt);
+        if (!copied) throw new Error('copy failed');
+        const badge = button.querySelector('b');
+        badge.textContent = '已复制';
+        showCopyToast('已复制，请到左侧 WorkBuddy 对话粘贴发送');
+        setTimeout(() => {
+          badge.textContent = '复制';
+        }, 1400);
+      } catch {
+        showCopyToast('复制失败，请手动选中文字复制', false);
+      }
     });
   });
 }

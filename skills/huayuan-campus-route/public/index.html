@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>华园一日 · 大学城校园路线</title>
+  <meta name="description" content="按课表、食堂、图书馆和宿舍热水时间，生成华南理工大学大学城校区的一日步行路线。" />
+  <link rel="stylesheet" href="styles.css" />
+  <script>
+    window.addEventListener('error', function (event) {
+      var box = document.getElementById('jsError');
+      if (box) {
+        box.hidden = false;
+        box.textContent = '页面脚本出错：' + (event.message || 'unknown') + (event.filename ? ' @ ' + event.filename.split('/').pop() + ':' + event.lineno : '');
+      }
+    });
+  </script>
+</head>
+<body>
+  <div class="js-error" id="jsError" hidden></div>
+  <div class="app">
+    <header class="topbar">
+      <div class="brand">
+        <div class="seal" aria-hidden="true">华</div>
+        <div class="brand-text">
+          <div class="brand-title">华园一日</div>
+          <div class="brand-sub" id="brandSub">大学城校区 · 校园路线</div>
+        </div>
+      </div>
+      <div class="top-actions">
+        <div class="date-chip">
+          <span class="dot"></span>
+          <input id="dateInput" type="date" value="" aria-label="选择日期" />
+          <span id="topDate">周四</span>
+        </div>
+        <button class="btn ghost" id="exportBtn" type="button">导出 Markdown</button>
+        <button class="btn ghost" id="printBtn" type="button">打印</button>
+      </div>
+    </header>
+
+    <!-- HUAYUAN_PAGE_NAV -->
+
+    <main class="layout">
+      <aside class="panel" aria-label="控制与时间轴">
+        <!-- HUAYUAN_DASHBOARD_BRIEF -->
+        <section class="control-card">
+          <div class="eyebrow">CAMPUS DAY ROUTE</div>
+          <h1>今天怎么走？</h1>
+          <p class="lede">把课表、食堂、图书馆和热水时间排进一条顺路的线，少绕路，也别错过饭点。</p>
+
+          <div class="profile-setup">
+            <div class="profile-line">
+              <span class="profile-label">专业</span>
+              <input id="majorInput" type="text" maxlength="40" placeholder="如 软件工程" aria-label="专业" />
+              <button type="button" class="mini-btn" id="saveMajorBtn">保存</button>
+            </div>
+            <div class="profile-line">
+              <span class="profile-label">课表</span>
+              <button type="button" class="mini-btn" id="importTimetableBtn">导入教务课表</button>
+              <button type="button" class="link-btn" id="pickTimetableFileBtn">本地文件</button>
+              <button type="button" class="link-btn" id="demoTimetableBtn">用示例</button>
+              <input id="timetableFile" type="file" accept=".json,application/json" hidden />
+            </div>
+            <div class="profile-status" id="timetableStatus">当前：示例课表（虚构）</div>
+          </div>
+
+          <div class="location-picker">
+            <span class="location-label">我现在在</span>
+            <div class="location-command">
+              <input
+                id="locationSearch"
+                type="text"
+                role="combobox"
+                aria-autocomplete="list"
+                aria-expanded="false"
+                aria-controls="locationResults"
+                autocomplete="off"
+                placeholder="搜索楼栋，如 C11、B3、图书馆"
+              />
+              <button type="button" class="mini-btn" id="useLocationBtn">设为起点</button>
+            </div>
+            <div class="location-results" id="locationResults" role="listbox" hidden></div>
+            <div class="location-selected" id="locationSelected">未选择楼栋 · 可搜索 82 个校园地点；也可使用设备定位</div>
+          </div>
+
+          <div class="field">
+            <span class="label">今天的人格</span>
+            <div class="presets" id="presets" role="group" aria-label="日程画像">
+              <button type="button" data-preset="grind"><span>🦌</span>卷王</button>
+              <button type="button" data-preset="balanced" class="active"><span>⚖️</span>均衡</button>
+              <button type="button" data-preset="play"><span>🎈</span>玩咖</button>
+              <button type="button" data-preset="sport"><span>🏃</span>运动</button>
+            </div>
+          </div>
+
+          <div class="weights" aria-label="时间分配权重">
+            <div class="weight-row" data-key="study">
+              <div class="weight-head"><span>学习</span><b id="wStudy">46%</b></div>
+              <input type="range" min="0" max="100" value="46" id="slStudy" aria-label="学习权重" />
+            </div>
+            <div class="weight-row" data-key="play">
+              <div class="weight-head"><span>放松</span><b id="wPlay">22%</b></div>
+              <input type="range" min="0" max="100" value="22" id="slPlay" aria-label="放松权重" />
+            </div>
+            <div class="weight-row" data-key="sport">
+              <div class="weight-head"><span>运动</span><b id="wSport">32%</b></div>
+              <input type="range" min="0" max="100" value="32" id="slSport" aria-label="运动权重" />
+            </div>
+          </div>
+
+          <div class="weather-row">
+            <span class="weather-label">天气</span>
+            <select id="weatherSelect" aria-label="天气">
+              <option value="clear">☀️ 晴</option>
+              <option value="cloudy" selected>☁️ 多云</option>
+              <option value="rain">🌧️ 小雨</option>
+              <option value="storm">⛈️ 大雨</option>
+              <option value="heat">🌡️ 高温</option>
+              <option value="cold">🥶 寒冷</option>
+              <option value="polluted">😷 空气污染</option>
+            </select>
+            <input id="tempInput" type="number" min="-5" max="45" value="26" aria-label="温度" />
+            <span class="weather-unit">°C</span>
+            <button type="button" class="live-weather" id="weatherLive">实时</button>
+          </div>
+
+          <div class="chips" aria-label="路线选项">
+            <button type="button" class="chip" id="crowdChip">👥 避开人流</button>
+            <button type="button" class="chip" id="bikeChip">🚲 骑行</button>
+          </div>
+
+          <div class="actions">
+            <button type="button" class="btn primary" id="generateBtn">生成今日路线</button>
+            <button type="button" class="btn location" id="gpsBtn">📍 设备定位</button>
+          </div>
+          <div class="sub-actions">
+            <button type="button" class="link-btn" id="simGpsBtn">模拟在图书馆</button>
+            <button type="button" class="link-btn" id="clearGpsBtn" hidden>清除定位</button>
+            <span class="privacy">定位只在本地换算，不上传</span>
+          </div>
+        </section>
+
+        <section class="stats" id="stats" aria-label="路线统计">
+          <div class="stat"><span>总步行</span><b id="statWalk">—</b><em id="statWalkMin">—</em></div>
+          <div class="stat"><span>自习</span><b id="statStudy">—</b><em>图书馆 / 尚学空间</em></div>
+          <div class="stat"><span>运动</span><b id="statSport">—</b><em>田径场 / 体育馆</em></div>
+          <div class="stat"><span>放松</span><b id="statPlay">—</b><em>琴湖 / 咖啡厅</em></div>
+        </section>
+
+        <details class="task-section" id="taskSection">
+          <summary>
+            <span>考试与待办</span>
+            <span class="task-summary" id="taskCount">0 项</span>
+          </summary>
+          <div class="task-body">
+            <div class="task-toolbar">
+              <button type="button" class="mini-btn" id="importExamsBtn">导入考试</button>
+              <button type="button" class="link-btn" id="demoExamsBtn">载入示例</button>
+              <button type="button" class="link-btn" id="clearExamsBtn" hidden>清空考试</button>
+              <button type="button" class="link-btn" id="remindBtn">开启页面提醒</button>
+              <input id="examsFile" type="file" accept=".json,application/json" hidden />
+            </div>
+            <div class="task-hint" id="examStatus">尚未导入考试安排；载入示例可看效果</div>
+            <div class="exam-list" id="examList"></div>
+
+            <div class="todo-form">
+              <input id="todoTitle" type="text" maxlength="100" placeholder="手动加待办：交实验报告" aria-label="待办标题" />
+              <div class="todo-row">
+                <input id="todoDate" type="date" aria-label="截止日期" />
+                <input id="todoMinutes" type="number" min="10" max="480" step="10" value="60" aria-label="预计分钟" />
+                <select id="todoPriority" aria-label="优先级">
+                  <option value="P1">P1</option>
+                  <option value="P2" selected>P2</option>
+                  <option value="P0">P0</option>
+                  <option value="P3">P3</option>
+                </select>
+                <button type="button" class="mini-btn" id="addTodoBtn">添加</button>
+              </div>
+            </div>
+
+            <div class="task-list" id="taskList"></div>
+          </div>
+        </details>
+
+        <section class="timeline-section">
+          <div class="section-head">
+            <h2>时间轴</h2>
+            <span id="dayMeta">—</span>
+          </div>
+          <div id="warnings" class="warnings" hidden></div>
+          <div class="timeline" id="timeline"></div>
+        </section>
+      </aside>
+
+      <section class="map-wrap" aria-label="校园路线地图">
+        <div class="map-head">
+          <div class="map-title">
+            <b>华工大学城 · 步行示意</b>
+            <span>按真实 POI 经纬度绘制，不替代导航</span>
+          </div>
+          <div class="map-head-right">
+            <span class="weather-badge" id="weatherBadge">☁️ 多云 26°C</span>
+            <div class="legend">
+              <span><i style="--c:#3f6ad8"></i>课程</span>
+              <span><i style="--c:#2f6b4f"></i>自习</span>
+              <span><i style="--c:#d98324"></i>用餐</span>
+              <span><i style="--c:#c94f4f"></i>运动</span>
+              <span><i style="--c:#7c5cbf"></i>放松</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="map-canvas" id="mapCanvas">
+          <svg id="map" viewBox="0 0 1000 1000" role="img" aria-label="华南理工大学大学城校区路线示意图"></svg>
+
+          <div class="weather-alert" id="weatherAlert" hidden></div>
+
+          <div class="map-tools">
+            <button type="button" id="zoomIn" aria-label="放大">＋</button>
+            <button type="button" id="zoomOut" aria-label="缩小">−</button>
+            <button type="button" id="zoomReset" aria-label="复位">◎</button>
+          </div>
+
+          <div class="map-summary" id="mapSummary">正在排路线…</div>
+
+          <div class="poi-card" id="poiCard" hidden>
+            <button type="button" class="poi-close" id="poiClose" aria-label="关闭">×</button>
+            <div class="poi-kicker" id="poiKicker">地点</div>
+            <div class="poi-name" id="poiName">—</div>
+            <div class="poi-hours" id="poiHours">—</div>
+            <p class="poi-desc" id="poiDesc"></p>
+            <div class="poi-tags" id="poiTags"></div>
+            <div class="poi-actions">
+              <a id="poiNav" class="btn small" target="_blank" rel="noopener">在高德地图打开</a>
+              <button type="button" class="btn small ghost" id="poiStart">从这里出发</button>
+            </div>
+          </div>
+
+          <div class="map-foot">
+            <div class="scale"><span></span>100 m</div>
+            <div class="north">N ↑</div>
+            <div class="gps-state" id="gpsState">未使用定位</div>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+  <noscript>这个页面需要 JavaScript 才能生成路线。</noscript>
+
+  <script src="../data/campus-data.js"></script>
+  <script src="../data/exam-catalog.js"></script>
+  <script src="../scripts/route-engine.js"></script>
+  <script src="../scripts/timetable-import.js"></script>
+  <script src="../scripts/task-planner.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

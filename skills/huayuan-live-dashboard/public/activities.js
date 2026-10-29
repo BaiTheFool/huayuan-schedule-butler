@@ -25,6 +25,41 @@ function esc(value) {
     .replace(/'/g, '&#39;');
 }
 
+async function copyText(text) {
+  try {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      await navigator.clipboard.writeText(text);
+      return true;
+    }
+  } catch {
+    // Use the local textarea fallback below.
+  }
+  const area = document.createElement('textarea');
+  area.value = text;
+  area.style.position = 'fixed';
+  area.style.opacity = '0';
+  document.body.appendChild(area);
+  area.select();
+  const copied = document.execCommand('copy');
+  area.remove();
+  return copied;
+}
+
+function showCopyToast(message, ok = true) {
+  let toast = document.getElementById('copyToast');
+  if (!toast) {
+    toast = document.createElement('div');
+    toast.id = 'copyToast';
+    toast.className = 'copy-toast';
+    document.body.appendChild(toast);
+  }
+  toast.textContent = message;
+  toast.dataset.ok = ok ? '1' : '0';
+  toast.classList.add('show');
+  clearTimeout(showCopyToast.timer);
+  showCopyToast.timer = setTimeout(() => toast.classList.remove('show'), 1800);
+}
+
 function daysLeft(deadline) {
   if (!deadline) return null;
   const now = new Date();
@@ -145,11 +180,19 @@ function render(data) {
   const button = $('#copyActivityPrompt');
   const prompt = activity.prompt || '刷新校园活动。';
   button.onclick = async () => {
-    await navigator.clipboard.writeText(prompt);
-    button.textContent = '已复制';
-    setTimeout(() => {
-      button.textContent = '复制刷新指令';
-    }, 1200);
+    try {
+      const copied = await copyText(prompt);
+      if (!copied) throw new Error('copy failed');
+      button.textContent = '已复制';
+      showCopyToast('活动刷新指令已复制，请到左侧对话粘贴发送');
+    } catch {
+      button.textContent = '复制失败';
+      showCopyToast('复制失败，请手动选中指令复制', false);
+    } finally {
+      setTimeout(() => {
+        button.textContent = '复制刷新指令';
+      }, 1400);
+    }
   };
   const refreshButton = $('#refreshActivities');
   refreshButton.disabled = false;

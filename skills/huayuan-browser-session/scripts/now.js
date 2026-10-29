@@ -460,16 +460,39 @@ function buildNow({ analysis, preferences, overrides, clock }) {
     weekInfo.needs_confirmation ||
     Boolean(weekInfo.filter && weekInfo.filter.unknown_week_count);
 
-  // 待办分档：已过期、已延后不混进 P0/P1/P2，它们在下面单独成段
-  // 第一动作与下方 sequence 必须使用同一批可排任务：标题不可识别而被排除的条目
-  // 只能留在待确认区，不能在这里抢到“现在开始”，否则会出现上有任务、下无绑定。
+  // 可排程任务：过期、延后、标题不可识别只影响“现在做什么”，不能从全部待办中消失。
+  // 第一动作与 sequence 必须使用同一批可排任务，避免出现上有任务、下无绑定。
   const activeTasks = (pool.items || []).filter(
     (item) => item.status !== 'overdue' && !item.deferred_until && !item.exclude_from_plan
   );
-  const views = activeTasks.map((item) => taskView(item, clock.date, { timetableKnown }));
-  for (const view of views) view.reason = reasonFor(view, { window, nowMinutes: clock.minutes });
+  const activeViews = activeTasks.map((item) => taskView(item, clock.date, { timetableKnown }));
+  for (const view of activeViews) view.reason = reasonFor(view, { window, nowMinutes: clock.minutes });
   const order = { P0: 0, P1: 1, P2: 2, P3: 3 };
-  views.sort((a, b) => {
+  activeViews.sort((a, b) => {
+    if (order[a.priority] !== order[b.priority]) return order[a.priority] - order[b.priority];
+    if (a.deadline && b.deadline) return a.deadline < b.deadline ? -1 : a.deadline > b.deadline ? 1 : 0;
+    if (a.deadline) return -1;
+    if (b.deadline) return 1;
+    return 0;
+  });
+
+  // 全部待办：所有仍在任务池中的未完成项都必须出现。
+  // 延后项下降一级继续列出；无法进入排程的待确认项保留，但降到 P3，避免它们驱动第一动作。
+  const lowerPriority = { P0: 'P1', P1: 'P2', P2: 'P3', P3: 'P3' };
+  const allViews = (pool.items || []).map((item) => {
+    const view = taskView(item, clock.date, { timetableKnown });
+    if (item.deferred_until) {
+      view.priority = lowerPriority[view.priority] || 'P3';
+      view.priority_basis = `延后至 ${item.deferred_until}，降级列入待办`;
+    } else if (item.exclude_from_plan) {
+      view.priority = 'P3';
+      view.priority_basis = '信息不完整，保留在待办但不参与排程';
+    }
+    view.reason = reasonFor(view, { window, nowMinutes: clock.minutes });
+    if (item.deferred_until) view.reason = `${view.priority_basis}；${view.reason}`;
+    return view;
+  });
+  allViews.sort((a, b) => {
     if (order[a.priority] !== order[b.priority]) return order[a.priority] - order[b.priority];
     if (a.deadline && b.deadline) return a.deadline < b.deadline ? -1 : a.deadline > b.deadline ? 1 : 0;
     if (a.deadline) return -1;
@@ -569,8 +592,8 @@ function buildNow({ analysis, preferences, overrides, clock }) {
     rest_daily_minutes: preferences.rest.enabled ? preferences.rest.daily_minutes : 0,
   };
 
-  const first = decideFirstAction({ clock, ongoing, window, gap, nextWindow, tasks: views, sequence, plannedNow });
-  const afterCurrent = decideNextAfter({ clock, ongoing, window, gap, sequence, tasks: views });
+  const first = decideFirstAction({ clock, ongoing, window, gap, nextWindow, tasks: activeViews, sequence, plannedNow });
+  const afterCurrent = decideNextAfter({ clock, ongoing, window, gap, sequence, tasks: activeViews });
 
   return {
     generated_at: new Date().toISOString(),
@@ -658,11 +681,11 @@ function buildNow({ analysis, preferences, overrides, clock }) {
     first_action: first,
     next_after_current: afterCurrent,
     tasks: {
-      p0: views.filter((item) => item.priority === 'P0'),
-      p1: views.filter((item) => item.priority === 'P1'),
-      p2: views.filter((item) => item.priority === 'P2'),
-      p3: views.filter((item) => item.priority === 'P3'),
-      total: views.length,
+      p0: allViews.filter((item) => item.priority === 'P0'),
+      p1: allViews.filter((item) => item.priority === 'P1'),
+      p2: allViews.filter((item) => item.priority === 'P2'),
+      p3: allViews.filter((item) => item.priority === 'P3'),
+      total: allViews.length,
     },
     overdue,
     completed_local: completedLocal,

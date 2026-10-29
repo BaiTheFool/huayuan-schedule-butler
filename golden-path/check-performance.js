@@ -28,7 +28,22 @@ check(
   `${Buffer.byteLength(browserSkill)} B`
 );
 check('maxTurns 不超过 30', /maxTurns:\s*30\b/.test(agent));
-check('Skills 数量为 5', plugin.skills.length === 5, String(plugin.skills.length));
+const agentSkillsMatch = agent.match(/^skills:\s*\[(.*?)\]\s*$/m);
+const agentSkills = agentSkillsMatch
+  ? agentSkillsMatch[1].split(',').map((item) => item.trim()).filter(Boolean)
+  : [];
+const pluginSkills = plugin.skills.map((item) => path.basename(item));
+const directorySkills = fs
+  .readdirSync(path.join(ROOT, 'skills'), { withFileTypes: true })
+  .filter((entry) => entry.isDirectory() && fs.existsSync(path.join(ROOT, 'skills', entry.name, 'SKILL.md')))
+  .map((entry) => entry.name);
+const sameSkills = (left, right) =>
+  left.length === right.length && [...left].sort().every((item, index) => item === [...right].sort()[index]);
+check(
+  'Skills 注册、Agent frontmatter 与实际目录一致',
+  sameSkills(agentSkills, pluginSkills) && sameSkills(pluginSkills, directorySkills),
+  `agent=${agentSkills.length} plugin=${pluginSkills.length} dir=${directorySkills.length}`
+);
 check(
   '普通“现在该干什么”不自动 Widget',
   /不自动生成 Widget/.test(agent)

@@ -114,6 +114,7 @@ const DEFAULT_PREFERENCES = {
   weekend: { wake: '08:30', sleep: '23:30', prefer_morning_study: true },
   campus: null,
   college: null,
+  major: null,
   pending: [],
 };
 
@@ -482,6 +483,9 @@ function normalizePreferences(input = {}) {
   if (typeof input.college === 'string' && input.college.trim()) {
     base.college = input.college.trim().slice(0, 40);
   }
+  if (typeof input.major === 'string' && input.major.trim()) {
+    base.major = input.major.trim().slice(0, 40);
+  }
 
   // 作息一致性检查：不阻断，但要说清楚
   const wake = toMinutes(base.daily.wake);
@@ -526,6 +530,7 @@ function describePreferences(preferences) {
   const dayNames = ['周一', '周二', '周三', '周四', '周五', '周六', '周日'];
   const lines = [
     `学院：${preferences.college || '未选择（活动推送仅展示校级来源）'}`,
+    `专业：${preferences.major || '未填写（只影响展示，不影响课表读取）'}`,
     `作息：${preferences.daily.wake} 起床 / ${preferences.daily.sleep} 睡觉；可用 ${preferences.daily.day_start}-${preferences.daily.day_end}`,
     `周末：${preferences.weekend.wake} 起床，${preferences.weekend.prefer_morning_study ? '上午优先学习' : '不强制上午学习'}`,
     `用餐：${preferences.meals.map((meal) => `${meal.label} ${meal.start}-${meal.end}`).join('；')}`,

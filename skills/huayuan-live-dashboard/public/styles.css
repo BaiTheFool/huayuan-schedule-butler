@@ -29,15 +29,20 @@ h1 em { color: var(--accent); font-style: normal; }
 .status.live i { background: var(--green); }
 
 .page-nav {
+  position: sticky;
+  top: 10px;
+  z-index: 30;
   display: flex;
   align-items: center;
   gap: 7px;
   width: fit-content;
   margin: -7px 0 16px;
   padding: 4px;
-  background: color-mix(in srgb, var(--paper) 72%, var(--page));
+  background: color-mix(in srgb, var(--paper) 94%, var(--page));
   border: 1px solid var(--line);
   border-radius: 999px;
+  box-shadow: 0 5px 18px rgba(57, 48, 30, 0.08);
+  backdrop-filter: blur(14px);
 }
 .page-nav a {
   padding: 7px 13px;
@@ -161,6 +166,28 @@ footer { display: flex; justify-content: space-between; gap: 16px; padding: 18px
   cursor: pointer;
   font: 700 12px/1.4 "Microsoft YaHei UI", "PingFang SC", system-ui, sans-serif;
 }
+
+.copy-toast {
+  position: fixed;
+  left: 50%;
+  bottom: 24px;
+  z-index: 9999;
+  max-width: min(520px, calc(100vw - 32px));
+  padding: 11px 16px;
+  color: #f6fff9;
+  background: #1e7358;
+  border: 1px solid rgba(255,255,255,.18);
+  border-radius: 11px;
+  box-shadow: 0 10px 28px rgba(25, 48, 38, 0.22);
+  font-size: 12px;
+  line-height: 1.5;
+  opacity: 0;
+  pointer-events: none;
+  transform: translate(-50%, 10px);
+  transition: opacity .16s ease, transform .16s ease;
+}
+.copy-toast.show { opacity: 1; transform: translate(-50%, 0); }
+.copy-toast[data-ok="0"] { background: #9a3f2f; }
 
 .summary-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-top: 14px; }
 .stat { padding: 16px; background: var(--paper); border: 1px solid var(--line); border-radius: 14px; }

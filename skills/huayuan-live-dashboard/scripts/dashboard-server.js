@@ -2,6 +2,7 @@
 
 const fs = require('fs');
 const http = require('http');
+const os = require('os');
 const path = require('path');
 const { spawn } = require('child_process');
 
@@ -16,7 +17,13 @@ const token = argValue('--token', '');
 const nowPath = path.resolve(argValue('--now', ''));
 const activityPath = path.resolve(argValue('--activities', path.join(path.dirname(nowPath), 'activity-feed.json')));
 const publicDir = path.resolve(__dirname, '..', 'public');
-const API_VERSION = 3;
+const routeSkillDir = path.resolve(__dirname, '..', '..', 'huayuan-campus-route');
+const routePublicDir = path.join(routeSkillDir, 'public');
+const routeDataDir = path.join(routeSkillDir, 'data');
+const routeScriptsDir = path.join(routeSkillDir, 'scripts');
+const browserSkillDir = path.resolve(__dirname, '..', '..', 'huayuan-browser-session');
+const jwTimetableScript = path.join(browserSkillDir, 'scripts', 'jw-timetable.js');
+const API_VERSION = 4;
 const SYNC_INTERVAL_DAYS = 7;
 const SYNC_PROMPT =
   '刷新我的校园待办：请重新读取教务、eCourse、雨课堂和校园门户，更新待办与日程，并告诉我新增、临近截止、已过期和发生变化的事项。';
@@ -31,9 +38,102 @@ const activityScript = path.resolve(
   'activity-feed.js'
 );
 let activityRefreshRunning = false;
+let timetableRefreshJob = {
+  status: 'IDLE',
+  running: false,
+  started_at: null,
+  finished_at: null,
+  message: null,
+};
 
 function readNow() {
   return JSON.parse(fs.readFileSync(nowPath, 'utf8'));
+}
+
+function readJsonIfExists(filePath) {
+  if (!filePath || !fs.existsSync(filePath)) return null;
+  try {
+    return JSON.parse(fs.readFileSync(filePath, 'utf8').replace(/^\uFEFF/, ''));
+  } catch {
+    return null;
+  }
+}
+
+function readPreferences() {
+  const home = process.env.HUAYUAN_HOME || path.join(os.homedir(), '.workbuddy', 'huayuan-schedule-butler');
+  const candidates = [
+    path.join(path.dirname(nowPath), 'preferences.json'),
+    path.join(home, 'preferences.json'),
+  ];
+  for (const candidate of candidates) {
+    const value = readJsonIfExists(candidate);
+    if (value) return value;
+  }
+  return null;
+}
+
+function findLatestTimetable(startDir) {
+  const home = process.env.HUAYUAN_HOME || path.join(os.homedir(), '.workbuddy', 'huayuan-schedule-butler');
+  const roots = Array.from(
+    new Set([
+      startDir,
+      path.join(process.cwd(), 'huayuan-output'),
+      home,
+      path.join(os.homedir(), 'WorkBuddy'),
+    ].filter(Boolean).map((item) => path.resolve(item)))
+  );
+  let best = null;
+  for (const root of roots) {
+    if (!fs.existsSync(root)) continue;
+    const pending = [{ dir: root, depth: 0 }];
+    while (pending.length) {
+      const current = pending.shift();
+      let entries;
+      try {
+        entries = fs.readdirSync(current.dir, { withFileTypes: true });
+      } catch {
+        continue;
+      }
+      for (const entry of entries) {
+        const candidate = path.join(current.dir, entry.name);
+        if (entry.isFile() && entry.name === 'jw-timetable.json') {
+          const stat = fs.statSync(candidate);
+          if (!best || stat.mtimeMs > best.mtimeMs) {
+            best = {
+              file: candidate,
+              mtimeMs: stat.mtimeMs,
+              data: readJsonIfExists(candidate),
+            };
+          }
+        } else if (entry.isDirectory() && current.depth < 4) {
+          pending.push({ dir: candidate, depth: current.depth + 1 });
+        }
+      }
+    }
+  }
+  return best;
+}
+
+function routeContext() {
+  const now = readNow();
+  const dir = path.dirname(nowPath);
+  const timetableResult = findLatestTimetable(dir);
+  const timetable = timetableResult && timetableResult.data;
+  const preferences = readPreferences();
+  const tasks = taskList(now).map((task) => ({
+    ...task,
+    done: Boolean(task.done),
+  }));
+  return {
+    ok: true,
+    timetable,
+    timetable_available: Boolean(timetable),
+    timetable_updated_at: timetableResult ? new Date(timetableResult.mtimeMs).toISOString() : null,
+    timetable_course_count: timetable && Array.isArray(timetable.courses) ? timetable.courses.length : 0,
+    preferences,
+    major: preferences && preferences.major ? preferences.major : null,
+    tasks,
+  };
 }
 
 function readActivities() {
@@ -99,6 +199,88 @@ function runActivityRefresh({ force = false } = {}) {
     });
   }).finally(() => {
     activityRefreshRunning = false;
+  });
+}
+
+function runTimetableRefresh() {
+  if (timetableRefreshJob.running) return Promise.reject(new Error('TIMETABLE_REFRESH_BUSY'));
+  if (!fs.existsSync(jwTimetableScript)) return Promise.reject(new Error('JW_TIMETABLE_SCRIPT_MISSING'));
+  const outputDir = path.dirname(nowPath);
+  timetableRefreshJob = {
+    status: 'RUNNING',
+    running: true,
+    started_at: new Date().toISOString(),
+    finished_at: null,
+    message: '正在连接教务系统；如需登录会打开专用 Chrome 窗口。',
+  };
+  return new Promise((resolve) => {
+    const child = spawn(
+      process.execPath,
+      [
+        jwTimetableScript,
+        '--output-dir',
+        outputDir,
+        '--login-timeout-seconds',
+        '600',
+      ],
+      { cwd: browserSkillDir, windowsHide: true }
+    );
+    let stdout = '';
+    let stderr = '';
+    const timer = setTimeout(() => {
+      child.kill();
+      timetableRefreshJob = {
+        ...timetableRefreshJob,
+        status: 'FAILED',
+        running: false,
+        finished_at: new Date().toISOString(),
+        message: '教务课表读取超时，请检查登录状态后重试。',
+      };
+      resolve(timetableRefreshJob);
+    }, 660000);
+    child.stdout.on('data', (chunk) => {
+      stdout += chunk;
+    });
+    child.stderr.on('data', (chunk) => {
+      stderr += chunk;
+    });
+    child.on('error', (error) => {
+      clearTimeout(timer);
+      timetableRefreshJob = {
+        ...timetableRefreshJob,
+        status: 'FAILED',
+        running: false,
+        finished_at: new Date().toISOString(),
+        message: String(error.message || error).slice(0, 500),
+      };
+      resolve(timetableRefreshJob);
+    });
+    child.on('exit', (code) => {
+      clearTimeout(timer);
+      const latest = findLatestTimetable(outputDir);
+      const hasCourses = Boolean(
+        latest &&
+        latest.data &&
+        Array.isArray(latest.data.courses) &&
+        latest.data.courses.length > 0
+      );
+      const summaryLine = stdout
+        .split(/\r?\n/)
+        .reverse()
+        .find((line) => /JW_TIMETABLE_(RESULT|SUMMARY):/.test(line));
+      timetableRefreshJob = {
+        ...timetableRefreshJob,
+        status: hasCourses ? 'SUCCESS' : 'FAILED',
+        running: false,
+        finished_at: new Date().toISOString(),
+        message: hasCourses
+          ? `已更新教务课表${summaryLine ? `：${summaryLine.trim()}` : ''}`
+          : (stderr || stdout || `JW_TIMETABLE_EXIT_${code}`).trim().split(/\r?\n/).slice(-1)[0].slice(0, 500),
+      };
+      resolve(timetableRefreshJob);
+    });
+  }).finally(() => {
+    timetableRefreshJob.running = false;
   });
 }
 
@@ -183,6 +365,73 @@ function sendJson(res, status, data) {
   res.end(JSON.stringify(data));
 }
 
+function dashboardIndexHtml() {
+  const source = path.join(routePublicDir, 'index.html');
+  if (!fs.existsSync(source)) {
+    return fs.readFileSync(path.join(publicDir, 'index.html'), 'utf8');
+  }
+  let html = fs.readFileSync(source, 'utf8');
+  const pageNav = `
+    <nav class="huayuan-page-nav" aria-label="驾驶舱页面">
+      <a class="active" href="/" aria-current="page">今日安排</a>
+      <a href="/todo.html">全部待办</a>
+      <a href="/activities.html">可参与事项</a>
+    </nav>`;
+  const brief = `
+        <section class="dashboard-brief" aria-label="实时第一动作">
+          <div class="dashboard-brief-head">
+            <span class="dashboard-brief-kicker">LIVE · 来自最新 now.json</span>
+            <span class="dashboard-brief-status" id="dashboardBriefStatus"><i></i>正在读取</span>
+          </div>
+          <h2 id="dashboardBriefAction">正在整理最新安排…</h2>
+          <p id="dashboardBriefHint">路线读取与 WorkBuddy 任务同步会同时进行。</p>
+          <div class="dashboard-brief-sync" id="dashboardBriefSync">正在读取最近一次平台同步时间…</div>
+          <div class="dashboard-brief-pending" id="dashboardBriefPending" hidden></div>
+          <div class="dashboard-brief-prompts" id="dashboardBriefPrompts" hidden></div>
+          <div class="dashboard-brief-foot">
+            <span class="dashboard-brief-status"><i></i>第一动作来自主任务池</span>
+            <span class="dashboard-brief-status" id="dashboardBriefUpdated"></span>
+          </div>
+        </section>`;
+  html = html
+    .replace('href="styles.css"', 'href="/route-assets/styles.css"')
+    .replaceAll('src="../data/', 'src="/route-data/')
+    .replaceAll('src="../scripts/', 'src="/route-scripts/')
+    .replace('src="app.js"', 'src="/route-assets/app.js"')
+    .replace('<!-- HUAYUAN_PAGE_NAV -->', pageNav)
+    .replace('<!-- HUAYUAN_DASHBOARD_BRIEF -->', brief)
+    .replace('</head>', '  <link rel="stylesheet" href="/dashboard-shell.css" />\n</head>')
+    .replace('</body>', '  <script src="/dashboard-bridge.js"></script>\n</body>');
+  return html;
+}
+
+function resolveMountedFile(pathname) {
+  const mounts = [
+    ['/route-assets/', routePublicDir],
+    ['/route-data/', routeDataDir],
+    ['/route-scripts/', routeScriptsDir],
+  ];
+  for (const [prefix, root] of mounts) {
+    if (!pathname.startsWith(prefix)) continue;
+    const relative = decodeURIComponent(pathname.slice(prefix.length));
+    const file = path.resolve(root, relative);
+    const withinRoot = file === root || file.startsWith(root + path.sep);
+    if (!withinRoot || !fs.existsSync(file) || !fs.statSync(file).isFile()) return null;
+    return file;
+  }
+  return null;
+}
+
+function contentType(file) {
+  const ext = path.extname(file).toLowerCase();
+  if (ext === '.css') return 'text/css; charset=utf-8';
+  if (ext === '.js') return 'text/javascript; charset=utf-8';
+  if (ext === '.json') return 'application/json; charset=utf-8';
+  if (ext === '.png') return 'image/png';
+  if (ext === '.svg') return 'image/svg+xml';
+  return 'text/html; charset=utf-8';
+}
+
 const server = http.createServer((req, res) => {
   const url = new URL(req.url, `http://127.0.0.1:${port}`);
   if (req.method === 'GET' && url.pathname === '/api/dashboard') {
@@ -203,6 +452,39 @@ const server = http.createServer((req, res) => {
     } catch (error) {
       sendJson(res, 503, { ok: false, error: String(error.message || error) });
     }
+    return;
+  }
+  if (req.method === 'GET' && url.pathname === '/api/route-context') {
+    try {
+      sendJson(res, 200, routeContext());
+    } catch (error) {
+      sendJson(res, 503, { ok: false, error: String(error.message || error) });
+    }
+    return;
+  }
+  if (req.method === 'GET' && url.pathname === '/api/timetable/status') {
+    sendJson(res, 200, { ok: true, ...timetableRefreshJob });
+    return;
+  }
+  if (req.method === 'POST' && url.pathname === '/api/timetable/refresh') {
+    if (req.headers['x-huayuan-action'] !== 'refresh-timetable') {
+      sendJson(res, 403, { ok: false, error: 'INVALID_ACTION' });
+      return;
+    }
+    if (timetableRefreshJob.running) {
+      sendJson(res, 409, { ok: false, error: 'TIMETABLE_REFRESH_BUSY', ...timetableRefreshJob });
+      return;
+    }
+    runTimetableRefresh().catch((error) => {
+      timetableRefreshJob = {
+        ...timetableRefreshJob,
+        status: 'FAILED',
+        running: false,
+        finished_at: new Date().toISOString(),
+        message: String(error.message || error),
+      };
+    });
+    sendJson(res, 202, { ok: true, status: 'RUNNING', started_at: timetableRefreshJob.started_at });
     return;
   }
   if (req.method === 'GET' && url.pathname === '/api/activities') {
@@ -233,16 +515,28 @@ const server = http.createServer((req, res) => {
     return;
   }
   if (req.method === 'GET' || req.method === 'HEAD') {
-    const requested = url.pathname === '/' ? '/index.html' : url.pathname;
+    if (url.pathname === '/' || url.pathname === '/index.html' || url.pathname === '/route.html') {
+      const html = dashboardIndexHtml();
+      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' });
+      res.end(html);
+      return;
+    }
+    const mounted = resolveMountedFile(url.pathname);
+    if (mounted) {
+      const mime = contentType(mounted);
+      res.writeHead(200, { 'Content-Type': mime, 'Cache-Control': mime.startsWith('text/html') ? 'no-store' : 'public, max-age=300' });
+      fs.createReadStream(mounted).pipe(res);
+      return;
+    }
+    const requested = url.pathname;
     const file = path.resolve(publicDir, `.${requested}`);
     if (!file.startsWith(publicDir + path.sep) || !fs.existsSync(file) || !fs.statSync(file).isFile()) {
       res.writeHead(404);
       res.end('Not found');
       return;
     }
-    const ext = path.extname(file);
-    const mime = ext === '.css' ? 'text/css; charset=utf-8' : ext === '.js' ? 'text/javascript; charset=utf-8' : 'text/html; charset=utf-8';
-    res.writeHead(200, { 'Content-Type': mime, 'Cache-Control': ext === '.html' ? 'no-store' : 'public, max-age=300' });
+    const mime = contentType(file);
+    res.writeHead(200, { 'Content-Type': mime, 'Cache-Control': path.extname(file) === '.html' ? 'no-store' : 'public, max-age=300' });
     fs.createReadStream(file).pipe(res);
     return;
   }
