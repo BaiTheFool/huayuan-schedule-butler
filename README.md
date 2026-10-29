@@ -21,6 +21,14 @@
 - 完整演示脚本、固定样例与预期输出：[`GOLDEN-PATH.md`](GOLDEN-PATH.md)
 - 一条命令复跑黄金路径：`node golden-path\check.js`（49 项断言，离线、不用登录）
 
+> 版本 0.12.0 新增**考试复习 + 手动待办**：按专业筛选考试安排，自动拆 T-14/T-7/T-3/T-1 复习任务；手动待办可填截止/耗时/优先级；任务会标进当天自习块，页面开着时可开启截止前 1 小时提醒。考试数据需要导入 `exams.json`；内置的考试目录是**虚构示例**，不是教务真实安排。
+>
+> 版本 0.11.0 新增**专业入口 + 教务课表导入**：路线页面可以直接填写专业（保存在本机），并导入 `jw-timetable.json`；导入时先校验是不是大学城校区、有多少门课、当前第几周，五山课表会被拒绝。命令行用 `--major` 和 `--timetable` 对应。
+>
+> 版本 0.10.1 为一日路线接入**天气**：晴/多云/小雨/大雨/高温/寒冷/空气污染会改变运动与放松地点、步行时间、缓冲和提醒；页面可手动选，也可用 Open-Meteo 实时天气（无需 Key，失败自动退回手动）。只覆盖大学城校区，五山课表会被明确拒绝而不是硬套。
+>
+> 版本 0.10.0 新增**大学城一日路线**：按当天课表、食堂/图书馆/宿舍热水开放时间和「卷 / 玩 / 运动」权重，排出地点顺序、步行/骑行路段与分钟级日程；可选手机定位作为起点，课间人流与雨天会自动加时。只覆盖大学城校区，五山课表会被明确拒绝而不是硬套。
+>
 > 版本 0.9.0 新增**校园活动信息流**：初始化询问用户所在学院，内置 42 个本科相关学院/书院官网入口；抓取校级来源后，自动发现所选学院的通知、学生工作、团学、活动、竞赛和讲座栏目。活动页分别展示“校级”和“我的学院”，可直接刷新或发送“刷新校园活动”。公众号和班级群消息标为用户补充来源，不伪装成自动抓取。
 >
 > 版本 0.8.3 改为**任务连续优先，休息后补**：课程等硬占用之后，先把明确任务按完整预计耗时排进去，再把每日休息配额放进剩余时间；不再让固定的偏好休息时刻把 45 分钟任务切成无意义的 38+7 分钟。只有连续窗口确实放不下长任务时才拆段。
@@ -60,6 +68,7 @@ Agent 型（单个 AI 专家）
 3. **可解释日程分析**：当前占用 → 空闲窗口 → 推荐休息与作业时段 → 冲突与待确认分离，每条结论都带"因为…所以…"
 4. **跨平台去重合并**：合并重复任务并保留全部来源，证据不足时保留两条并提示确认，**只合并标记、不删条目**
 5. **不说假话**：没读到就说"未读到"，读到 0 条才说"没有"，读不全就标"不确定"，绝不伪造 0 待办
+6. **大学城一日路线**：按课表、食堂/图书馆/热水开放时间和卷/玩/运动权重，排出地点顺序、步行/骑行路段与分钟级日程；支持专业入口、教务课表/考试导入、自动复习任务、手动待办、手机定位起点、天气与课间人流修正（雨天/高温/污染自动改室内）
 
 ## 新用户上手
 
@@ -316,6 +325,44 @@ node skills/huayuan-dashboard-widget/scripts/build-widget.js --self-check       
 ```
 
 脚本输出 `title / widget_code / loading_messages / text_fallback / meta`，由 Agent 直接传给 WorkBuddy 原生 `show_widget`。**不启动本地服务器、不落地 HTML 文件、不引外部脚本、不调网络**；`show_widget` 失败时降级成一条"第一动作 + 下一步"文字。触发时机只有三类：初始化刚完成、你说"看驾驶舱 / 看时间轴 / 看一下今天安排"、你完成或延后或临时新增并重算之后。带“打开/网页/分屏”的请求走外部网页驾驶舱，不走向内嵌卡片。
+
+## 内置技能 huayuan-campus-route
+
+按**当天课表**和**大学城校区开放时间**排一条能走通的一日路线，回答“今天怎么走 / 上完课顺路去哪个饭堂 / 图书馆闭馆前怎么安排”：
+
+![华园一日路线预览](skills/huayuan-campus-route/assets/preview.png)
+
+填入专业并导入 `jw-timetable.json` 后，顶部会显示课程数与教学周（下图为示例数据）：
+
+![专业与课表导入预览](skills/huayuan-campus-route/assets/preview-import.png)
+
+考试与待办：导入考试后自动拆复习任务，也可以手动加待办（下图为虚构示例考试）：
+
+![考试与待办预览](skills/huayuan-campus-route/assets/preview-tasks.png)
+
+```bash
+node skills/huayuan-campus-route/scripts/day-route.js --demo --date 2026-10-29 --preset balanced
+node skills/huayuan-campus-route/scripts/day-route.js --timetable <输出目录>\jw-timetable.json --major 软件工程 --preset sport
+node skills/huayuan-campus-route/scripts/day-route.js --demo --major 软件工程 --exams exams.json
+node skills/huayuan-campus-route/scripts/day-route.js --demo --tasks tasks.json
+node skills/huayuan-campus-route/scripts/day-route.js --demo --weather rain --temp 23 --mode bike --traffic peak
+node skills/huayuan-campus-route/scripts/day-route.js --demo --weather heat --temp 35
+node skills/huayuan-campus-route/scripts/day-route.js --demo --gps 23.0469,113.4054,wgs84
+node skills/huayuan-campus-route/test/check-route.js
+```
+
+- **专业入口**：页面顶部填“专业”，保存在本机 `localStorage`；命令行用 `--major 软件工程`；专家里用 `manage-items.js set-major --name 软件工程`。专业只用于展示和日程上下文，不改变教务读取。
+- **从教务导入课表**：先在助手里完成初始化/读取教务，拿到 `jw-timetable.json`；页面点“导入教务课表”选择该文件。导入时会校验：是不是大学城、几门课、有没有缺时间、当前第几周；五山/广州国际校区会拒绝。
+- **考试复习与待办**：展开“考试与待办”，导入 `exams.json` 或载入**虚构示例**；按专业筛选考试，自动拆 T-14/T-7/T-3/T-1 复习任务。手动待办填截止、预计分钟、优先级；任务会标进当天自习块。页面开着时可开启截止前 1 小时提醒。真实考试安排需要导入，内置示例不是教务真实数据。
+- 四个画像：卷王 / 均衡 / 玩咖 / 运动；也可以用 `--study/--play/--sport` 自定义权重。
+- 固定课程不动；早餐/午餐/晚餐按下一节课就近选一饭或二饭；自习进图书馆（07:30–23:00）或 C11 尚学空间；运动进田径场/体育馆；洗澡卡在热水 12:00–14:00、17:00–00:00，并在门禁前回宿舍。
+- **天气会改路线**：小雨/大雨把运动改体育馆、放松改咖啡厅/尚学空间，步行时间按天气系数加时；高温/污染取消露天跑步；寒冷加热身提醒；并给出带伞、防晒、口罩等提示。页面可选天气，也可点“实时”用 Open-Meteo 获取（无需 Key，失败自动保留手动天气；URL 加 `?live=1` 可自动取）。
+- 每段路算步行/骑行时间，课间人流、天气、高峰会加时；产物 `day-route.json` / `day-route.md` 带每段依据、开放时间校验和天气说明。
+- 可视化页面 `skills/huayuan-campus-route/public/index.html`，**不用起服务器**，双击即可：切画像、拖权重、选天气、开骑行、导入课表/考试、加待办、点“定位我”或“模拟在图书馆”、导出 Markdown。
+- 只覆盖**大学城校区**；读到五山/广州国际校区会返回 `CAMPUS_UNSUPPORTED`，不硬套。图书馆、热水、门禁为官方来源；饭堂/体育馆时段是参考值，页面标“以现场为准”。
+- 手机定位只在用户点击后读取，浏览器本地换算 WGS-84 → GCJ-02，不上传；被拒绝或超时会明确提示。地图是按真实 POI 经纬度绘制的**示意图**，不是导航底图，不接实时路况 API。
+- 20 项扩展逐条状态、复用点与建议下一步：[`docs/ROADMAP-20.md`](docs/ROADMAP-20.md)。
+- 完整使用说明（页面按钮、CLI 参数、常见问题）：[`skills/huayuan-campus-route/USAGE.md`](skills/huayuan-campus-route/USAGE.md)。
 
 ## 平台支持矩阵
 

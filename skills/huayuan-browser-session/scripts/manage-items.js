@@ -25,6 +25,7 @@
  *   node manage-items.js week --timetable ../jw-timetable.json   # 识别当前教学周（只读，不写文件）
  *   node manage-items.js set-week --number 10                    # 用户确认后保存
  *   node manage-items.js set-college --name 软件学院             # 保存学院，活动推送会追加该学院来源
+ *   node manage-items.js set-major --name 软件工程               # 保存专业，供展示与排课上下文使用
  */
 
 const fs = require('fs');
@@ -1031,6 +1032,19 @@ function cmdSetCollege() {
   console.log('学院仅用于筛选公开活动来源，不写入学校系统。');
 }
 
+function cmdSetMajor() {
+  const name = String(arg('--name', arg('--major', '')) || '').trim().slice(0, 40);
+  if (!name) fail('MISSING_MAJOR', '请用 --name 指定专业名称');
+  const current = readPreferences();
+  const raw = current.exists && current.raw ? current.raw : {};
+  raw.major = name;
+  raw.updated_at = new Date().toISOString();
+  const { preferences } = normalizePreferences(raw);
+  writePreferences(preferences);
+  console.log(`MAJOR_SET:${preferences.major}`);
+  console.log('专业只用于展示与排课上下文，不写入学校系统，也不改变教务课表读取。');
+}
+
 function main() {
   const command = process.argv[2];
   if (command === '--self-check') {
@@ -1049,12 +1063,13 @@ function main() {
     week: cmdWeek,
     'set-week': cmdSetWeek,
     'set-college': cmdSetCollege,
+    'set-major': cmdSetMajor,
     legacy: cmdLegacy,
   };
   const handler = table[command];
   if (!handler) {
     console.error(
-      '用法：node manage-items.js <add-course|add-task|add-personal|cancel-course|done|defer|remove|list|set-week|set-college|legacy> [参数]'
+      '用法：node manage-items.js <add-course|add-task|add-personal|cancel-course|done|defer|remove|list|set-week|set-college|set-major|legacy> [参数]'
     );
     console.error(`覆盖层文件：${displayPath(overridesPath())}`);
     process.exit(2);

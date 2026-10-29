@@ -1,0 +1,23 @@
+{
+  "_note": "手动待办示例（虚构）。可用于 day-route.js --tasks 演示。",
+  "tasks": [
+    {
+      "id": "manual-demo-report",
+      "title": "交实验报告（样例）",
+      "due": "2026-10-30T23:59",
+      "priority": "P0",
+      "estimated_minutes": 60,
+      "source": "manual",
+      "done": false
+    },
+    {
+      "id": "manual-demo-words",
+      "title": "背英语单词（样例）",
+      "due": "2026-10-31T21:00",
+      "priority": "P2",
+      "estimated_minutes": 40,
+      "source": "manual",
+      "done": false
+    }
+  ]
+}
