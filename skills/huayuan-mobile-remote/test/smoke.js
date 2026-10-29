@@ -18,6 +18,7 @@ const { spawnSync } = require('child_process');
 
 const ROOT = path.resolve(__dirname, '..');
 const LAUNCHER = path.join(ROOT, 'scripts', 'launch-remote.js');
+const DISCOVERY_PORT = 4427; // 避开本机正在运行的 4327，防止端口复用导致测试抖动
 const WORK = fs.mkdtempSync(path.join(os.tmpdir(), 'huayuan-mobile-smoke-'));
 const HOME = path.join(WORK, 'home');
 const OUT = path.join(WORK, 'out');
@@ -37,6 +38,52 @@ function freePort() {
       const { port } = probe.address();
       probe.close(() => resolve(port));
     });
+  });
+}
+
+/** 模拟手机 App：广播 HUAYUAN_DISCOVER/1，等电脑回端口。 */
+function probeDiscovery(expectedPort, timeoutMs = 3000, discoveryPort = DISCOVERY_PORT) {
+  const dgram = require('dgram');
+  return new Promise((resolve) => {
+    const socket = dgram.createSocket({ type: 'udp4', reuseAddr: true });
+    let done = false;
+    const finish = (result) => {
+      if (done) return;
+      done = true;
+      try {
+        socket.close();
+      } catch {
+        // ignore
+      }
+      resolve(result);
+    };
+    socket.on('message', (message) => {
+      try {
+        const body = JSON.parse(message.toString('utf8'));
+        if (body.service !== 'huayuan-mobile-remote') return;
+        if (Number(body.port) === expectedPort) {
+          finish({ found: true, port: Number(body.port), detail: `v${body.version || '?'}` });
+        }
+      } catch {
+        // 不认识的报文忽略
+      }
+    });
+    socket.bind(0, '0.0.0.0', () => {
+      try {
+        socket.setBroadcast(true);
+      } catch {
+        // ignore
+      }
+      const payload = Buffer.from('HUAYUAN_DISCOVER/1', 'utf8');
+      for (const target of ['255.255.255.255', '127.0.0.1']) {
+        try {
+          socket.send(payload, discoveryPort, target);
+        } catch {
+          // ignore
+        }
+      }
+    });
+    setTimeout(() => finish({ found: false, port: 0, detail: 'no reply' }), timeoutMs);
   });
 }
 
@@ -137,7 +184,7 @@ async function main() {
 
   const launch = spawnSync(
     process.execPath,
-    [LAUNCHER, '--now', path.join(OUT, 'now.json'), '--no-open', '--port', String(port)],
+    [LAUNCHER, '--now', path.join(OUT, 'now.json'), '--no-open', '--port', String(port), '--discovery-port', String(DISCOVERY_PORT)],
     { encoding: 'utf8', env, timeout: 30000 }
   );
   const stdout = `${launch.stdout || ''}${launch.stderr || ''}`;
@@ -190,6 +237,9 @@ async function main() {
 
     const queryAuth = await fetch(`${base}/api/dashboard?k=${encodeURIComponent(state.token)}`);
     check('链接内令牌同样可用（手机直连）', queryAuth.status === 200);
+
+    const discovered = await probeDiscovery(port);
+    check('局域网发现返回本机端口（App 用）', discovered.found && discovered.port === port, discovered.detail);
 
     const writeAttempt = await fetch(`${base}/api/dashboard`, { method: 'POST', headers });
     check('写方法被拒（405）', writeAttempt.status === 405);

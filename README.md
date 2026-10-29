@@ -21,6 +21,8 @@
 - 完整演示脚本、固定样例与预期输出：[`GOLDEN-PATH.md`](GOLDEN-PATH.md)
 - 一条命令复跑黄金路径：`node golden-path\check.js`（49 项断言，离线、不用登录）
 
+> 版本 0.13.0 为手机工作台加**局域网自动发现**：服务端在 UDP `4327` 上应答 `HUAYUAN_DISCOVER/1`（只回端口与版本，不回令牌/配对码，只应答私有地址），Android 壳（WebView APK）开屏即可自动列出同一 Wi-Fi 下的电脑，找不到时再手动输入地址。配套更新 `smoke.js`（33 项，新增发现用例）与 `check-mobile.js`（35 项）。
+>
 > 版本 0.12.0 新增**手机远程工作台**：内置技能 `huayuan-mobile-remote` 把“今日安排 / 全部待办 / 可参与事项 / 本周计划”变成手机可直接打开的只读网页。电脑上一条命令启动，手机同 Wi-Fi 打开地址 + 输入 6 位配对码即可；需要走出局域网时加 `--tunnel` 用本机 `cloudflared` 的免账号快速隧道拿 https 地址。前端是可“添加到主屏幕”的 PWA（192/512 图标、深色模式、下拉刷新），只读、无写接口，令牌+配对码+失败限速+路径白名单；新增回归 `golden-path\check-mobile.js`（33 项）与 `skills\huayuan-mobile-remote\test\smoke.js`（32 项）。
 >
 > 版本 0.11.0 新增**绩点与操行分顾问**：内置技能 `huayuan-score-advisor` 依据官方《2026 本科生手册》整理绩点两类算法（百分制平均学分绩点 / 四分制 GPA 动态转换）、综合测评 H=0.7X+0.1C+0.2S 与操行评定细则、奖学金与推免门槛，并提供两个计分工具（`gpa-calculator.js` 算绩点/学位/反推目标，`conduct-calculator.js` 算综合测评与操行分），新增回归门禁 `golden-path\check-score.js`（16 项，全绿）。
@@ -372,7 +374,9 @@ MOBILE_REMOTE_PUBLIC:https://xxxx.trycloudflare.com   # 仅 --tunnel 且隧道�
 - **只读**：与网页驾驶舱同一套结论，不提供提交作业、报名、缴费、删除或改学校数据的按钮；数据只来自本机 `now.json` / `plan.json` / `activity-feed.json`。
 - **配对与鉴权**：6 位配对码换令牌（令牌存 `%HUAYUAN_HOME%\mobile-remote.json`），配对码连续错 8 次锁 5 分钟；除 `/api/health` 外所有接口都要令牌。
 - **可安装**：`manifest.webmanifest` + 192/512 PNG 图标，支持“添加到主屏幕”，深色模式、下拉刷新、断网时显示上次缓存。
+- **局域网发现**：服务端同时监听 UDP `4327`，手机 App 广播 `HUAYUAN_DISCOVER/1` 即回端口与版本（不含令牌/配对码）；`MOBILE_REMOTE_DISCOVERY:udp://4327` 出现在启动日志里。
 - **公网访问**：`--tunnel` 用本机 `cloudflared`（免账号）开快速隧道；也可用任意虚拟组网（awl / Tailscale / 自建 FRP）把端口转发到手机。
+- **Android 壳（可选）**：`android-app/` 是一个不引第三方库的 WebView 壳，开屏自动发现电脑、记住地址，页面仍是同一套 PWA；构建见该目录 README。
 - **停止 / 换码**：`--stop` 停止服务与隧道；`--reset-pairing` 换新配对码，旧手机立即失效。
 - **防火墙**：首次监听会弹窗，允许“专用网络”；也可用 `netsh advfirewall firewall add rule name="Huayuan Mobile 4320" dir=in action=allow protocol=TCP localport=4320`。
 - **回归**：`node golden-path\check-mobile.js`（33 项）、`node skills\huayuan-mobile-remote\test\smoke.js`（32 项）。

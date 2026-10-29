@@ -123,6 +123,13 @@
 - 验证：`--tunnel` 第二次尝试即拿到 `MOBILE_REMOTE_PUBLIC`（`public_verified=true`），公网 `api/health`、`/api/pair`、`/api/dashboard` 全部 200；headless Edge 加载公网地址，设置页显示「公网隧道（https）」。
 - 预防规则：验证「公网域名」不要依赖本机 DNS（校园网/运营商污染很常见），DoH + `--resolve` 是唯一可控路径；隧道类探测必须给 DNS 传播留时间；进程存活比一次探测失败更重要（宁可标「未验证」也不要杀掉可用隧道）。
 
+### #16 · 2026-10-30 · Android 壳（0.13.0）：模拟器网络不可用、中文路径构建
+- 现象：APK 在 Android 11 模拟器里手动填 `10.0.2.2:4320` 报 `Failed to connect`；`adb shell ping 10.0.2.2` 直接 `Network is unreachable`；同一份代码在真机 Wi-Fi 下无此问题。
+- 根因：本机装了 awl / vgate / Tailscale 等多块虚拟网卡，模拟器 slirp NAT 没能建立默认路由（模拟器状态栏 Wi-Fi 图标带 `?`）；这不是 App 或服务端问题。另：AGP 对非 ASCII 工程路径敏感，直接在含中文的交付目录里构建容易踩 `android.overridePathCheck` 之外的新坑。
+- 解决：验证走 `adb reverse tcp:4320 tcp:4320`，让设备 `127.0.0.1:4320` 转发到宿主，完成「发现/手输地址 → 配对 → 页面渲染」全链路；APK 构建统一在 ASCII 临时目录（`C:\gcc-tmp\hywb`）执行，产物再拷回中文交付目录。
+- 验证：Android 11 模拟器里 APK 打开配对页、输入 6 位配对码、进入工作台；发现列表曾成功列出 `http://10.0.2.2:4345/`（一次），说明广播应答链路可用；服务端 UDP 探针 100% 回复。
+- 预防规则：**模拟器 ≠ 手机**，Android 网络问题先用 `adb reverse` 排除 NAT；真机验收再测 Wi-Fi 广播。Android 工程一律在 ASCII 路径构建；`usesCleartextTraffic` + `networkSecurityConfig` 必须同时给，否则 Android 9+ 直接拒绝局域网 http。
+
 ---
 
 ## 运行时错误日志（logs/errors.jsonl）使用说明

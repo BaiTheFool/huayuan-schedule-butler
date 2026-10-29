@@ -76,6 +76,8 @@ check('静态目录限制在 public 内', /publicDir \+ path\.sep/.test(serverSo
 check('响应带 CSP / nosniff / frame 保护', /Content-Security-Policy/.test(serverSource) && /nosniff/.test(serverSource) && /X-Frame-Options/.test(serverSource));
 check('不硬编码令牌或配对码', !/[0-9a-f]{40,}/.test(serverSource) && !/code\s*=\s*'\d{6}'/.test(serverSource));
 check('启动器支持公网隧道与停止', /--tunnel/.test(launcherSource) && /--stop/.test(launcherSource));
+check('服务端提供局域网发现（UDP 广播）', /HUAYUAN_DISCOVER/.test(serverSource) && /require\('dgram'\)/.test(serverSource));
+check('启动器打印发现端口', /MOBILE_REMOTE_DISCOVERY/.test(launcherSource));
 
 // 5) 端到端冒烟
 const smoke = spawnSync(process.execPath, [SMOKE], { encoding: 'utf8', timeout: 120000 });

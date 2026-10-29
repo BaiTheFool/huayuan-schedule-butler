@@ -13,6 +13,7 @@
  */
 
 const crypto = require('crypto');
+const dgram = require('dgram');
 const fs = require('fs');
 const http = require('http');
 const path = require('path');
@@ -22,6 +23,7 @@ const SERVICE = 'huayuan-mobile-remote';
 const API_VERSION = 1;
 const MAX_PAIR_FAILURES = 8;
 const PAIR_WINDOW_MS = 5 * 60 * 1000;
+const DISCOVERY_REQUEST = 'HUAYUAN_DISCOVER/1';
 
 const argv = process.argv;
 const argValue = (name, fallback = null) => {
@@ -320,3 +322,47 @@ server.on('error', (error) => {
 server.listen(port, host, () => {
   console.log(`MOBILE_REMOTE_SERVER_LISTENING:http://${host}:${port}`);
 });
+
+// ── 局域网发现（给手机 App 用）──────────────────────────────────────
+// App 向 255.255.255.255:4327 广播 HUAYUAN_DISCOVER/1，这里只回一个端口 + 版本，
+// 不回令牌、不回配对码、不回任何数据；只应答来源是私有地址的请求。
+const version = String(argValue('--version', '') || '');
+const discoveryPort = Number(argValue('--discovery-port', '4327'));
+
+function isPrivateAddress(address) {
+  if (!address) return false;
+  if (address === '127.0.0.1' || address.startsWith('::ffff:127.')) return true;
+  const parts = address.replace(/^::ffff:/, '').split('.').map(Number);
+  if (parts.length !== 4) return false;
+  if (parts[0] === 10) return true;
+  if (parts[0] === 192 && parts[1] === 168) return true;
+  if (parts[0] === 172 && parts[1] >= 16 && parts[1] <= 31) return true;
+  return false;
+}
+
+if (Number.isFinite(discoveryPort) && discoveryPort > 0) {
+  const discovery = dgram.createSocket({ type: 'udp4', reuseAddr: true });
+  discovery.on('error', () => {
+    try {
+      discovery.close();
+    } catch {
+      // 端口被另一个实例占用时静默跳过：发现只是便利功能
+    }
+  });
+  discovery.on('message', (message, remote) => {
+    if (!isPrivateAddress(remote.address)) return;
+    if (message.toString('utf8').trim() !== DISCOVERY_REQUEST) return;
+    const reply = Buffer.from(
+      JSON.stringify({ service: SERVICE, api_version: API_VERSION, port, version, name: '华园日程管家 · 手机工作台' }),
+      'utf8'
+    );
+    discovery.send(reply, remote.port, remote.address, () => {});
+  });
+  discovery.bind(discoveryPort, '0.0.0.0', () => {
+    try {
+      discovery.setBroadcast(true);
+    } catch {
+      // 某些网络不允许，忽略
+    }
+  });
+}

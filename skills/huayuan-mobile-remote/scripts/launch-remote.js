@@ -97,6 +97,21 @@ function newPairCode() {
   return String(crypto.randomInt(0, 1000000)).padStart(6, '0');
 }
 
+/** 读 VERSION.md 首行；读不到也不影响启动（发现报文里版本号只是给 App 显示）。 */
+function pluginVersion() {
+  try {
+    const first = fs
+      .readFileSync(path.join(__dirname, '..', '..', '..', 'VERSION.md'), 'utf8')
+      .split(/\r?\n/)[0]
+      .trim();
+    const match = /^VERSION=(\S+)$/.exec(first);
+    if (match) return match[1];
+  } catch {
+    // 忽略
+  }
+  return '';
+}
+
 function lanAddresses() {
   const rows = [];
   const interfaces = os.networkInterfaces();
@@ -306,6 +321,8 @@ async function main() {
   await stopExisting();
 
   const host = argValue('--host', '0.0.0.0');
+  const discoveryPort = Number(argValue('--discovery-port', '4327'));
+  const version = pluginVersion();
   const token = newToken();
   const code = newPairCode();
 
@@ -316,7 +333,7 @@ async function main() {
     if (await waitForHealth(port, 200)) continue;
     const child = spawn(
       process.execPath,
-      [serverPath, '--now', nowPath, '--port', String(port), '--host', host, '--token', token, '--code', code],
+      [serverPath, '--now', nowPath, '--port', String(port), '--host', host, '--token', token, '--code', code, '--version', version, '--discovery-port', String(discoveryPort)],
       { detached: true, stdio: 'ignore', windowsHide: true, cwd: __dirname }
     );
     child.unref();
@@ -339,6 +356,7 @@ async function main() {
     pid: chosen.pid,
     tunnel_pid: null,
     public_url: null,
+    discovery_port: discoveryPort,
     started_at: new Date().toISOString(),
   };
 
@@ -372,6 +390,7 @@ function printReady(state) {
   console.log(`MOBILE_REMOTE_PAIR:${state.code}`);
   console.log(`MOBILE_REMOTE_LOCAL:http://127.0.0.1:${state.port}/?k=${state.token}`);
   console.log(`MOBILE_REMOTE_PORT:${state.port}`);
+  if (state.discovery_port) console.log(`MOBILE_REMOTE_DISCOVERY:udp://${state.discovery_port}`);
   if (state.public_url) {
     console.log(`${state.public_verified === false ? 'MOBILE_REMOTE_PUBLIC_UNVERIFIED' : 'MOBILE_REMOTE_PUBLIC'}:${state.public_url}`);
   }
