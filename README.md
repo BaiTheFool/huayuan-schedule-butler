@@ -21,6 +21,8 @@
 - 完整演示脚本、固定样例与预期输出：[`GOLDEN-PATH.md`](GOLDEN-PATH.md)
 - 一条命令复跑黄金路径：`node golden-path\check.js`（49 项断言，离线、不用登录）
 
+> 版本 0.12.0 新增**手机远程工作台**：内置技能 `huayuan-mobile-remote` 把“今日安排 / 全部待办 / 可参与事项 / 本周计划”变成手机可直接打开的只读网页。电脑上一条命令启动，手机同 Wi-Fi 打开地址 + 输入 6 位配对码即可；需要走出局域网时加 `--tunnel` 用本机 `cloudflared` 的免账号快速隧道拿 https 地址。前端是可“添加到主屏幕”的 PWA（192/512 图标、深色模式、下拉刷新），只读、无写接口，令牌+配对码+失败限速+路径白名单；新增回归 `golden-path\check-mobile.js`（33 项）与 `skills\huayuan-mobile-remote\test\smoke.js`（32 项）。
+>
 > 版本 0.11.0 新增**绩点与操行分顾问**：内置技能 `huayuan-score-advisor` 依据官方《2026 本科生手册》整理绩点两类算法（百分制平均学分绩点 / 四分制 GPA 动态转换）、综合测评 H=0.7X+0.1C+0.2S 与操行评定细则、奖学金与推免门槛，并提供两个计分工具（`gpa-calculator.js` 算绩点/学位/反推目标，`conduct-calculator.js` 算综合测评与操行分），新增回归门禁 `golden-path\check-score.js`（16 项，全绿）。
 >
 > 版本 0.10.2 新增**共同开发指南与工程治理闭环**：仓库加入 `CONTRIBUTING.md`（分支/PR/测试门禁/打包/版本规则/隐私红线），其协作规范已整合进 `AGENTS.md` 并新增**开发者自更新契约**（文档与代码不符时以代码为准、直接修正，不自更=任务未完成）；补齐 `golden-path/fixtures/preferences.json`，全量测试门禁首次全绿（`GOLDEN_PATH:PASS 49/49`、`V081:PASS 9/9`、`PERFORMANCE:PASS 7/7` 等，见 `ERROR_LOG.md` #11/#12）；`bump-version.ps1` 发版链路实测通过。
@@ -66,6 +68,7 @@ Agent 型（单个 AI 专家）
 3. **可解释日程分析**：当前占用 → 空闲窗口 → 推荐休息与作业时段 → 冲突与待确认分离，每条结论都带"因为…所以…"
 4. **跨平台去重合并**：合并重复任务并保留全部来源，证据不足时保留两条并提示确认，**只合并标记、不删条目**
 5. **不说假话**：没读到就说"未读到"，读到 0 条才说"没有"，读不全就标"不确定"，绝不伪造 0 待办
+6. **手机远程工作台**：一条命令把今日安排、全部待办、校园活动和本周计划变成手机可打开的只读 PWA，局域网直连、配对码鉴权，需要时用免账号隧道走出内网
 
 ## 新用户上手
 
@@ -345,6 +348,34 @@ node skills/huayuan-dashboard-widget/scripts/build-widget.js --self-check       
 - 隐私：真实成绩只在用户本机计算，不落盘到项目产物；所有样例均为虚构
 
 > 与 `huayuan-campus-manual`（社区版生存手册）的分工：本技能以官方手册条文为准，两者冲突时以本技能 + 学校最新官方通知为准，差异记入 `ERROR_LOG.md`。
+
+## 内置技能 huayuan-mobile-remote（手机远程工作台）
+
+不在电脑前也想看一眼“现在该干什么”时用：
+
+```powershell
+node skills\huayuan-mobile-remote\scripts\launch-remote.js            # 局域网
+node skills\huayuan-mobile-remote\scripts\launch-remote.js --tunnel   # 外加公网 https 地址
+```
+
+终端会输出手机要打开的地址与 6 位配对码：
+
+```text
+MOBILE_REMOTE_READY:http://192.168.1.23:4320/
+MOBILE_REMOTE_PAIR:123456
+MOBILE_REMOTE_LOCAL:http://127.0.0.1:4320/?k=<令牌>
+MOBILE_REMOTE_PUBLIC:https://xxxx.trycloudflare.com   # 仅 --tunnel 且隧道成功时
+```
+
+手机浏览器打开 `MOBILE_REMOTE_READY`（或 `MOBILE_REMOTE_PUBLIC`），输入配对码即连上；同一台手机只需输一次，之后直接打开。页面底部四个 Tab：**今日 / 待办 / 活动 / 本周**，设置页可刷新、复制刷新指令、解除配对。
+
+- **只读**：与网页驾驶舱同一套结论，不提供提交作业、报名、缴费、删除或改学校数据的按钮；数据只来自本机 `now.json` / `plan.json` / `activity-feed.json`。
+- **配对与鉴权**：6 位配对码换令牌（令牌存 `%HUAYUAN_HOME%\mobile-remote.json`），配对码连续错 8 次锁 5 分钟；除 `/api/health` 外所有接口都要令牌。
+- **可安装**：`manifest.webmanifest` + 192/512 PNG 图标，支持“添加到主屏幕”，深色模式、下拉刷新、断网时显示上次缓存。
+- **公网访问**：`--tunnel` 用本机 `cloudflared`（免账号）开快速隧道；也可用任意虚拟组网（awl / Tailscale / 自建 FRP）把端口转发到手机。
+- **停止 / 换码**：`--stop` 停止服务与隧道；`--reset-pairing` 换新配对码，旧手机立即失效。
+- **防火墙**：首次监听会弹窗，允许“专用网络”；也可用 `netsh advfirewall firewall add rule name="Huayuan Mobile 4320" dir=in action=allow protocol=TCP localport=4320`。
+- **回归**：`node golden-path\check-mobile.js`（33 项）、`node skills\huayuan-mobile-remote\test\smoke.js`（32 项）。
 
 ## 平台支持矩阵
 

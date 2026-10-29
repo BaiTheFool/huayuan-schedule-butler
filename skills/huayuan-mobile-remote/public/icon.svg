@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512" role="img" aria-label="华园日程管家手机工作台">
+  <rect width="512" height="512" rx="112" fill="#143f33"/>
+  <rect x="82" y="123" width="348" height="287" rx="36" fill="#fbf7ec"/>
+  <path d="M82 159a36 36 0 0 1 36-36h276a36 36 0 0 1 36 36v48H82z" fill="#143f33"/>
+  <rect x="143" y="90" width="34" height="64" rx="17" fill="#fbf7ec"/>
+  <rect x="335" y="90" width="34" height="64" rx="17" fill="#fbf7ec"/>
+  <g fill="#1b2a23">
+    <circle cx="142" cy="268" r="14"/>
+    <circle cx="215" cy="268" r="14"/>
+    <circle cx="288" cy="268" r="14"/>
+    <circle cx="142" cy="331" r="14"/>
+    <circle cx="215" cy="331" r="14"/>
+  </g>
+  <path d="M266 331l51 51 82-97" fill="none" stroke="#c8603c" stroke-width="38" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

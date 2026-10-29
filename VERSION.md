@@ -1,4 +1,11 @@
-VERSION=0.11.0
+VERSION=0.12.0
+
+### 0.12.0 · 2026-10-30 · feat: add mobile remote workbench (read-only PWA, pairing code, optional cloudflared tunnel)
+- 新增内置技能 `huayuan-mobile-remote`：手机浏览器直接打开「今日安排 / 全部待办 / 可参与事项 / 本周计划」的只读工作台；`launch-remote.js` 一条命令起服务，打印局域网地址与 6 位配对码，`--tunnel` 用本机 `cloudflared` 免账号快速隧道拿到公网 https 地址。
+- 新增共享只读快照层 `huayuan-live-dashboard/lib/snapshot.js`：网页驾驶舱与手机端共用同一份 `now/todo/sync/activities/prompts` 组装逻辑，端到端结论一致（`dashboard-server.js` 同步改为引用它，API 版本仍为 3）。
+- 手机端为可安装 PWA：`manifest.webmanifest` + 程序化生成的 192/512/180 PNG 图标、深色模式、下拉刷新、断网回退到 localStorage 缓存；底部四个 Tab + 设置页（复制刷新指令、解除配对）。
+- 安全：除 `/api/health` 外所有接口要求令牌（`timingSafeEqual`）；配对码错 8 次锁 5 分钟；静态资源只从 `public/` 白名单读取；统一 CSP / nosniff / frame 保护；服务端零写文件。
+- 新增回归：`skills/huayuan-mobile-remote/test/smoke.js`（32 项）、`golden-path/check-mobile.js`（33 项）。
 
 ### 0.11.0 · 2026-10-28 · feat: huayuan-score-advisor GPA/conduct calculators + official-manual KB (0.11.0)
 
