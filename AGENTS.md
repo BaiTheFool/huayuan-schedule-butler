@@ -70,7 +70,7 @@ node golden-path\check-performance.js # 性能
 node golden-path\check-dashboard-reuse.js # 驾驶舱保持同一 PID 并刷新本地数据
 node golden-path\check-activities.js  # 校园活动
 node golden-path\check-score.js       # 绩点/操行分计分工具（0.11.0）
-node golden-path\check-mobile.js      # 手机远程工作台（含路线地图与 41 项服务冒烟）
+node golden-path\check-mobile.js      # 手机远程工作台（含实时时间、路线地图与 41 项服务冒烟）
 
 # 单步脚本（示例）
 node skills\huayuan-browser-session\scripts\first-run.js --wizard --login

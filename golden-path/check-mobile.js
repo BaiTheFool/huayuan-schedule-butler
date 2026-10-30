@@ -77,6 +77,12 @@ check(
   /content\.scrollTop\s*=\s*0/.test(appJs) &&
     /\$\('content'\)\.addEventListener\(\s*'scroll'/.test(appJs)
 );
+check(
+  '手机当前时间使用设备实时时间',
+  /function liveClock\(\)/.test(appJs) &&
+    /const clock = liveClock\(\)/.test(appJs) &&
+    !/const clock = \(now\.now && now\.now\.time\)/.test(appJs)
+);
 
 // 4) 安全约束（源码级）
 check('服务端只读：写方法统一 405', /READ_ONLY/.test(serverSource) && /'POST'/.test(serverSource));

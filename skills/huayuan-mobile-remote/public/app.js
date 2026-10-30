@@ -233,6 +233,11 @@
     return match ? Number(match[1]) * 60 + Number(match[2]) : null;
   }
 
+  function liveClock() {
+    const now = new Date();
+    return `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+  }
+
   function renderRouteMap(route) {
     const bounds = route && route.campus && route.campus.bounds;
     if (!bounds) return '';
@@ -316,8 +321,8 @@
     const data = state.data || {};
     const now = data.now || {};
     const first = now.first_action || {};
-    const clock = (now.now && now.now.time) || '--:--';
-    const weekday = (now.now && now.now.weekday) || weekdayOf(now.now && now.now.date);
+    const clock = liveClock();
+    const weekday = weekdayOf(todayIso());
     const week = now.week || {};
 
 
@@ -333,13 +338,39 @@
 
     const current = now.current || {};
     const firstType = String(first.type || '');
-    const currentValue = /class/.test(firstType)
-      ? '要上课'
-      : current.status === 'in_class'
-        ? '在上课'
-        : current.status === 'busy'
-          ? '有安排'
-          : '空闲';
+    const currentMinutes = clockMinutes(clock);
+    const routeToday =
+      data.route &&
+      data.route.ok &&
+      data.route.meta &&
+      data.route.meta.date === todayIso();
+    const currentBlock =
+      routeToday && currentMinutes != null
+        ? (data.route.blocks || []).find(
+            (block) => Number(block.start_min) <= currentMinutes && Number(block.end_min) > currentMinutes
+          )
+        : null;
+    const currentValue = currentBlock
+      ? currentBlock.type === 'class'
+        ? '要上课'
+        : currentBlock.type === 'walk'
+          ? '在路上'
+          : currentBlock.type === 'meal'
+            ? '用餐'
+            : currentBlock.type === 'study'
+              ? '自习'
+              : currentBlock.type === 'sport'
+                ? '运动'
+                : currentBlock.type === 'play'
+                  ? '放松'
+                  : '有安排'
+      : /class/.test(firstType)
+        ? '要上课'
+        : current.status === 'in_class'
+          ? '在上课'
+          : current.status === 'busy'
+            ? '有安排'
+            : '空闲';
     const hasRoute = renderRouteOverview(data);
     const facts = [
       { label: '此刻', value: currentValue },
@@ -351,7 +382,6 @@
       .join('');
 
     const routeBlocks = hasRoute ? data.route.blocks || [] : [];
-    const currentMinutes = clockMinutes(clock);
     const rows = routeBlocks.length
       ? routeBlocks
           .filter((block) => currentMinutes == null || Number(block.end_min) >= currentMinutes - 1)
@@ -685,9 +715,9 @@
     const data = state.data || {};
     const now = data.now || {};
     if (view === 'today') {
-      const clock = (now.now && now.now.time) || '';
+      const clock = liveClock();
       const week = (now.week && now.week.number != null) ? `第 ${now.week.number} 周` : '教学周未确认';
-      return `${(now.now && now.now.weekday) || ''} · ${week}${clock ? ` · ${clock}` : ''}`;
+      return `${weekdayOf(todayIso())} · ${week} · ${clock}`;
     }
     if (view === 'todo') return `共 ${(data.todo && data.todo.total) || 0} 条待办`;
     if (view === 'activities') {
@@ -828,6 +858,9 @@
     setInterval(() => {
       if (document.visibilityState === 'visible') load({ silent: true });
     }, REFRESH_MS);
+    setInterval(() => {
+      if (document.visibilityState === 'visible' && state.view === 'today' && state.data) renderToday();
+    }, 30000);
 
     const topbar = $('topbar');
     $('content').addEventListener(

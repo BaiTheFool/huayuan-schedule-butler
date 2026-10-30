@@ -1,4 +1,4 @@
-VERSION=0.14.10
+VERSION=0.14.11
 
 # 华园日程管家 · 版本记录
 
@@ -7,6 +7,11 @@ VERSION=0.14.10
 > 规则：版本号一律由脚本递增，**不要手动改** VERSION.md 与 plugin.json 的版本号；确需大/中版本时用 `-Part major|minor`。
 
 ## 变更日志（新→旧）
+
+### 0.14.11 · 2026-10-30 · fix: use live device clock in mobile workbench
+- 手机顶部和“此刻”改用设备实时时间，每 30 秒自动更新，不再显示 `now.json` 生成时间。
+- 当前活动依据最新路线块和实时分钟判断，快照时间旧也不会让“要上课/在路上/用餐”长期停滞。
+- 手机总回归扩展到 44 项。
 
 ### 0.14.10 · 2026-10-30 · fix: refresh mobile after local ignore and defer changes
 - 手机服务绑定固定 `live-now.json`，不再固定到启动时的历史 `now.json`；完成、延后或忽略事项后下一次刷新即可同步。
