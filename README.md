@@ -382,6 +382,10 @@ node skills/huayuan-campus-route/test/check-route.js
 - 20 项扩展逐条状态、复用点与建议下一步：[`docs/ROADMAP-20.md`](docs/ROADMAP-20.md)。
 - 完整使用说明（页面按钮、CLI 参数、常见问题）：[`skills/huayuan-campus-route/USAGE.md`](skills/huayuan-campus-route/USAGE.md)。
 
+## 内置技能 huayuan-campus-manual（校园手册知识库）
+
+回答作息与节次、校巴、食堂、校区地图、学业规则、就医医保、竞赛、毕业去向和新生入门等非实时校园生活问题。技能先从 `knowledge/000-知识库索引.md` 定位资料；具体数字和时效规则标注“手册数据，以官方最新通知为准”。当前产品只向用户展示大学城相关内容，五山和广州国际资料不进入路线及主流程。
+
 ## 平台支持矩阵
 
 | 平台 | 入口（通用域名） | 读取状态 | 登录方式 | 可读内容 |
