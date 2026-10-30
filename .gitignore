@@ -7,6 +7,8 @@ dist/
 # Local configuration or generated plans
 config.json
 preferences.json
+# 例外：黄金路径离线回归的虚构样例偏好（仅此路径；真实用户偏好仍一律忽略、禁止提交）
+!golden-path/fixtures/preferences.json
 user-overrides.json
 user-state.json
 live-dashboard.json
