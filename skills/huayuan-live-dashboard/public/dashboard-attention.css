@@ -1,0 +1,211 @@
+.huayuan-attention-card {
+  position: relative;
+  z-index: 30;
+  margin: 10px 24px 0;
+  padding: 14px 15px;
+  border: 1px solid rgba(201, 79, 79, 0.28);
+  border-radius: 14px;
+  background:
+    radial-gradient(circle at 100% 0%, rgba(201, 79, 79, 0.1), transparent 34%),
+    rgba(255, 253, 247, 0.96);
+  box-shadow: 0 10px 28px rgba(57, 48, 30, 0.09);
+}
+
+.huayuan-attention-card[hidden],
+.huayuan-tab-dot[hidden],
+.huayuan-dot[hidden] {
+  display: none !important;
+}
+
+.huayuan-attention-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.huayuan-attention-kicker {
+  color: #a33b2f;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+}
+
+.huayuan-attention-card h2 {
+  margin: 4px 0 2px;
+  font-size: 16px;
+  line-height: 1.4;
+}
+
+.huayuan-attention-card p {
+  margin: 0;
+  color: var(--ink-2, #43534b);
+  font-size: 11.5px;
+  line-height: 1.55;
+}
+
+.huayuan-attention-progress {
+  flex: none;
+  min-width: 88px;
+  padding: 6px 9px;
+  border-radius: 999px;
+  background: rgba(201, 79, 79, 0.08);
+  color: #8f352b;
+  font-size: 10px;
+  font-weight: 800;
+  text-align: center;
+}
+
+.huayuan-attention-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  gap: 7px;
+  margin: 11px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.huayuan-attention-item {
+  min-width: 0;
+  padding: 9px 10px;
+  border: 1px solid rgba(201, 79, 79, 0.16);
+  border-radius: 10px;
+  background: rgba(255, 250, 246, 0.8);
+}
+
+.huayuan-attention-item-head {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.huayuan-attention-item-head strong {
+  min-width: 0;
+  font-size: 11.5px;
+  line-height: 1.4;
+}
+
+.huayuan-attention-item small {
+  display: block;
+  margin: 3px 0 7px 14px;
+  color: var(--muted, #7d8a81);
+  font-size: 9.5px;
+  line-height: 1.45;
+}
+
+.huayuan-attention-copy {
+  margin-left: 14px;
+  padding: 5px 8px;
+  border: 1px solid rgba(47, 107, 79, 0.22);
+  border-radius: 7px;
+  background: rgba(223, 233, 221, 0.68);
+  color: var(--green, #2f6b4f);
+  font-size: 9.5px;
+  font-weight: 700;
+}
+
+.huayuan-attention-copy:hover {
+  background: #d3e3d0;
+}
+
+.huayuan-attention-main {
+  margin-top: 10px;
+  padding: 7px 10px;
+  border: 1px solid rgba(47, 107, 79, 0.26);
+  border-radius: 8px;
+  background: var(--green, #2f6b4f);
+  color: #f8f4e8;
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.huayuan-dot,
+.huayuan-tab-dot {
+  display: inline-block;
+  flex: none;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #d84a3d;
+  box-shadow: 0 0 0 3px rgba(216, 74, 61, 0.13);
+}
+
+.huayuan-page-nav a,
+.page-nav a {
+  position: relative;
+}
+
+.huayuan-tab-dot {
+  position: absolute;
+  top: 2px;
+  right: 1px;
+  width: 6px;
+  height: 6px;
+  box-shadow: 0 0 0 2px rgba(255, 253, 247, 0.95);
+}
+
+.huayuan-attention-target {
+  position: relative;
+}
+
+.huayuan-attention-target::after {
+  content: "";
+  position: absolute;
+  top: 7px;
+  right: 7px;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #d84a3d;
+  box-shadow: 0 0 0 3px rgba(216, 74, 61, 0.12);
+  pointer-events: none;
+}
+
+.huayuan-copy-toast {
+  position: fixed;
+  left: 50%;
+  bottom: 28px;
+  z-index: 9999;
+  max-width: min(520px, calc(100vw - 32px));
+  padding: 11px 16px;
+  border-radius: 10px;
+  background: rgba(31, 78, 59, 0.96);
+  color: #f8f4e8;
+  box-shadow: 0 10px 30px rgba(31, 48, 39, 0.24);
+  font-size: 12px;
+  opacity: 0;
+  pointer-events: none;
+  transform: translate(-50%, 10px);
+  transition: opacity 0.16s ease, transform 0.16s ease;
+}
+
+.huayuan-copy-toast.show {
+  opacity: 1;
+  transform: translate(-50%, 0);
+}
+
+@media (max-width: 860px) {
+  .huayuan-attention-card {
+    margin: 10px 12px 0;
+  }
+}
+
+@media (max-width: 520px) {
+  .huayuan-attention-card {
+    margin: 8px 8px 0;
+    padding: 12px;
+  }
+
+  .huayuan-attention-head {
+    display: block;
+  }
+
+  .huayuan-attention-progress {
+    width: fit-content;
+    margin-top: 7px;
+  }
+
+  .huayuan-attention-list {
+    grid-template-columns: 1fr;
+  }
+}

@@ -15,6 +15,7 @@
  */
 
 const fs = require('fs');
+const os = require('os');
 const path = require('path');
 const crypto = require('crypto');
 const { argValue, defaultOutputDir, displayPath } = require('./huayuan-paths');
@@ -24,6 +25,21 @@ const { collegeByInput } = require('./colleges');
 const ARGV = process.argv;
 const arg = (name, fallback = null) => argValue(ARGV, name, fallback);
 const flag = (name) => ARGV.includes(name);
+
+function publishDashboardActivities(jsonPath, homeDir = null) {
+  const home = path.resolve(
+    homeDir ||
+      process.env.HUAYUAN_HOME ||
+      path.join(os.homedir(), '.workbuddy', 'huayuan-schedule-butler')
+  );
+  fs.mkdirSync(home, { recursive: true });
+  const target = path.join(home, 'live-activities.json');
+  const temp = `${target}.${process.pid}.tmp`;
+  fs.copyFileSync(jsonPath, temp);
+  fs.renameSync(temp, target);
+  return target;
+}
+
 const USER_AGENT = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/131 Safari/537.36';
 const POSITIVE =
   /大赛|竞赛|比赛|挑战杯|创新创业|活动|讲座|报告会|论坛|沙龙|工作坊|宣讲|招聘会|双选会|开放日|训练营|培训|报名|招募|征集|志愿|公益|社团|艺术节|文化节|心理|就业|职场/i;
@@ -415,6 +431,8 @@ async function main() {
       const existing = JSON.parse(fs.readFileSync(jsonPath, 'utf8'));
       const generatedAt = Date.parse(existing.generated_at);
       if (Number.isFinite(generatedAt) && Date.now() - generatedAt < staleHours * 3600 * 1000) {
+        const dashboardPath = publishDashboardActivities(jsonPath);
+        console.log(`DASHBOARD_ACTIVITIES:${displayPath(dashboardPath)}`);
         console.log(`ACTIVITY_FEED_FRESH:${displayPath(jsonPath)}`);
         console.log(`ACTIVITY_FEED_SUMMARY:items=${existing.item_count || 0} sources=${(existing.sources || []).length} fresh=1`);
         return existing;
@@ -535,6 +553,7 @@ async function main() {
     warnings,
   };
   fs.writeFileSync(jsonPath, JSON.stringify(doc, null, 2), 'utf8');
+  const dashboardPath = publishDashboardActivities(jsonPath);
   const lines = [
     `# 可参与事项（${today}）`,
     '',
@@ -556,6 +575,7 @@ async function main() {
   fs.writeFileSync(mdPath, `${lines.join('\n')}\n`, 'utf8');
   console.log(`ACTIVITY_FEED_JSON:${displayPath(jsonPath)}`);
   console.log(`ACTIVITY_FEED_MD:${displayPath(mdPath)}`);
+  console.log(`DASHBOARD_ACTIVITIES:${displayPath(dashboardPath)}`);
   console.log(`ACTIVITY_FEED_SUMMARY:items=${items.length} sources=${sourceSummary.length} failed=${warnings.length}`);
   return doc;
 }
@@ -574,5 +594,6 @@ module.exports = {
   extractEventDate,
   extractListItems,
   knownItems,
+  publishDashboardActivities,
   selfCheck,
 };

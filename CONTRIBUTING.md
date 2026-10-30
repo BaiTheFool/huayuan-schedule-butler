@@ -9,7 +9,7 @@
 5. 由维护者合并到 `main`；
 6. 打包并安装成 WorkBuddy 专家测试。
 
-当前版本：`0.9.0`  
+当前版本：`0.14.11`
 仓库：<https://github.com/BaiTheFool/huayuan-schedule-butler>  
 主分支：`main`
 
@@ -24,7 +24,7 @@
 - 根据截止时间、预计耗时、作息与偏好生成日程；
 - 回答“我现在该干什么”；
 - 支持临时加课、加任务、加休息和重新排程；
-- 提供“今日安排、全部待办、可参与事项”三页本地 WebUI；
+- 提供“今日安排、全部待办、可参与事项、手机工作台”四页本地 WebUI；
 - 从公开网页抓取学校及学院活动信息。
 
 核心原则：
@@ -97,11 +97,21 @@ huayuan-schedule-butler/
 │  ├─ huayuan-task-card/
 │  ├─ timeline-brief/
 │  ├─ huayuan-dashboard-widget/
-│  └─ huayuan-live-dashboard/
+│  ├─ huayuan-live-dashboard/
+│  ├─ huayuan-campus-manual/   校园生存手册知识库（CC0，46 份知识文件）
+│  ├─ huayuan-score-advisor/   绩点与操行分顾问（官方手册口径 + gpa/conduct 计分工具）
+│  └─ huayuan-mobile-remote/   手机远程工作台（只读 PWA + 配对码 + 可选公网隧道）
+├─ scripts/
+│  ├─ bump-version.ps1         版本递增（VERSION.md + plugin.json 自动同步）
+│  └─ error-log.js             运行时错误日志（logs/errors.jsonl）
+├─ logs/                       运行时日志目录
 ├─ golden-path/
 ├─ README.md
 ├─ GOLDEN-PATH.md
+├─ AGENTS.md                   后来 Agent 的交接入口（必读）
 ├─ CONTRIBUTING.md
+├─ ERROR_LOG.md                踩坑档案（人工维护，后来者必读）
+├─ VERSION.md                  版本单一事实源 + 变更日志
 └─ .gitignore
 ```
 
@@ -185,7 +195,24 @@ scripts/launch-dashboard.js
 
 网页只绑定 `127.0.0.1`，没有聊天输入框，不直接修改学校系统。
 
-### 3.8 `golden-path/`
+### 3.8 `skills/huayuan-mobile-remote/`
+
+手机远程工作台（只读，供手机浏览器打开）：
+
+```text
+public/index.html                单页工作台（今日 / 待办 / 活动 / 本周 / 设置 + 配对页）
+public/app.js · public/styles.css
+public/manifest.webmanifest      可“添加到主屏幕”
+public/icon*.png · icon.svg      运行时生成的图标（scripts/make-icons.js）
+scripts/remote-server.js         只读服务端：令牌 + 配对码 + 静态白名单
+scripts/launch-remote.js         启动器：找最新 now.json、打印局域网/公网地址与配对码
+test/smoke.js                    32 项冒烟（启动 → 配对 → 只读接口 → 安全 → 停止）
+lib/snapshot.js（在 huayuan-live-dashboard 下）  驾驶舱与手机端共用的只读快照层
+```
+
+默认监听 `0.0.0.0` 供手机访问，所有 `/api/*`（除 `/api/health`）都要令牌；只读 `now.json` / `plan.json` / `activity-feed.json`，不写文件、不读 Cookie。
+
+### 3.9 `golden-path/`
 
 离线回归测试。`fixtures/` 里的数据全是虚构样例，不包含真实学生数据。
 
@@ -290,7 +317,9 @@ git switch -c feature/activity-filter
 | 增加完成、延后、临时事项 | `manage-items.js`、`user-overrides.js` |
 | 修改活动抓取 | `activity-feed.js`、`colleges.js` |
 | 修改网页页面 | `huayuan-live-dashboard/public/` |
-| 修改网页数据接口 | `dashboard-server.js` |
+| 修改网页数据接口 | `dashboard-server.js`、`huayuan-live-dashboard/lib/snapshot.js` |
+| 修改手机工作台页面 / 接口 / 配对逻辑 | `huayuan-mobile-remote/public/`、`remote-server.js`、`launch-remote.js` |
+| 修改绩点/GPA/操行分/综合测评口径或计分 | `huayuan-score-advisor/scripts/`（计分脚本 + `knowledge/` 常量表双份同步） |
 | 修改平台展示 | `.codebuddy-plugin/plugin.json` |
 | 增加回归 | `golden-path/` |
 
@@ -315,7 +344,11 @@ node golden-path/check-widget.js
 node golden-path/check-v081.js
 node golden-path/check-activities.js
 node golden-path/check-performance.js
+node golden-path/check-dashboard-reuse.js
+node golden-path/check-score.js
+node golden-path/check-mobile.js
 node skills/huayuan-live-dashboard/test/smoke.js
+node skills/huayuan-mobile-remote/test/smoke.js
 node skills/huayuan-browser-session/scripts/manage-items.js --self-check
 node skills/huayuan-browser-session/scripts/activity-feed.js --self-check
 ```
@@ -334,6 +367,9 @@ node golden-path/check-ecourse-ux.js
 - `V081:PASS`
 - `ACTIVITIES:PASS`
 - `PERFORMANCE:PASS`
+- `SCORE_GATE:PASS`
+- `MOBILE:PASS`
+- `MOBILE_REMOTE_SMOKE:PASS`
 - `LIVE_DASHBOARD_SMOKE:PASS`
 - `SELF_CHECK:PASS`
 
@@ -366,6 +402,22 @@ http://127.0.0.1:<端口>/activities.html
 ```
 
 只修改前端时，可以先启动服务，再刷新页面观察变化。涉及 `dashboard-server.js` 时必须重启服务。
+
+### 9.1 本地测试手机工作台
+
+```powershell
+node skills/huayuan-mobile-remote/scripts/launch-remote.js --now "<输出目录>\now.json" --no-open
+```
+
+终端会输出手机地址、6 位配对码和一条本机直连链接：
+
+```text
+MOBILE_REMOTE_READY:http://<局域网IP>:4320/
+MOBILE_REMOTE_PAIR:123456
+MOBILE_REMOTE_LOCAL:http://127.0.0.1:4320/?k=<令牌>
+```
+
+本机验证不需要手机：打开 `MOBILE_REMOTE_LOCAL` 会跳过配对直接进入；要验证配对流程，用无痕窗口打开 `MOBILE_REMOTE_READY` 再输配对码。只改前端时刷新页面即可；改了 `remote-server.js` 要 `--stop` 后重启。手机与电脑不在同一网络时加 `--tunnel`（需本机安装 `cloudflared`）。
 
 ---
 
@@ -411,6 +463,8 @@ git diff
 ```powershell
 git add <文件1> <文件2>
 ```
+
+注意：**唯一例外**是 `golden-path/fixtures/preferences.json`——它是黄金路径离线回归的虚构样例偏好（文件内有 `_note` 声明），已在 `.gitignore` 显式放行；除此之外任何位置的 `preferences.json`（真实用户偏好）一律禁止提交。
 
 提交信息使用简短、明确的格式：
 
@@ -543,13 +597,20 @@ huayuan-schedule-butler-v2
 - 新增用户可见功能：`0.x.0`
 - 大幅重构或协议变更：`x.0.0`
 
-每次升版本至少同步：
+发版动作统一用脚本，**不要手改版本号**：
 
-1. `.codebuddy-plugin/plugin.json`
-2. `README.md` 的版本说明
-3. 相关测试或新增回归
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts\bump-version.ps1 -Message "<一句话变更>"
+```
 
-不要只改 README 里的版本号而漏改 `plugin.json`。
+脚本自动递增 `VERSION.md`（单一事实源）与 `.codebuddy-plugin/plugin.json` 的版本号。之后每次升版本至少同步：
+
+1. `.codebuddy-plugin/plugin.json`（脚本已同步）
+2. `VERSION.md` 变更日志（脚本已追加）
+3. `README.md` 的版本说明（手动补一行）
+4. 相关测试或新增回归
+
+不要只改 README 里的版本号而漏改 `plugin.json`；`VERSION.md` 与 `plugin.json` 的版本号必须一致。
 
 ---
 
@@ -560,7 +621,10 @@ huayuan-schedule-butler-v2
 - 微信公众号和班级群属于私域，暂不做不稳定自动抓取。
 - 学院官网模板很多，活动栏目需要持续验证。
 - Chrome 是当前主链路，其他浏览器回退仍需完善。
-- 当前开发版本是 `0.9.0`；本地版本和开放平台审核版本可能不同步。
+- `golden-path` 全量测试当前**全部通过**（`GOLDEN_PATH:PASS 49/49`、`SCORE_GATE:PASS 16/16` 等）。历史上的基线缺口（上游 v0.9.0 遗留：fixtures 缺 `preferences.json`、技能数断言 5→6）已在 0.10.1 修复并记录于 `ERROR_LOG.md` #11/#12。修复这类问题时**不要**删断言或改预期来"通过"，先按 #12 的做法补真实 fixture / 同步正确断言。
+- `huayuan-score-advisor` 计分口径基于《2026 本科生手册》官方条文（学籍管理办法 2026 修订第 39 条等）；**各院（系）综合测评实施细则可在校级办法基础上微调加分认定**，计分结果以院（系）细则与官方最新通知为准。四分制 GPA 的动态转换需要课程班排名，只有分数时工具会标记无法精算。
+- 当前开发版本是 `0.14.11`；本地版本和开放平台审核版本可能不同步。
+- 文档维护契约：`AGENTS.md`（Agent 交接）与 `CONTRIBUTING.md`（团队协作）必须由开发者自行保持与代码同步，发现过时直接改。
 
 ---
 
@@ -571,7 +635,7 @@ huayuan-schedule-butler-v2
 - 平台适配：教务、eCourse、雨课堂、校园门户；
 - 活动数据：学院来源、公众号补充、截止时间解析；
 - 排程算法：优先级、休息、任务拆分、冲突解释；
-- WebUI：三页驾驶舱、交互、移动端适配；
+- WebUI：四页驾驶舱、初始化红点、手机连接控制、交互与移动端适配；
 - 测试与演示：干净电脑安装、真实用户试用、答辩素材。
 
 每个任务都应该有：

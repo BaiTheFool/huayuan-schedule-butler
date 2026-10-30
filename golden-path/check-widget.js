@@ -183,17 +183,24 @@ const again = build(['--now', PARTIAL]);
 check('两次生成的 widget_code 完全一致', again.doc.widget_code === partial.doc.widget_code, `${partial.doc.meta.bytes} B vs ${again.doc.meta.bytes} B`);
 
 // ── 7 Widget 与网页驾驶舱路由 ──────────────────────────────────────
-group('[7] 内嵌卡片与网页驾驶舱必须分流');
+group('[7] 每轮优先侧边驾驶舱，内嵌卡片只在明确要求时出现');
 const agentText = fs.readFileSync(path.join(PKG_ROOT, 'agents', 'huayuan-schedule-butler.md'), 'utf8');
 const widgetSkill = fs.readFileSync(path.join(WIDGET_DIR, 'SKILL.md'), 'utf8');
 const liveSkill = fs.readFileSync(
   path.join(PKG_ROOT, 'skills', 'huayuan-live-dashboard', 'SKILL.md'),
   'utf8'
 );
-check('专家说明声明两条可视化路径互斥', /路径互斥规则/.test(agentText) && /show_widget.*不执行/.test(agentText));
-check('“打开/网页/分屏”进入外部网页驾驶舱', /打开驾驶舱/.test(liveSkill) && /打开分屏/.test(liveSkill));
-check('Widget Skill 把“打开驾驶舱”明确转给网页驾驶舱', /打开驾驶舱.*huayuan-live-dashboard/.test(widgetSkill));
-check('Widget 触发词不再直接包含“打开驾驶舱”', !/用户说“打开驾驶舱”/.test(widgetSkill));
+check(
+  '专家说明要求每轮先打开侧边驾驶舱',
+  /驾驶舱总闸/.test(agentText) &&
+    /第一个工具调用必须是/.test(agentText) &&
+    /preview_url/.test(agentText) &&
+    /LIVE_DASHBOARD_VERIFIED:1/.test(agentText) &&
+    /不得宣称已打开/.test(agentText)
+);
+check('侧边驾驶舱技能覆盖自动打开与未初始化模式', /用户任何消息/.test(liveSkill) && /ONBOARDING_MODE/.test(liveSkill));
+check('Widget Skill 把“打开驾驶舱”转给侧边驾驶舱', /打开驾驶舱.*侧边网页驾驶舱/.test(widgetSkill));
+check('Widget 只在明确“看卡片”时生成', /在对话里看卡片/.test(widgetSkill) && /不能替代侧边驾驶舱/.test(widgetSkill));
 
 const failed = results.filter((item) => !item.ok);
 console.log(`\n========================================================`);

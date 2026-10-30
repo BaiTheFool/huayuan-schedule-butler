@@ -256,6 +256,8 @@ group('[6] 提示条在页面重定向后仍存在');
   timers.forEach((fn) => fn());
   check('登录成功后文案即时切换为"正在读取"', /正在读取课程列表/.test(doc.getElementById(NOTICE_ID).textContent), doc.getElementById(NOTICE_ID).textContent);
   check('提示条 z-index 置顶且只有一个', nodes.filter((node) => node.id === NOTICE_ID).length >= 1 && /z-index:2147483647/.test(doc.getElementById(NOTICE_ID).style.cssText));
+  check('iframe 内不再重复挂提示条', /window\.top !== window\.self/.test(source));
+  check('跨页面导航保留最新提示文案', /sessionStorage/.test(source) && /STORAGE/.test(source));
 }
 
 // ---------- 7. 子进程流式输出与心跳 ----------

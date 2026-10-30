@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>手机工作台 · 华园日程管家</title>
+  <link rel="stylesheet" href="/styles.css" />
+  <link rel="stylesheet" href="/dashboard-attention.css" />
+  <link rel="stylesheet" href="/mobile-ui.css" />
+</head>
+<body>
+  <main class="mobile-page">
+    <header>
+      <div>
+        <span class="eyebrow">HUAYUAN / MOBILE BRIDGE</span>
+        <h1>把今天的安排，<em>放进手机里。</em></h1>
+      </div>
+      <span class="status" id="mobileStatus"><i></i>正在检查</span>
+    </header>
+
+    <nav class="page-nav" aria-label="驾驶舱页面">
+      <a href="/">今日安排</a>
+      <a href="/todo.html">全部待办</a>
+      <a href="/activities.html">可参与事项</a>
+      <a class="active" href="/mobile.html" aria-current="page">手机工作台</a>
+    </nav>
+
+    <section class="mobile-hero" id="mobileStatusCard">
+      <div class="mobile-hero-copy">
+        <span class="eyebrow">PHONE CONTROL</span>
+        <h2 id="mobileHeadline">正在检查手机工作台</h2>
+        <p id="mobileMessage">只读连接本机最新安排，不上传账号，不提交作业。</p>
+      </div>
+      <div class="mobile-controls">
+        <button id="mobileStart" class="copy-primary" type="button">启动手机工作台</button>
+        <button id="mobileStop" class="copy-secondary" type="button">停止</button>
+        <button id="mobileReset" class="copy-secondary" type="button">换配对码</button>
+      </div>
+    </section>
+
+    <section class="mobile-grid">
+      <article class="mobile-card">
+        <div class="mobile-card-head">
+          <span>连接信息</span>
+          <b id="mobileRunningLabel">未启动</b>
+        </div>
+        <div id="mobileConnection" class="mobile-connection">
+          <p class="empty">启动后，这里会出现手机可打开的局域网地址和 6 位配对码。</p>
+        </div>
+      </article>
+
+      <article class="mobile-card">
+        <div class="mobile-card-head">
+          <span>安装到手机</span>
+          <b>只读</b>
+        </div>
+        <ol class="mobile-steps">
+          <li>电脑和手机连接同一个 Wi‑Fi。</li>
+          <li>点“启动手机工作台”，在手机浏览器打开显示的地址。</li>
+          <li>输入 6 位配对码；安卓可下载 APK，iPhone 用“添加到主屏幕”。</li>
+        </ol>
+        <a class="mobile-apk" href="/download/app.apk">下载安卓 APK</a>
+      </article>
+    </section>
+
+    <section class="mobile-card mobile-guide">
+      <div class="mobile-card-head">
+        <span>连不上时按顺序检查</span>
+        <b>本地诊断</b>
+      </div>
+      <div class="mobile-guide-grid">
+        <div><strong>01</strong><p>确认电脑和手机在同一 Wi‑Fi，不是访客网络。</p></div>
+        <div><strong>02</strong><p>首次启动允许 Windows 防火墙“专用网络”访问。</p></div>
+        <div><strong>03</strong><p>配对码以本页最新显示为准；换码后旧手机会失效。</p></div>
+        <div><strong>04</strong><p>手机用流量时需在左侧让专家用 `--tunnel` 启动公网地址。</p></div>
+      </div>
+    </section>
+
+    <section class="mobile-card mobile-boundary">
+      <div>
+        <span class="eyebrow">READ ONLY</span>
+        <h3>手机端不会修改学校数据</h3>
+        <p>可查看今日安排、全部待办、校园活动和本周计划；不提供提交、报名、缴费或删除。</p>
+      </div>
+      <button id="copyMobileInstallPrompt" class="copy-secondary" type="button">复制手机引导指令</button>
+    </section>
+
+    <footer>
+      <span>只读手机工作台 · 配对码仅显示在本机驾驶舱</span>
+      <span id="mobileUpdated"></span>
+    </footer>
+  </main>
+  <script src="/mobile.js"></script>
+  <script src="/dashboard-attention.js"></script>
+</body>
+</html>

@@ -75,6 +75,7 @@ function itemHtml(item, index) {
 
 function render(data) {
   const now = data.now || {};
+  const hasNow = Boolean(data.now);
   const todo = data.todo || {};
   const sync = data.sync || {};
   const status = now.data_status || {};
@@ -82,7 +83,7 @@ function render(data) {
   const groups = Array.isArray(todo.groups) ? todo.groups : [];
 
   $('#status').classList.add('live');
-  $('#status').innerHTML = `<i></i>${pending.length ? '部分数据' : '已同步'}`;
+  $('#status').innerHTML = `<i></i>${!hasNow ? '等待初始化' : pending.length ? '部分数据' : '已同步'}`;
   $('#syncCard').classList.toggle('due', Boolean(sync.due));
   $('#syncTitle').textContent = sync.due ? '该刷新一次各平台任务了' : `建议每 ${sync.interval_days || 7} 天刷新一次`;
   $('#syncMessage').textContent = sync.message || '向左侧发送刷新指令即可重读各平台。';
@@ -110,11 +111,15 @@ function render(data) {
   $('#countOverdue').textContent = String((todo.overdue || []).length);
   $('#overdueBadge').textContent = `${(todo.overdue || []).length} 条`;
   $('#pendingBadge').textContent = `${pending.length} 条`;
-  $('#todoUpdated').textContent = `更新于 ${new Date(data.updated_at).toLocaleTimeString('zh-CN')}`;
+  $('#todoUpdated').textContent = data.updated_at
+    ? `更新于 ${new Date(data.updated_at).toLocaleTimeString('zh-CN')}`
+    : '初始化后更新';
   $('#source').textContent = `${now.now?.date || ''} ${now.now?.weekday || ''}`;
 
-  $('#todoGroups').innerHTML = groups
-    .map((group) => {
+  $('#todoGroups').innerHTML = !hasNow
+    ? '<p class="empty">还没有初始化。请先按上方红点复制初始化指令，完成后这里会列出全部未完成任务。</p>'
+    : groups
+      .map((group) => {
       const items = group.items || [];
       return `<section class="todo-group ${esc(group.key)}">
         <div class="todo-group-head">
@@ -127,15 +132,17 @@ function render(data) {
             : '<p class="empty">这一类暂时没有任务。</p>'
         }
       </section>`;
-    })
-    .join('');
+      })
+      .join('');
 
   const overdue = todo.overdue || [];
   $('#overdue').innerHTML = overdue.length
     ? overdue.map((item) => `<li><strong>${esc(item.title)}</strong><br>${esc(item.course || '')} · 截止 ${esc(item.deadline || '待确认')}</li>`).join('')
     : '<li class="empty">没有已过期未完成项。</li>';
 
-  $('#pending').innerHTML = pending.length
+  $('#pending').innerHTML = !hasNow
+    ? '<li class="empty">尚未读取平台数据。</li>'
+    : pending.length
     ? pending.slice(0, 8).map((item) => `<li>${esc(item)}</li>`).join('')
     : '<li class="empty">没有需要人工确认的数据。</li>';
 

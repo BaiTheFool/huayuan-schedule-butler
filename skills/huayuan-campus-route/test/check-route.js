@@ -259,6 +259,38 @@ check('GPS 定位在图书馆时，起点被识别为图书馆', () => {
   assert.ok(plan.blocks.some((b) => b.type === 'place' && b.poi_id === 'library'));
 });
 
+check('00:00 睡觉按当天 24:00 封口，不从零点出发也不产生重叠', () => {
+  const c10 = DATA.LOCATIONS.find((item) => item.id === 'c10');
+  const plan = R.planDay({
+    date: '2026-10-30',
+    preset: 'balanced',
+    preferences: { daily: { wake: '07:00', sleep: '00:00' } },
+    gps: {
+      lat: c10.lat,
+      lng: c10.lng,
+      coord: c10.coord,
+      simulated: true,
+      label: c10.name,
+    },
+  });
+  assert.strictEqual(plan.ok, true);
+  assert.strictEqual(plan.validation.ok, true, plan.validation.issues.join('；'));
+  assert.ok(plan.blocks.every((block) => block.start_min >= 7 * 60), '不应出现 00:00 块');
+  assert.ok(plan.blocks.some((block) => block.title === '从C10 宿舍出发'));
+  assert.ok(!plan.blocks.some((block) => block.type === 'sleep' && block.start === '00:00'));
+  assert.ok(plan.warnings.some((warning) => warning.includes('按 24:00 封口')));
+});
+
+check('次日凌晨睡觉同样封口到 24:00，不把凌晨时间排到时间轴开头', () => {
+  const plan = R.planDay({
+    date: '2026-10-30',
+    preferences: { daily: { wake: '07:00', sleep: '01:30' } },
+  });
+  assert.strictEqual(plan.validation.ok, true, plan.validation.issues.join('；'));
+  assert.ok(plan.blocks.every((block) => block.start_min >= 7 * 60));
+  assert.strictEqual(plan.blocks.find((block) => block.type === 'sleep'), undefined);
+});
+
 check('GPS 在校外时给出提示，并回退到 C11 出发', () => {
   const plan = R.planDay({
     date: '2026-10-29',
