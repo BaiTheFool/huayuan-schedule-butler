@@ -568,9 +568,17 @@
     const p = input || {};
     const daily = p.daily || {};
     const study = p.study || {};
+    const wake = parseTime(daily.wake || '07:00') ?? 420;
+    const rawSleep = parseTime(daily.sleep);
+    let sleep = rawSleep === null ? 1410 : rawSleep;
+    // 一天路线只覆盖当天。用户把睡觉设为 00:00（或次日凌晨）时，
+    // 它表示当天结束边界，不能当成当天 00:00 起床后又去睡觉。
+    const sleepCrossDay = rawSleep !== null && rawSleep <= wake;
+    if (sleepCrossDay) sleep = 1440;
     return {
-      wake: parseTime(daily.wake || '07:00') ?? 420,
-      sleep: parseTime(daily.sleep || '23:30') ?? 1410,
+      wake,
+      sleep,
+      sleep_cross_day: sleepCrossDay,
       study_limit: Number(study.weekday_daily_limit_min || study.daily_limit_min || 240),
       max_continuous: Number(study.max_continuous_minutes || 60),
       buffer: Number(study.buffer_min || 10),
@@ -697,6 +705,9 @@
     };
     const warnings = [];
     const gps = resolveGps(opts.gps);
+    if (prefs.sleep_cross_day) {
+      warnings.push('睡觉时间属于次日，本日路线按 24:00 封口，不会生成 00:00 出发或零点睡觉块');
+    }
 
     const timetable = opts.timetable || DEMO_TIMETABLE;
     const campusScope = resolveCampusScope(timetable);
@@ -874,20 +885,23 @@
     };
     blocks.push(shower);
 
-    // 睡前
-    blocks.push({
-      id: 'sleep',
-      type: 'sleep',
-      title: '熄灯 / 睡觉',
-      subtitle: showerPoi.name,
-      poiId: dormPoiId,
-      start: prefs.sleep,
-      end: Math.min(prefs.sleep + 30, 1440),
-      locked: true,
-      source: '[偏好]',
-      reason: `按你的睡觉时间 ${clock(prefs.sleep)}，保证第二天有精神`,
-      detail: `次日 ${clock(wake)} 起床`,
-    });
+    // 睡前。睡觉时间正好是当天 24:00 时，不生成跨日空块；
+    // 22:30–24:00 的晚间时间仍由下面的“洗漱后自由时间”完整覆盖。
+    if (prefs.sleep < 1440) {
+      blocks.push({
+        id: 'sleep',
+        type: 'sleep',
+        title: '熄灯 / 睡觉',
+        subtitle: showerPoi.name,
+        poiId: dormPoiId,
+        start: prefs.sleep,
+        end: Math.min(Math.max(prefs.sleep + 30, prefs.sleep + 1), 1440),
+        locked: true,
+        source: '[偏好]',
+        reason: `按你的睡觉时间 ${clock(prefs.sleep)}，保证第二天有精神`,
+        detail: `次日 ${clock(wake)} 起床`,
+      });
+    }
     if (prefs.sleep - shower.end >= 15) {
       blocks.push({
         id: 'night-free',
@@ -1142,8 +1156,13 @@
     // 合并所有块，补上 GPS 起点时间
     let all = blocks.concat(flexible);
     if (gps && gps.in_campus) {
-      const firstReal = all.filter((b) => b.type !== 'place').sort((a, b) => a.start - b.start)[0];
-      const startAt = Math.max(0, Math.min(firstReal ? firstReal.start - 30 : 8 * 60, 23 * 60));
+      const firstReal = all
+        .filter((b) => b.type !== 'place' && b.type !== 'sleep' && b.start >= prefs.wake)
+        .sort((a, b) => a.start - b.start)[0];
+      const startAt = Math.max(
+        prefs.wake,
+        Math.min(firstReal ? firstReal.start - 30 : 8 * 60, 23 * 60)
+      );
       const gpsBlock = all.find((b) => b.id === 'gps-start');
       if (gpsBlock) {
         gpsBlock.start = startAt;

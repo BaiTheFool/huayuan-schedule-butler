@@ -26,6 +26,7 @@
  */
 
 const fs = require('fs');
+const os = require('os');
 const path = require('path');
 const { spawnSync } = require('child_process');
 const { argValue, defaultOutputDir, displayPath, flag, readSetupState } = require('./huayuan-paths');
@@ -118,19 +119,61 @@ function findLatest(filename, explicit) {
     const resolved = path.resolve(explicit);
     return fs.existsSync(resolved) ? resolved : null;
   }
-  const roots = [path.join(process.cwd(), 'huayuan-output')];
-  if (process.env.HUAYUAN_OUTPUT_DIR) roots.push(path.resolve(process.env.HUAYUAN_OUTPUT_DIR));
+  const home =
+    process.env.HUAYUAN_HOME || path.join(os.homedir(), '.workbuddy', 'huayuan-schedule-butler');
+  const roots = [
+    path.join(process.cwd(), 'huayuan-output'),
+    process.env.HUAYUAN_OUTPUT_DIR,
+    process.env.HUAYUAN_SEARCH_ROOT,
+    path.join(os.homedir(), 'WorkBuddy'),
+    home,
+  ].filter(Boolean).map((item) => path.resolve(item));
   const candidates = [];
   for (const root of roots) {
     if (!fs.existsSync(root)) continue;
-    for (const entry of fs.readdirSync(root, { withFileTypes: true })) {
-      if (!entry.isDirectory()) continue;
-      const file = path.join(root, entry.name, filename);
-      if (fs.existsSync(file)) candidates.push({ file, mtime: fs.statSync(file).mtimeMs });
+    const pending = [{ dir: root, depth: 0 }];
+    while (pending.length) {
+      const current = pending.shift();
+      let entries;
+      try {
+        entries = fs.readdirSync(current.dir, { withFileTypes: true });
+      } catch {
+        continue;
+      }
+      for (const entry of entries) {
+        const candidate = path.join(current.dir, entry.name);
+        if (entry.isFile() && entry.name === filename) {
+          candidates.push({ file: candidate, mtime: fs.statSync(candidate).mtimeMs });
+        } else if (
+          entry.isDirectory() &&
+          current.depth < 5 &&
+          !['.git', 'node_modules', 'profiles', 'cache'].includes(entry.name)
+        ) {
+          pending.push({ dir: candidate, depth: current.depth + 1 });
+        }
+      }
     }
   }
   candidates.sort((a, b) => b.mtime - a.mtime);
   return candidates.length ? candidates[0].file : null;
+}
+
+function publishDashboardSnapshot(jsonPath) {
+  const home =
+    process.env.HUAYUAN_HOME || path.join(os.homedir(), '.workbuddy', 'huayuan-schedule-butler');
+  fs.mkdirSync(home, { recursive: true });
+  const target = path.join(home, 'live-now.json');
+  const temp = `${target}.${process.pid}.tmp`;
+  fs.copyFileSync(jsonPath, temp);
+  fs.renameSync(temp, target);
+  const planPath = path.join(path.dirname(jsonPath), 'plan.json');
+  if (fs.existsSync(planPath)) {
+    const planTarget = path.join(home, 'live-plan.json');
+    const planTemp = `${planTarget}.${process.pid}.tmp`;
+    fs.copyFileSync(planPath, planTemp);
+    fs.renameSync(planTemp, planTarget);
+  }
+  return target;
 }
 
 /** 跑一次分析（或复用已有结果），拿到 schedule-analysis.json */
@@ -1198,9 +1241,11 @@ function main() {
   const mdPath = path.join(outputDir, 'now.md');
   fs.writeFileSync(jsonPath, JSON.stringify(view, null, 2), 'utf8');
   fs.writeFileSync(mdPath, buildMarkdown(view), 'utf8');
+  const dashboardNowPath = publishDashboardSnapshot(jsonPath);
 
   console.log(`NOW_JSON:${displayPath(jsonPath)}`);
   console.log(`NOW_MD:${displayPath(mdPath)}`);
+  console.log(`DASHBOARD_NOW:${displayPath(dashboardNowPath)}`);
   console.log(`NOW_HEADLINE:${view.first_action.headline}`);
   console.log(`NOW_BRIEF:${view.brief}`);
   console.log(

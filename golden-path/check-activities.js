@@ -7,6 +7,8 @@ const { spawnSync } = require('child_process');
 
 const ROOT = path.resolve(__dirname, '..');
 const SCRIPTS = path.join(ROOT, 'skills', 'huayuan-browser-session', 'scripts');
+const ACTIVITY_SCRIPT = path.join(SCRIPTS, 'activity-feed.js');
+const { createSnapshot } = require(path.join(ROOT, 'skills', 'huayuan-live-dashboard', 'lib', 'snapshot.js'));
 const HOME = fs.mkdtempSync(path.join(os.tmpdir(), 'huayuan-activities-home-'));
 const OUT = fs.mkdtempSync(path.join(os.tmpdir(), 'huayuan-activities-out-'));
 const results = [];
@@ -41,6 +43,35 @@ function run(script, args) {
 
   const invalid = run('manage-items.js', ['set-college', '--name', '不存在的学院']);
   check('未知学院被拒绝而不是静默保存', invalid.status !== 0 && /COLLEGE_NOT_FOUND/.test(invalid.stderr), invalid.stderr.split('\n')[0]);
+
+  const nowDir = path.join(OUT, 'latest');
+  const oldDir = path.join(HOME, 'history');
+  fs.mkdirSync(nowDir, { recursive: true });
+  fs.mkdirSync(oldDir, { recursive: true });
+  fs.writeFileSync(path.join(nowDir, 'now.json'), JSON.stringify({ first_action: { headline: '测试' } }), 'utf8');
+  const activityDoc = {
+    generated_at: new Date().toISOString(),
+    item_count: 1,
+    items: [{ id: 'activity-1', title: '校园活动', type: 'lecture', status: 'open', eligible: true }],
+    sources: [{ id: 'youth', label: '校团委', status: 'READ_OK' }],
+    warnings: [],
+  };
+  const historyFile = path.join(oldDir, 'activity-feed.json');
+  fs.writeFileSync(historyFile, JSON.stringify(activityDoc), 'utf8');
+  const snapshot = createSnapshot({ nowPath: path.join(nowDir, 'now.json'), homeDir: HOME });
+  const fallback = snapshot.readActivities();
+  check(
+    '活动快照可跨会话找到最新 activity-feed.json',
+    fallback.status === 'READY' && fallback.items?.[0]?.title === '校园活动'
+  );
+  const { publishDashboardActivities } = require(ACTIVITY_SCRIPT);
+  const published = publishDashboardActivities(historyFile, HOME);
+  const stableSnapshot = createSnapshot({ nowPath: path.join(nowDir, 'now.json'), homeDir: HOME });
+  check(
+    '活动刷新发布固定 live-activities.json',
+    published === path.join(HOME, 'live-activities.json') &&
+      stableSnapshot.readActivities().items?.[0]?.title === '校园活动'
+  );
 
   const failed = results.filter((item) => !item.ok);
   console.log(`ACTIVITIES:${failed.length ? 'FAIL' : 'PASS'} ${results.length - failed.length}/${results.length}`);

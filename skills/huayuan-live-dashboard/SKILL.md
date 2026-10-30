@@ -11,7 +11,7 @@ description: Start and open a local read-only split-screen dashboard that visual
 
 ## 触发
 
-专家收到用户任何有效指令后，都必须先执行本技能，再处理原请求。用户没有提到驾驶舱也要打开；用户只要求“看卡片”时，先打开侧边驾驶舱，再按需生成内嵌卡片。
+专家收到用户任何消息后，第一轮业务动作都必须先执行本技能，再判断意图或处理原请求。用户没有提到驾驶舱也要打开；确认、纠错、取消、普通问答和“看卡片”也不例外。用户只要求“看卡片”时，先打开侧边驾驶舱，再按需生成内嵌卡片。
 
 未初始化、没有 `now.json` 不是跳过理由。启动器会打印：
 
@@ -22,22 +22,27 @@ LIVE_DASHBOARD_READY:http://127.0.0.1:<端口>/
 
 ## 执行
 
-1. 直接启动；不要先调用 `now.js`，也不要求用户先找文件：
+1. 直接启动；不要先调用 `intro.js`、`now.js`，也不要求用户先找文件：
 
 ```powershell
 node <本技能目录>\scripts\launch-dashboard.js --no-open
 ```
 
-启动器只创建本地服务，不直接拉起外部浏览器。读取输出：
+启动器只创建并验证本地服务，不直接拉起外部浏览器。读取输出：
 
-- `LIVE_DASHBOARD_SIDEBAR_FILE`：启动器在本次会话工作区生成的跳板 HTML 绝对路径；它打开后立即重定向到本地驾驶舱；
-- `LIVE_DASHBOARD_ALREADY_OPEN:0`：先处理原请求；本轮完成时，最后一个工具调用必须是 `present_files({"files":["<LIVE_DASHBOARD_SIDEBAR_FILE>"]})`，在右侧内置浏览器面板打开；
-- `LIVE_DASHBOARD_ALREADY_OPEN:1`：侧边页面仍在线，不要重复打开；
-- 禁止再次运行启动器，禁止去掉 `--no-open`，禁止打开外部浏览器；`present_files` 后只写最终文字，不再调用工具。
+- `LIVE_DASHBOARD_VERIFIED:1`：目标已确认返回“华园日程”HTML，不是脚本、JSON 或文件附件；
+- `LIVE_DASHBOARD_OPEN_REQUIRED:1`：本轮必须打开，永远为 1；
+- `LIVE_DASHBOARD_ACTION:refresh-existing`：服务已运行，只更新 `live-now.json` 并打开/刷新同一 URL，不得重启服务或再起进程；
+- `LIVE_DASHBOARD_PREVIEW_ARGS`：必须原样用于预览工具的 `{"url":"..."}`；
+- `LIVE_DASHBOARD_READY`：驾驶舱完整 URL。
 
-2. 看到 `LIVE_DASHBOARD_READY:<url>` 后，在处理原请求的回答里保留一行：
+2. 启动成功后立即调用 WorkBuddy 原生 `preview_url`，仍在原请求处理之前：
 
-> 驾驶舱已打开：`<url>`
+```json
+preview_url({"url":"<LIVE_DASHBOARD_READY>"})
+```
+
+成功后继续原请求。失败只重试同一 URL 一次；仍失败就如实报告“右侧预览未成功”，不得说已打开。禁止 `sleep/curl` 探测、手工 spawn、`present_files`、`show_widget`、本地 HTML 跳板、`file://`、外部浏览器和文件附件；这些都不是驾驶舱。
 
 用户问手机、手机连接或手机安装时使用 `--page mobile`，直接定位到第四个“手机工作台”标签：
 
@@ -45,7 +50,7 @@ node <本技能目录>\scripts\launch-dashboard.js --no-open
 node <本技能目录>\scripts\launch-dashboard.js --no-open --page mobile
 ```
 
-拿到 `LIVE_DASHBOARD_SIDEBAR_FILE` 后，完成手机相关处理后用 `present_files({"files":["<SIDEBAR_FILE>"]})` 作为最后工具调用，不启动外部浏览器。
+拿到 `mobile.html` URL 后，先按总闸立即用 `preview_url({"url":"<mobile URL>"})` 打开，再处理手机相关问题；不启动外部浏览器。
 
 驾驶舱里的“重新导入课表”直接读取教务时，需要 WorkBuddy 允许本专家运行本地命令并启动浏览器。受限环境若返回 `EPERM`，不要要求用户永久开启全部权限；引导其点击页面上的“复制教务读取指令”，在左侧对话完成读取，或使用“本地文件”作为备用。
 

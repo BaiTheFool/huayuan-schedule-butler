@@ -1,6 +1,6 @@
 {
     "name":  "huayuan-schedule-butler-v2",
-    "version":  "0.14.4",
+    "version":  "0.14.10",
     "description":  "Unifies SCUT undergraduate course schedules, assignments, exams and notices into explainable plans. Every turn opens a guided four-page dashboard in WorkBuddy\u0027s side browser with setup red dots, copyable onboarding actions, University Town routes, all todos, campus activities and mobile companion controls.",
     "author":  {
                    "name":  "华园日程管家项目组",

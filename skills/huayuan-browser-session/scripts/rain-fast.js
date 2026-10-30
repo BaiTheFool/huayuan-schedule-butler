@@ -423,7 +423,12 @@ function captureStaticHeaders(state, request) {
   for (const name of STATIC_HEADER_NAMES) {
     if (headers[name]) state.staticHeaders[name] = headers[name];
   }
-  state.headersReady = STATIC_HEADER_NAMES.every((name) => Boolean(state.staticHeaders[name]));
+  // user-courses 实测最先拒绝缺少 XTBZ 的请求；其他客户端标识可能不会在每个页面都出现。
+  state.headersReady = rainHeadersReady(state.staticHeaders);
+}
+
+function rainHeadersReady(headers = {}) {
+  return Boolean(headers && headers.xtbz);
 }
 
 function createRuntimeState() {
@@ -438,7 +443,7 @@ function configurePage(page, state) {
   page.on('request', (request) => captureStaticHeaders(state, request));
 }
 
-async function inspectAuth({ page, initial, loginWait }) {
+async function inspectAuth({ page, initial, loginWait, state }) {
   if (initial) {
     await page.goto(COURSELIST, {
       waitUntil: 'domcontentloaded',
@@ -448,27 +453,60 @@ async function inspectAuth({ page, initial, loginWait }) {
   }
 
   // 登录等待期间只做一次只读接口检查：不能 reload，否则用户正在扫的二维码会被刷掉
-  if (loginWait) return inspectRainPassive(page);
+  if (loginWait) return inspectRainPassive(page, state || null);
 
-  const state = await checkPlatform('rain', { page, initial: false });
-  return state;
+  const platformState = await checkPlatform('rain', { page, initial: false });
+  return platformState;
 }
 
-async function inspectRainPassive(page) {
-  const response = await fetchUserCourses(page);
+async function rainCourseListVisible(page) {
+  return page
+    .evaluate(() => {
+      const text = document.body ? document.body.innerText.replace(/\s+/g, '') : '';
+      return (
+        /\/pro\/courselist/i.test(location.pathname) &&
+        /搜索课程/.test(text) &&
+        /开课学期/.test(text) &&
+        /当前学期/.test(text)
+      );
+    })
+    .catch(() => false);
+}
+
+async function inspectRainPassive(page, state = null) {
+  let response = await fetchUserCourses(page, state && state.staticHeaders ? state.staticHeaders : {});
+  if (
+    response.status === 200 &&
+    response.body &&
+    response.body.success === false &&
+    state &&
+    Object.keys(state.staticHeaders || {}).length === 0
+  ) {
+    // 页面自然请求可能比接口轮询稍晚，短暂等待后使用已采集的静态标识头重试。
+    await page.waitForTimeout(1200).catch(() => {});
+    response = await fetchUserCourses(page, state.staticHeaders || {});
+  }
   const body = response.body;
   const successFalse = Boolean(body && body.success === false);
   const hasCourses = Boolean(
     body && body.data && Array.isArray(body.data.product_list) && body.data.product_list.length > 0
   );
+  const courseListVisible = await rainCourseListVisible(page);
   return {
-    authenticated: response.status === 200 && !successFalse && hasCourses,
-    reason: hasCourses ? '个人课程列表可读' : `登录等待中：user-courses HTTP ${response.status}`,
+    authenticated: (response.status === 200 && !successFalse && hasCourses) || courseListVisible,
+    reason: hasCourses
+      ? '个人课程列表可读'
+      : courseListVisible
+        ? '已进入个人课程列表页，登录成功'
+        : `登录等待中：user-courses HTTP ${response.status}`,
     details: {
       course_count: hasCourses ? body.data.product_list.length : 0,
       http_status: response.status,
       login_wait: true,
+      course_list_visible: courseListVisible,
+      static_header_names: Object.keys((state && state.staticHeaders) || {}).sort(),
     },
+    data: hasCourses ? response : null,
   };
 }
 
@@ -633,10 +671,12 @@ async function readRain({
   );
 
   if (!state.headersReady) {
-    await page.goto(COURSELIST, {
-      waitUntil: 'domcontentloaded',
-      timeout: 30000,
-    }).catch(() => {});
+    if (!/\/pro\/courselist/i.test(page.url())) {
+      await page.goto(COURSELIST, {
+        waitUntil: 'domcontentloaded',
+        timeout: 30000,
+      }).catch(() => {});
+    }
     // 轮询等待页面自然请求产生静态标识头（最多 12 秒），避免页面慢时全部课程误失败
     for (let waited = 0; waited < 12 && !state.headersReady; waited += 1) {
       await page.waitForTimeout(1000);
@@ -646,11 +686,7 @@ async function readRain({
   let authData = state.authState && state.authState.data;
   if (!authData || authData.status !== 200 || !authData.body) {
     // 带静态标识头请求（接口可能要求 XTBZ 等，裸 fetch 会被拒）
-    authData = await fetchInPage(
-      page,
-      USER_COURSES,
-      state.headersReady ? state.staticHeaders : {}
-    );
+    authData = await fetchInPage(page, USER_COURSES, state.staticHeaders);
     if (
       authData.status === 200 &&
       authData.body &&
@@ -658,9 +694,11 @@ async function readRain({
       !state.headersReady
     ) {
       // 头未采集完整时重试一次收集流程
-      await page
-        .reload({ waitUntil: 'domcontentloaded', timeout: 30000 })
-        .catch(() => {});
+      if (!/\/pro\/courselist/i.test(page.url())) {
+        await page
+          .reload({ waitUntil: 'domcontentloaded', timeout: 30000 })
+          .catch(() => {});
+      }
       for (let waited = 0; waited < 12 && !state.headersReady; waited += 1) {
         await page.waitForTimeout(1000);
       }
@@ -929,7 +967,7 @@ async function main() {
     // 无头判定未登录后才走到这里：可见窗口必须落在真实登录界面
     ensureLoginEntry: async ({ page }) => openLoginEntry({ page, outputDir }),
     isAuthenticated: async (args) => {
-      const authenticated = await inspectAuth(args);
+      const authenticated = await inspectAuth({ ...args, state: runtime });
       runtime.authState = authenticated;
       return authenticated;
     },
@@ -1007,6 +1045,13 @@ function selfCheck() {
     '登录控件词表包含扫码/账号登录',
     LOGIN_CONTROL_TEXTS.includes('扫码登录') && LOGIN_CONTROL_TEXTS.includes('账号登录'),
     LOGIN_CONTROL_TEXTS.length + ' 项'
+  );
+  assert('XTBZ 存在即允许接口重试', rainHeadersReady({ xtbz: 'test' }), 'xtbz');
+  assert('缺少 XTBZ 不提前判定就绪', !rainHeadersReady({}), 'empty');
+  assert(
+    '静态请求头列表覆盖 XTBZ',
+    STATIC_HEADER_NAMES.includes('xtbz'),
+    STATIC_HEADER_NAMES.join(',')
   );
 
   const failed = checks.filter((item) => !item.pass);

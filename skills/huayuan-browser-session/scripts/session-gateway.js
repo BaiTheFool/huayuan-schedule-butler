@@ -18,7 +18,14 @@ const {
   resolveProfileDir,
 } = require('./huayuan-paths');
 const { HOST_PATTERNS } = require('./endpoints');
-const { installContextNotice, NOTICE_CSS, NOTICE_ID, TEXT_VARIABLE, updateNoticeText } = require('./session-notice');
+const {
+  installContextNotice,
+  NOTICE_CSS,
+  NOTICE_ID,
+  STORAGE_KEY,
+  TEXT_VARIABLE,
+  updateNoticeText,
+} = require('./session-notice');
 
 // 登录等待期的轮询间隔：默认 800ms —— 登录成功后最多不到 1 秒就能切到"正在读取"
 const LOGIN_POLL_INTERVAL_MS = 800;
@@ -273,6 +280,12 @@ async function injectVisibleNotice(page, text) {
         'pointer-events:none',
       ].join(';');
       document.documentElement.appendChild(notice);
+      try {
+        window.__HUAYUAN_NOTICE_TEXT__ = noticeText;
+        sessionStorage.setItem('__HUAYUAN_NOTICE_STORAGE__', noticeText);
+      } catch {
+        // Storage may be unavailable on auth interstitials.
+      }
     }, text);
   } catch {
     // A cross-origin auth frame can reject DOM injection; the browser window is still usable.

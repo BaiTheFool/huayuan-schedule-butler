@@ -1,4 +1,4 @@
-VERSION=0.14.4
+VERSION=0.14.10
 
 # 华园日程管家 · 版本记录
 
@@ -8,10 +8,40 @@ VERSION=0.14.4
 
 ## 变更日志（新→旧）
 
-### 0.14.4 · 2026-10-30 · fix: use a local redirect file for side-panel preview
-- 实测确认当前 WorkBuddy 的 `present_files.files` 只接受本地文件路径；直接传 `http://127.0.0.1` 会使工具调用失败，侧栏不会打开。
-- 启动器现在在本次会话工作区生成 `huayuan-dashboard-launch.html` 跳板文件，打开后立即 `location.replace()` 到驾驶舱地址。
-- Agent 的最后一个工具调用改为 `present_files({"files":["<LIVE_DASHBOARD_SIDEBAR_FILE>"]})`；不再向 `present_files` 传 URL，也不二次启动外部浏览器。
+### 0.14.10 · 2026-10-30 · fix: refresh mobile after local ignore and defer changes
+- 手机服务绑定固定 `live-now.json`，不再固定到启动时的历史 `now.json`；完成、延后或忽略事项后下一次刷新即可同步。
+- `now.js` 同时发布 `live-plan.json`，快照层缺失计划时递归查找最新计划，避免手机本周计划跟随旧目录。
+- 移动端冒烟扩展到 41 项，新增快照更新后的 P0 与已完成状态同步断言。
+
+### 0.14.9 · 2026-10-30 · feat: sync mobile route map and timeline with desktop dashboard
+- 手机服务端复用电脑端同一路线引擎，返回真实课程、通勤、学习、运动、休息、地图折线、POI、天气、权重和统计。
+- 手机今日页新增校园路线地图、地点编号、路线摘要、学习/放松/运动权重与四项统计；时间轴改用 `route.blocks`，不再只显示 `now.sequence` 中的单个休息块。
+- 移动端冒烟扩展到 39 项，覆盖课程块、路线折线和地图点。
+
+### 0.14.8 · 2026-10-30 · fix: sync mobile activities across WorkBuddy sessions
+- 活动刷新后发布固定 `live-activities.json`，驾驶舱与手机工作台读取同一份活动数据。
+- 共享快照层在固定文件缺失时，递归查找最近一次历史 `activity-feed.json`，修复最新 `now.json` 与活动文件不在同一目录导致手机显示 `NOT_SYNCED`。
+- 增加跨会话活动发现与固定快照回归。
+
+### 0.14.7 · 2026-10-30 · fix: enable mobile scrolling and hide dashboard service windows
+- 手机主视图改为独立 `100dvh` 内容滚动容器，修复 Android WebView 无法上下滚动；切页、滚动监听和下拉刷新统一使用 `.content.scrollTop`。
+- 后台驾驶舱改由调度任务运行 UTF-16 VBScript，再以 `WScript.Shell.Run(..., 0, False)` 隐藏启动 Node，不再额外弹出 Windows Terminal 的 `node` 标签页。
+- 增加手机滚动和驾驶舱隐藏启动回归；服务复用仍保持同一 PID。
+
+### 0.14.6 · 2026-10-30 · fix: keep one resident dashboard and reuse latest local timetable
+- 驾驶舱使用固定 `live-now.json`；已有服务只更新快照并返回 `ACTION:refresh-existing`，不再因 WorkBuddy 回合 cwd 变化而重启或更换 PID。
+- Windows 下通过 WMI 创建脱离命令监管的独立服务进程，禁止 Agent 用 `sleep/curl` 或手工后台启动修补。
+- `now.js` 递归查找全部 WorkBuddy 历史输出中的最新课表并发布驾驶舱快照；顶部第一动作与路线页使用同一份课表，不再出现下方有课程、上方却提示未读课表。
+
+### 0.14.5 · 2026-10-30 · fix: open the real dashboard before every turn and fix midnight sleep routing
+- 驾驶舱改用 WorkBuddy 原生 `preview_url`：每条用户消息先启动并验证真实 HTML，再立即打开 HTTP URL；`ALREADY_OPEN` 不再允许跳过，禁止 `present_files`、本地 HTML、文件附件、卡片或外部浏览器冒充驾驶舱。
+- 启动器新增页面身份校验和固定预览参数输出，失败时不会宣称已打开。
+- 路线修复 `00:00`/次日睡觉偏好：按当天 24:00 封口，GPS 出发只相对起床后的非睡眠块计算，不再生成零点出发或伪重叠。
+
+### 0.14.4 · 2026-10-30 · fix: resume Rain Classroom after login and stabilize eCourse notices
+- 雨课堂登录等待改为复用页面自然请求采集到的静态标识头（重点为 `XTBZ`），登录后不再因裸接口拒绝而无限显示等待。
+- 增加“已进入个人课程列表页”的第二登录信号；接口稍慢时先继续读取，不刷新正在使用的课程列表。
+- eCourse 提示条只在顶层页面挂载，禁止 iframe 内重复显示；提示文案用 `sessionStorage` 跨页面导航保留，登录页稳定显示“请扫码登录”而不是回退到“正在打开”。
 
 ### 0.14.3 · 2026-10-30 · fix: make present_files the mandatory final side-panel action
 - WorkBuddy 宿主规定 `present_files` 只能作为“结果已完成”回合的最后一个工具调用；上一版让模型在回合开始立即打开，与宿主规则冲突，模型因此错误地二次运行启动器并打开外部 Chrome。

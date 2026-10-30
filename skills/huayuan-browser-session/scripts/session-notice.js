@@ -18,6 +18,7 @@
 
 const NOTICE_ID = '__huayuan_session_notice';
 const TEXT_VARIABLE = '__HUAYUAN_NOTICE_TEXT__';
+const STORAGE_KEY = '__HUAYUAN_NOTICE_STORAGE__';
 
 // 贴顶、窄条、半透明阴影，绝不铺满屏幕，也不参与命中测试
 const NOTICE_CSS = [
@@ -67,10 +68,18 @@ function buildNoticeInstaller({ text = '', intervalMs = 250 } = {}) {
   var TEXT = '${escapeText(text)}';
   var ID = '${NOTICE_ID}';
   var VAR = '${TEXT_VARIABLE}';
+  var STORAGE = '${STORAGE_KEY}';
   var CSS = ${JSON.stringify(NOTICE_CSS)};
   function ensure() {
     try {
+      // 只给顶层页面挂提示条。iframe 自己再挂一条会覆盖登录卡片并造成视觉错位。
+      if (window.top !== window.self) return null;
       var win = window;
+      try {
+        var stored = win.sessionStorage && win.sessionStorage.getItem(STORAGE);
+        if (stored) TEXT = stored;
+        else if (win.sessionStorage) win.sessionStorage.setItem(STORAGE, TEXT);
+      } catch (e) {}
       if (win[VAR] === undefined || win[VAR] === null) win[VAR] = TEXT;
       var root = document.documentElement || document.body;
       if (!root) return;
@@ -123,6 +132,9 @@ async function updateNoticeText(page, text) {
       ({ variable, value }) => {
         try {
           window[variable] = value;
+          if (window.sessionStorage) {
+            window.sessionStorage.setItem('${STORAGE_KEY}', value);
+          }
         } catch {
           return false;
         }
@@ -142,6 +154,7 @@ module.exports = {
   ECOURSE_NOTICE,
   NOTICE_CSS,
   NOTICE_ID,
+  STORAGE_KEY,
   TEXT_VARIABLE,
   buildNoticeInstaller,
   escapeText,

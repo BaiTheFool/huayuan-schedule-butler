@@ -94,7 +94,7 @@ node <本技能目录>\scripts\launch-remote.js --reset-pairing # 换配对码�
 
 | 路径 | 内容 |
 |---|---|
-| `/` | 今日安排：唯一第一动作、接下来时间轴、需要你决定、可复制指令 |
+| `/` | 今日安排：唯一第一动作、校园路线地图、天气与权重、步行/自习/运动统计、完整路线时间轴、需要你决定、可复制指令 |
 | `/todo.html` 等价路由（底部 Tab） | 全部待办 P0–P3、已过期项、本地完成/延后计数 |
 | 活动 Tab | 校级 / 学院活动，按类型筛选，显示截止倒计时与原文链接 |
 | 本周 Tab | `plan.json` 的每日时间块 |
@@ -114,6 +114,7 @@ node <本技能目录>\scripts\launch-remote.js --reset-pairing # 换配对码�
 ow.json`、`plan.json`、`activity-feed.json` 三个运行产物，不读浏览器 Cookie、密码、令牌、学号或成绩页面；
 - 不写任何文件（`test/smoke.js` 会断言服务端无写文件调用）；
 - 手机端不提供提交作业、报名、缴费、删除或修改学校数据的操作；
+- 手机服务持续读取固定 `live-now.json` / `live-plan.json`；电脑端完成、延后或忽略事项后，手机下一次刷新即可同步，不需要重启服务；
 - 配对码只在本机内存中，重启即换；令牌存在 `%HUAYUAN_HOME%\mobile-remote.json`（`HUAYUAN_HOME` 默认 `%USERPROFILE%\.workbuddy\huayuan-schedule-butler`）；
 - 公网隧道只是把本机端口转发出去，数据仍只存在你自己的电脑上；不用时执行 `--stop`。
 

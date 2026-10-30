@@ -171,16 +171,33 @@ const ACTIVITIES = {
   warnings: [],
 };
 
+const TIMETABLE = {
+  status: 'READ_OK',
+  campus: { key: 'university_town', label: '大学城校区', campus_text: '大学城校区' },
+  courses: [
+    {
+      course: '实验课（样例）',
+      weekday: 4,
+      start_time: '18:30',
+      end_time: '20:00',
+      classroom: 'A1-101',
+      campus: '大学城校区',
+      weeks: { raw: '1-16周', list: [10], ranges: [[1, 16]] },
+    },
+  ],
+};
+
 async function main() {
   fs.mkdirSync(HOME, { recursive: true });
   fs.mkdirSync(OUT, { recursive: true });
   fs.writeFileSync(path.join(OUT, 'now.json'), JSON.stringify(NOW, null, 2), 'utf8');
   fs.writeFileSync(path.join(OUT, 'plan.json'), JSON.stringify(PLAN, null, 2), 'utf8');
   fs.writeFileSync(path.join(OUT, 'activity-feed.json'), JSON.stringify(ACTIVITIES, null, 2), 'utf8');
+  fs.writeFileSync(path.join(OUT, 'jw-timetable.json'), JSON.stringify(TIMETABLE, null, 2), 'utf8');
 
   const port = await freePort();
   check('拿到空闲本地端口', port > 0, String(port));
-  const env = { ...process.env, HUAYUAN_HOME: HOME };
+  const env = { ...process.env, HUAYUAN_HOME: HOME, HUAYUAN_SEARCH_ROOT: OUT };
 
   const launch = spawnSync(
     process.execPath,
@@ -198,6 +215,7 @@ async function main() {
   const state = fs.existsSync(stateFile) ? JSON.parse(fs.readFileSync(stateFile, 'utf8')) : {};
   check('状态文件含服务名与端口', state.service === 'huayuan-mobile-remote' && Number(state.port) === port);
   check('令牌长度不小于 32', typeof state.token === 'string' && state.token.length >= 32);
+  check('手机服务绑定固定 live-now 快照', path.resolve(state.nowPath) === path.resolve(path.join(HOME, 'live-now.json')));
 
   const base = `http://127.0.0.1:${port}`;
   try {
@@ -233,7 +251,28 @@ async function main() {
     check('返回 P0 待办分组', body.todo && body.todo.groups && body.todo.groups[0].items.length === 1);
     check('返回本周计划', body.plan && body.plan.days && body.plan.days.length === 1);
     check('返回活动列表', body.activities && body.activities.items.length === 1);
+    check('返回与电脑端一致的路线计划', body.route && body.route.ok === true && body.route.blocks.length > 0);
+    check(
+      '手机路线包含真实课程和地图点',
+      body.route.blocks.some((block) => block.type === 'class' && block.title === '实验课（样例）') &&
+        body.route.route.points.length > 0 &&
+        body.route.pois.length > 0
+    );
     check('返回可复制指令', Array.isArray(body.prompts) && body.prompts.length > 0);
+
+    const updatedNow = {
+      ...NOW,
+      generated_at: new Date(Date.now() + 1000).toISOString(),
+      tasks: { p0: [], p1: [], p2: [], p3: [], total: 0 },
+      completed_local: [{ title: '第 6 章作业（样例）', completed_at: new Date().toISOString() }],
+    };
+    fs.writeFileSync(path.join(HOME, 'live-now.json'), JSON.stringify(updatedNow), 'utf8');
+    const refreshed = await (await fetch(`${base}/api/dashboard`, { headers })).json();
+    check(
+      '完成或忽略事项后手机读取最新 live-now',
+      refreshed.now.tasks.total === 0 && refreshed.now.completed_local.length === 1
+    );
+    fs.writeFileSync(path.join(HOME, 'live-now.json'), JSON.stringify(NOW), 'utf8');
 
     const queryAuth = await fetch(`${base}/api/dashboard?k=${encodeURIComponent(state.token)}`);
     check('链接内令牌同样可用（手机直连）', queryAuth.status === 200);
@@ -250,6 +289,7 @@ async function main() {
     const index = await fetch(`${base}/`, { headers: { Accept: 'text/html' } });
     const indexText = await index.text();
     check('首页可打开且含配对入口', index.status === 200 && indexText.includes('手机工作台') && indexText.includes('pairCode'));
+    check('首页包含手机路线地图容器', indexText.includes('id="routeMap"') && indexText.includes('id="routeOverview"'));
     check('首页带 CSP 与 nosniff', Boolean(index.headers.get('content-security-policy')) && index.headers.get('x-content-type-options') === 'nosniff');
 
     const manifest = await fetch(`${base}/manifest.webmanifest`);
@@ -258,6 +298,8 @@ async function main() {
 
     const appJs = await fetch(`${base}/app.js`);
     check('前端脚本可加载', appJs.status === 200 && appJs.headers.get('content-type').includes('javascript'));
+    const appText = await appJs.text();
+    check('手机今日页消费路线 blocks 而非只用 now.sequence', /data\.route\.blocks/.test(appText) && /renderRouteMap/.test(appText));
 
     const icon = await fetch(`${base}/icon-192.png`);
     check('PNG 图标存在', icon.status === 200 && icon.headers.get('content-type') === 'image/png');

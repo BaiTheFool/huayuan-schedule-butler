@@ -586,6 +586,7 @@ const server = http.createServer((req, res) => {
         ok: true,
         service: 'huayuan-live-dashboard',
         api_version: API_VERSION,
+        pid: process.pid,
         browser_alive: Date.now() - lastBrowserHeartbeat < 15000,
         now_path: nowPath,
         updated_at: nowPath && fs.existsSync(nowPath) ? fs.statSync(nowPath).mtime.toISOString() : null,

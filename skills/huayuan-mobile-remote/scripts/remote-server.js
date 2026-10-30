@@ -18,6 +18,8 @@ const fs = require('fs');
 const http = require('http');
 const path = require('path');
 const { createSnapshot } = require('../../huayuan-live-dashboard/lib/snapshot');
+const routeEngine = require('../../huayuan-campus-route/scripts/route-engine');
+const campusData = require('../../huayuan-campus-route/data/campus-data');
 
 const SERVICE = 'huayuan-mobile-remote';
 const API_VERSION = 1;
@@ -164,6 +166,128 @@ function serveStatic(res, pathname, headOnly = false) {
   return true;
 }
 
+function readJsonIfExists(file) {
+  try {
+    return JSON.parse(fs.readFileSync(file, 'utf8'));
+  } catch {
+    return null;
+  }
+}
+
+function findLatestTimetable() {
+  const roots = [
+    path.dirname(nowPath),
+    process.env.HUAYUAN_SEARCH_ROOT,
+    process.env.HUAYUAN_HOME,
+    path.join(require('os').homedir(), 'WorkBuddy'),
+  ].filter(Boolean);
+  let best = null;
+  for (const root of roots.map((item) => path.resolve(item))) {
+    if (!fs.existsSync(root)) continue;
+    const pending = [{ dir: root, depth: 0 }];
+    while (pending.length) {
+      const current = pending.shift();
+      let entries;
+      try {
+        entries = fs.readdirSync(current.dir, { withFileTypes: true });
+      } catch {
+        continue;
+      }
+      for (const entry of entries) {
+        const candidate = path.join(current.dir, entry.name);
+        if (entry.isFile() && entry.name === 'jw-timetable.json') {
+          const stat = fs.statSync(candidate);
+          if (!best || stat.mtimeMs > best.mtimeMs) {
+            best = { file: candidate, mtimeMs: stat.mtimeMs, data: readJsonIfExists(candidate) };
+          }
+        } else if (
+          entry.isDirectory() &&
+          current.depth < 5 &&
+          !['.git', 'node_modules', 'profiles', 'cache'].includes(entry.name)
+        ) {
+          pending.push({ dir: candidate, depth: current.depth + 1 });
+        }
+      }
+    }
+  }
+  return best;
+}
+
+function nowTasks(nowDoc) {
+  const tasks = (nowDoc && nowDoc.tasks) || {};
+  return [tasks.p0 || [], tasks.p1 || [], tasks.p2 || [], tasks.p3 || []]
+    .flat()
+    .filter((task) => task && !task.done)
+    .map((task) => ({
+      ...task,
+      due: task.due || task.deadline || null,
+    }));
+}
+
+function routePayload(nowDoc) {
+  const timetableResult = findLatestTimetable();
+  const timetable = timetableResult && timetableResult.data;
+  if (!timetable) {
+    return {
+      ok: false,
+      available: false,
+      message: '还没有找到本地教务课表，手机端暂时不能绘制路线。',
+    };
+  }
+  const preferences =
+    readJsonIfExists(path.join(process.env.HUAYUAN_HOME || '', 'preferences.json')) ||
+    readJsonIfExists(path.join(require('os').homedir(), '.workbuddy', 'huayuan-schedule-butler', 'preferences.json'));
+  const preset =
+    preferences &&
+    ['balanced', 'grind', 'play', 'sport'].includes(preferences.study && preferences.study.intensity)
+      ? preferences.study.intensity
+      : 'balanced';
+  const plan = routeEngine.planDay({
+    date: nowDoc && nowDoc.now ? nowDoc.now.date : undefined,
+    timetable,
+    preferences,
+    preset,
+    weekNumber: nowDoc && nowDoc.week ? nowDoc.week.number : null,
+    tasks: nowTasks(nowDoc),
+    weather: { condition: 'cloudy', temperature: 26, source: 'manual' },
+  });
+  if (!plan || !plan.ok) {
+    return {
+      ok: false,
+      available: false,
+      message: (plan && plan.message) || '路线生成失败。',
+    };
+  }
+  const poiById = new Map(campusData.POIS.map((poi) => [poi.id, poi]));
+  const pois = (plan.stops || [])
+    .map((stop) => poiById.get(stop.poiId))
+    .filter(Boolean)
+    .map((poi) => ({
+      id: poi.id,
+      name: poi.name,
+      short: poi.short,
+      category: poi.category,
+      icon: poi.icon,
+      lat: poi.lat,
+      lng: poi.lng,
+    }));
+  return {
+    ok: true,
+    available: true,
+    timetable_available: true,
+    timetable_course_count: Array.isArray(timetable.courses) ? timetable.courses.length : 0,
+    campus: campusData.CAMPUS,
+    meta: plan.meta,
+    summary: plan.summary,
+    blocks: plan.blocks,
+    stops: plan.stops,
+    route: plan.route,
+    pois,
+    warnings: plan.warnings,
+    validation: plan.validation,
+  };
+}
+
 function dashboardPayload() {
   const base = snap.dashboard();
   const plan = snap.readPlan();
@@ -173,6 +297,7 @@ function dashboardPayload() {
     api_version: API_VERSION,
     server: { name: '华园日程管家 · 手机工作台', read_only: true, api_version: API_VERSION },
     ...base,
+    route: routePayload(base.now),
     plan: plan
       ? {
           generated_at: plan.generated_at || null,

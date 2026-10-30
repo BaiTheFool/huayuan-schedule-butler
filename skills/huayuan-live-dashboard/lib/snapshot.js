@@ -10,6 +10,7 @@
  */
 
 const fs = require('fs');
+const os = require('os');
 const path = require('path');
 
 const SYNC_INTERVAL_DAYS = 7;
@@ -28,6 +29,37 @@ function mtimeIso(file) {
   return fs.statSync(file).mtime.toISOString();
 }
 
+function findLatestFile(filename, roots) {
+  const candidates = [];
+  for (const root of roots.filter(Boolean).map((item) => path.resolve(item))) {
+    if (!fs.existsSync(root)) continue;
+    const pending = [{ dir: root, depth: 0 }];
+    while (pending.length) {
+      const current = pending.shift();
+      let entries;
+      try {
+        entries = fs.readdirSync(current.dir, { withFileTypes: true });
+      } catch {
+        continue;
+      }
+      for (const entry of entries) {
+        const candidate = path.join(current.dir, entry.name);
+        if (entry.isFile() && entry.name === filename) {
+          candidates.push(candidate);
+        } else if (
+          entry.isDirectory() &&
+          current.depth < 5 &&
+          !['.git', 'node_modules', 'profiles', 'cache'].includes(entry.name)
+        ) {
+          pending.push({ dir: candidate, depth: current.depth + 1 });
+        }
+      }
+    }
+  }
+  candidates.sort((a, b) => fs.statSync(b).mtimeMs - fs.statSync(a).mtimeMs);
+  return candidates[0] || null;
+}
+
 /**
  * 建立一个只读快照读取器。
  * @param {{nowPath?: string|null, activityPath?: string, planPath?: string, homeDir?: string}} options
@@ -39,7 +71,9 @@ function createSnapshot({ nowPath, activityPath, planPath, homeDir }) {
   );
   const dataDir = nowFile ? path.dirname(nowFile) : home;
   const activityFile = path.resolve(activityPath || path.join(dataDir, 'activity-feed.json'));
+  const stableActivityFile = path.join(home, 'live-activities.json');
   const planFile = path.resolve(planPath || path.join(dataDir, 'plan.json'));
+  const stablePlanFile = path.join(home, 'live-plan.json');
 
   function readNow() {
     if (!nowFile || !fs.existsSync(nowFile)) return null;
@@ -47,7 +81,17 @@ function createSnapshot({ nowPath, activityPath, planPath, homeDir }) {
   }
 
   function readActivities() {
-    if (!fs.existsSync(activityFile)) {
+    const selectedActivityFile = fs.existsSync(stableActivityFile)
+      ? stableActivityFile
+      : fs.existsSync(activityFile)
+        ? activityFile
+        : findLatestFile('activity-feed.json', [
+            dataDir,
+            home,
+            process.env.HUAYUAN_SEARCH_ROOT,
+            path.join(os.homedir(), 'WorkBuddy'),
+          ]);
+    if (!selectedActivityFile) {
       return {
         ok: false,
         status: 'NOT_SYNCED',
@@ -59,7 +103,7 @@ function createSnapshot({ nowPath, activityPath, planPath, homeDir }) {
       };
     }
     try {
-      return { ok: true, status: 'READY', prompt: ACTIVITY_PROMPT, ...readJsonFile(activityFile) };
+      return { ok: true, status: 'READY', prompt: ACTIVITY_PROMPT, ...readJsonFile(selectedActivityFile) };
     } catch (error) {
       return {
         ok: false,
@@ -74,9 +118,19 @@ function createSnapshot({ nowPath, activityPath, planPath, homeDir }) {
   }
 
   function readPlan() {
-    if (!fs.existsSync(planFile)) return null;
+    const selectedPlanFile = fs.existsSync(stablePlanFile)
+      ? stablePlanFile
+      : fs.existsSync(planFile)
+        ? planFile
+        : findLatestFile('plan.json', [
+            dataDir,
+            home,
+            process.env.HUAYUAN_SEARCH_ROOT,
+            path.join(os.homedir(), 'WorkBuddy'),
+          ]);
+    if (!selectedPlanFile) return null;
     try {
-      return readJsonFile(planFile);
+      return readJsonFile(selectedPlanFile);
     } catch {
       return null;
     }

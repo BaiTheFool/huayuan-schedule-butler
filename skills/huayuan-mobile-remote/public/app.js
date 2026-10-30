@@ -215,6 +215,102 @@
     return pending.length;
   }
 
+  const ROUTE_KIND = {
+    class: { label: '课程', cls: 'kind-task' },
+    walk: { label: '步行', cls: '' },
+    meal: { label: '用餐', cls: 'kind-personal' },
+    study: { label: '自习', cls: 'kind-task' },
+    sport: { label: '运动', cls: 'kind-personal' },
+    play: { label: '放松', cls: 'kind-rest' },
+    rest: { label: '缓冲', cls: 'kind-rest' },
+    free: { label: '自由', cls: '' },
+    shower: { label: '洗澡', cls: '' },
+    sleep: { label: '睡觉', cls: '' },
+  };
+
+  function clockMinutes(value) {
+    const match = String(value || '').match(/^(\d{1,2}):(\d{2})$/);
+    return match ? Number(match[1]) * 60 + Number(match[2]) : null;
+  }
+
+  function renderRouteMap(route) {
+    const bounds = route && route.campus && route.campus.bounds;
+    if (!bounds) return '';
+    const width = 1000;
+    const height = 1000;
+    const pad = 72;
+    const x = (lng) =>
+      pad + ((Number(lng) - Number(bounds.west)) / (Number(bounds.east) - Number(bounds.west))) * (width - pad * 2);
+    const y = (lat) =>
+      height - pad - ((Number(lat) - Number(bounds.south)) / (Number(bounds.north) - Number(bounds.south))) * (height - pad * 2);
+    const points = (route.route && route.route.points) || [];
+    const path = points
+      .filter((point) => Number.isFinite(Number(point.lat)) && Number.isFinite(Number(point.lng)))
+      .map((point, index) => `${index ? 'L' : 'M'} ${x(point.lng).toFixed(1)} ${y(point.lat).toFixed(1)}`)
+      .join(' ');
+    const poiById = new Map((route.pois || []).map((poi) => [poi.id, poi]));
+    const markers = (route.stops || [])
+      .map((stop, index) => {
+        const poi = poiById.get(stop.poiId);
+        if (!poi || index >= 12) return '';
+        const px = x(poi.lng);
+        const py = y(poi.lat);
+        return `<g>
+          <circle class="route-map-point" cx="${px.toFixed(1)}" cy="${py.toFixed(1)}" r="34"/>
+          <text class="route-map-number" x="${px.toFixed(1)}" y="${(py + 9).toFixed(1)}">${index + 1}</text>
+          <text class="route-map-label" x="${px.toFixed(1)}" y="${(py - 47).toFixed(1)}">${esc(String(poi.short || poi.name || '').slice(0, 8))}</text>
+        </g>`;
+      })
+      .join('');
+    return `
+      <rect class="route-map-bg" x="0" y="0" width="1000" height="1000"/>
+      <path class="route-map-road" d="M 70 330 C 280 240, 430 330, 620 210 S 900 180, 940 350 M 160 760 C 330 620, 560 820, 900 700"/>
+      <path class="route-map-road-line" d="M 70 330 C 280 240, 430 330, 620 210 S 900 180, 940 350 M 160 760 C 330 620, 560 820, 900 700"/>
+      ${path ? `<path class="route-map-path" d="${path}"/>` : ''}
+      ${markers}`;
+  }
+
+  function renderRouteOverview(data) {
+    const route = data.route || {};
+    const overview = $('routeOverview');
+    if (!route.ok || !route.available) {
+      overview.hidden = true;
+      return false;
+    }
+    overview.hidden = false;
+    const weather = (route.meta && route.meta.weather) || {};
+    $('routeWeather').textContent = `${weather.icon || '☁️'} ${weather.label || '天气未知'} ${weather.temperature != null ? `${weather.temperature}°C` : ''}`;
+    $('routeMap').innerHTML = renderRouteMap(route);
+    const summary = route.summary || {};
+    $('routeSummary').innerHTML =
+      `<b>${summary.stops || 0} 个地点</b> · ${summary.visits || 0} 段停留 · 步行 ${((summary.walk_meters || 0) / 1000).toFixed(1)} km / ${summary.walk_minutes || 0} 分钟`;
+    const weights = (route.meta && route.meta.weights) || { study: 0.46, play: 0.22, sport: 0.32 };
+    $('routeWeights').innerHTML = [
+      ['study', '自习', weights.study],
+      ['play', '放松', weights.play],
+      ['sport', '运动', weights.sport],
+    ]
+      .map(
+        ([key, label, raw]) => {
+          const value = Math.round(Number(raw || 0) * 100);
+          return `<div class="route-weight ${key}">
+            <div class="route-weight-head"><span>${label}</span><b>${value}%</b></div>
+            <div class="route-weight-bar"><i style="width:${Math.max(0, Math.min(100, value))}%"></i></div>
+          </div>`;
+        }
+      )
+      .join('');
+    $('routeStats').innerHTML = [
+      ['自习', `${summary.study_minutes || 0} 分钟`],
+      ['运动', `${summary.sport_minutes || 0} 分钟`],
+      ['放松', `${summary.play_minutes || 0} 分钟`],
+      ['任务', `${summary.task_minutes || 0} 分钟`],
+    ]
+      .map(([label, value]) => `<div class="route-stat"><b>${esc(value)}</b><span>${esc(label)}</span></div>`)
+      .join('');
+    return true;
+  }
+
   // ── 渲染：今日 ────────────────────────────────────────────────────
   function renderToday() {
     const data = state.data || {};
@@ -244,6 +340,7 @@
         : current.status === 'busy'
           ? '有安排'
           : '空闲';
+    const hasRoute = renderRouteOverview(data);
     const facts = [
       { label: '此刻', value: currentValue },
       { label: '可用窗口', value: windowDoc.minutes ? `${windowDoc.minutes} 分钟` : '—' },
@@ -253,12 +350,22 @@
       .map((item) => `<div class="fact"><b>${esc(item.value)}</b><span>${esc(item.label)}</span></div>`)
       .join('');
 
-    const rows = (now.sequence || []).slice(0, 8);
+    const routeBlocks = hasRoute ? data.route.blocks || [] : [];
+    const currentMinutes = clockMinutes(clock);
+    const rows = routeBlocks.length
+      ? routeBlocks
+          .filter((block) => currentMinutes == null || Number(block.end_min) >= currentMinutes - 1)
+          .slice(0, 12)
+      : (now.sequence || []).slice(0, 8);
     $('timeline').innerHTML = rows.length
       ? rows
           .map((row) => {
-            const metaRow = kindMeta(row);
-            const sub = row.course || row.reason || (row.minutes ? `${row.minutes} 分钟` : '');
+            const metaRow = routeBlocks.length
+              ? ROUTE_KIND[row.type] || { label: '安排', cls: '' }
+              : kindMeta(row);
+            const sub = routeBlocks.length
+              ? [row.subtitle, row.task && row.task.title, row.reason].filter(Boolean).join(' · ')
+              : row.course || row.reason || (row.minutes ? `${row.minutes} 分钟` : '');
             return `<li>
               <time>${esc(row.start)}<br />${esc(row.end)}</time>
               <span class="dot ${metaRow.cls}"></span>
@@ -609,6 +716,8 @@
     });
     $('pageTitle').firstChild.nodeValue = VIEW_TITLE[view];
     $('pageSub').textContent = headerSubtitle(view);
+    const content = $('content');
+    if (content) content.scrollTop = 0;
     document.documentElement.scrollTop = 0;
     document.body.scrollTop = 0;
     const hash = view === 'today' ? '' : `#${view}`;
@@ -721,11 +830,16 @@
     }, REFRESH_MS);
 
     const topbar = $('topbar');
-    window.addEventListener(
+    $('content').addEventListener(
       'scroll',
       () => {
-        topbar.classList.toggle('scrolled', window.scrollY > 2);
+        topbar.classList.toggle('scrolled', $('content').scrollTop > 2);
       },
+      { passive: true }
+    );
+    window.addEventListener(
+      'scroll',
+      () => topbar.classList.toggle('scrolled', window.scrollY > 2),
       { passive: true }
     );
 
@@ -736,7 +850,7 @@
       'touchstart',
       (event) => {
         if (state.view !== 'today') return;
-        if (window.scrollY > 0 || event.touches.length !== 1) return;
+        if ($('content').scrollTop > 0 || window.scrollY > 0 || event.touches.length !== 1) return;
         startY = event.touches[0].clientY;
         pulling = false;
       },

@@ -150,11 +150,47 @@
 - 解决：先启动服务但保留 URL；完成用户请求后，最后调用 `present_files({"files":["<URL>"]})`，调用后只写最终文字。Agent 明令禁止二次启动和外部浏览器。
 - 验证：性能门禁新增参数 `files`、最终调用与“禁止二次启动器”断言；真实日志确认 `present_files` 在工具权限列表中可用。
 
-### #20 · 2026-10-30 · present_files 不接受 localhost URL（0.14.4）
-- 现象：0.14.3 已正确把 `present_files` 作为最后工具调用，但调用 3 秒后返回 unknown failure，右侧面板仍为空。
-- 根因：WorkBuddy 当前 `presentFiles` 处理器把 `files` 逐项交给 `normalizePresentFilesLocalInput`，只保留绝对本地路径或 `file://` 路径；`http://127.0.0.1` 被过滤，最终因“没有文件注册到所属会话”而失败。工具文档中“可传 URL”的描述与当前实现不一致。
-- 解决：启动器在本次会话 cwd 生成 `huayuan-dashboard-launch.html`，该 HTML 用 `location.replace()` 跳到驾驶舱；Agent 把该本地文件传给 `present_files`，让 WorkBuddy 打开 HTML 预览后再进入 localhost。
-- 预防：与 WorkBuddy 宿主工具交互时以实际处理器实现为准；`present_files.files` 只传本会话工作区内的绝对文件路径。
+### #20 · 2026-10-30 · 雨课堂登录成功不续读、eCourse 提示条重复错位（0.14.4）
+- 现象：雨课堂已经显示个人课程卡片，后台仍持续等待登录；eCourse 登录页顶部和二维码卡片内各出现一条“正在打开”提示，且不切换成“请扫码登录”。
+- 根因：雨课堂登录轮询使用裸 `user-courses`，没有复用页面采集的 `XTBZ` 请求头；eCourse 的提示安装脚本在每个 iframe 都执行，并且导航后只恢复初始文案。
+- 解决：雨课堂等待期复用静态头并把“个人课程列表页可见”作为第二登录信号；eCourse 提示条只在顶层挂载，文案写入 `sessionStorage` 跨导航保留。
+- 验证：雨课堂真实登录态无头读取 11 门课程并返回 `READ_OK`；eCourse UX 回归 38/38。
+
+### #21 · 2026-10-30 · 驾驶舱仍会打开附件、00:00 睡觉导致路线伪冲突（0.14.5）
+- 现象：专家只要求 `ALREADY_OPEN:0` 时打开，模型把 `launch-dashboard.js` 或本地 HTML 跳板当成驾驶舱；用户睡觉设为 `00:00` 时，路线出现 `00:00「从C10 宿舍出发」与上一项「熄灯 / 睡觉」重叠 30 分钟`。
+- 根因：`present_files` 不能可靠地直接呈现 localhost 页面，且“先启动、回合末打开”与用户要求的首动作不一致；路线引擎把 `00:00` 解析为当天第 0 分钟，又把这个睡眠块选成 GPS 首个真实块，倒推出发时间得到 00:00。
+- 解决：驾驶舱改走 WorkBuddy 原生 `preview_url`；启动器验证响应是“华园”HTML 后输出固定 `PREVIEW_ARGS`，每轮均要求打开，`ALREADY_OPEN` 不再具有跳过权。路线把 `00:00`/早于起床时间的睡觉边界解释为当天 `24:00`，GPS 出发只相对起床后的非睡眠块计算。
+- 验证：驾驶舱真实启动输出 `LIVE_DASHBOARD_VERIFIED:1`、`LIVE_DASHBOARD_OPEN_REQUIRED:1` 和 `http://127.0.0.1:4319/`；`check-performance.js` 11/11、`check-widget.js` 32/32、驾驶舱 smoke 91/91、路线回归 40/40；真实 `00:00` 偏好 + C10 起点复测无校验错误，首块为 07:05。
+
+### #22 · 2026-10-30 · 驾驶舱反复重启、顶部与路线课表状态不一致（0.14.6）
+- 现象：WorkBuddy 每条消息都可能重新拉起驾驶舱；Model 甚至会手工执行 `sleep/curl`。路线页下方已显示真实课程，顶部仍提示“未读取到教务课表”。
+- 根因：启动器只从当前 cwd 或 `HUAYUAN_OUTPUT_DIR` 查找 `now.json`，WorkBuddy 不同回合 cwd 变化后把已有服务误判成另一个数据源并重启；普通子进程会随命令结束被回收。`now.js` 也只搜索当前输出目录，找不到其他历史会话里的 `jw-timetable.json`，而路线页会递归搜索，两个入口因此读不同数据。
+- 解决：启动器递归搜索 WorkBuddy 历史输出并把最新 `now.json` 发布到固定 `live-now.json`；已有服务只刷新该快照并返回 `ACTION:refresh-existing`，不再更换 PID。Windows 下经 WMI 创建脱离命令监管的驻留服务。`now.js` 同样递归查找最新课表并主动发布固定快照。
+- 验证：`check-dashboard-reuse.js` 8/8（两次调用 PID 均为 32660，第二次为 `refresh-existing`）；真实环境 `now.js` 返回 `timetable_known=true`，第一动作改为正在上课；路线 40/40、驾驶舱 smoke 91/91。
+
+### #23 · 2026-10-30 · 手机页面无法滚动、每次启动多出 Node 终端（0.14.7）
+- 现象：安卓手机工作台内容无法上下滚动；每次修复驾驶舱时，Windows Terminal 新增一个标题为 `C:\Program Files\nodejs\node` 的标签页。
+- 根因：Android WebView 对 document 根滚动支持不一致，且页面只有固定底栏没有独立滚动区；WMI 启动的 Node 控制台进程继承了 DEFAULT_TERMINAL 的可见会话，因此尽管服务无窗口句柄，仍会生成 Windows Terminal 标签。首版调度任务又用无 BOM UTF-8 PowerShell 脚本，Windows PowerShell 5 把中文工作区路径按 GBK 误读。
+- 解决：手机主视图改为 `100dvh + overflow:hidden` 外壳和 `.content` 纵向滚动容器，统一 `scrollTop`、滚动监听和下拉刷新；隐藏服务改由调度任务执行 UTF-16 VBScript，再由 `WScript.Shell.Run(..., 0, False)` 启动 Node。
+- 验证：手机回归 43/43；驾驶舱复用 9/9；启动前后 Windows Terminal 数量 `0 -> 0`，新增服务 PID 可跨命令复用。
+
+### #24 · 2026-10-30 · 手机活动页误显示 NOT_SYNCED（0.14.8）
+- 现象：电脑上活动已经刷新，手机“可参与事项”仍显示没有活动数据；桌面与手机的活动状态也可能不一致。
+- 根因：最新 `now.json` 位于新会话目录，但 `activity-feed.json` 仍在上一个会话目录。移动服务只读取“当前 now 同目录”的活动文件，因此返回 `NOT_SYNCED`。
+- 解决：`activity-feed.js` 每次刷新后发布固定 `live-activities.json`；共享快照层优先读取固定文件，缺失时递归查找最近一次历史 `activity-feed.json`。桌面与手机使用同一活动数据。
+- 验证：活动回归 8/8；真实环境活动快照返回 `status=READY`、5 条活动、20 个来源；手机接口不再返回 `NOT_SYNCED`。
+
+### #25 · 2026-10-30 · 手机今日页只剩一个休息、缺少地图和路线（0.14.9）
+- 现象：手机端“接下来”只显示一个 20:30–22:00 的休息块，没有电脑端已有的课程、通勤、自习和校园地图；两端 UI 差异明显。
+- 根因：手机 App 制作时早于路线功能合入，前端只渲染 `now.sequence`，而 `sequence` 在当下只剩后续空闲/休息；手机服务也没有返回路线引擎生成的地图与 blocks。
+- 解决：手机服务端复用同一个 `huayuan-campus-route/route-engine`，返回路线计划、blocks、地图折线、POI、天气、权重和统计；手机今日页渲染校园地图、路线摘要、三类权重、四项统计和从当前时刻开始的完整路线时间轴。
+- 验证：移动端冒烟 39/39，新增断言覆盖真实课程块、路线折线、地图点和 `data.route.blocks` 渲染；手机总回归 43/43。
+
+### #26 · 2026-10-30 · 忽略过期事项后手机仍显示旧 P0（0.14.10）
+- 现象：WorkBuddy 已把 5 个过期事项标为本地完成/忽略，电脑固定快照也已更新，但手机仍显示 5 条 P0 和旧过期列表。
+- 根因：手机常驻服务启动时把 `nowPath` 固定在某个历史 `now.json`；后续忽略操作写入新的固定快照，手机服务并未跟随。计划文件也绑定旧目录，切换固定快照后可能出现本周计划缺失。
+- 解决：手机启动器改为发布并绑定 `live-now.json`；`now.js` 同时发布 `live-plan.json`；快照层缺少固定计划时递归查找最新 `plan.json`。手机下一次刷新直接读取最新快照。
+- 验证：移动端冒烟 41/41，新增“写入新 live-now 后 P0 清零且 completed_local 更新”断言；驾驶舱复用 9/9。
 
 ---
 

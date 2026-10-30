@@ -84,6 +84,25 @@ h1, h2, h3, h4 { font-family: var(--font-display); font-weight: 600; letter-spac
   position: relative;
 }
 
+/* Android WebView 对 document 自身滚动支持不一致：主视图使用独立滚动容器。 */
+#mainView:not([hidden]) {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  height: 100dvh;
+  min-height: 0;
+  overflow: hidden;
+}
+#mainView .content {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-y: contain;
+  touch-action: pan-y;
+}
+
 /* ── 顶栏 ─────────────────────────────────────────────── */
 .topbar {
   position: sticky;
@@ -182,6 +201,117 @@ h1, h2, h3, h4 { font-family: var(--font-display); font-weight: 600; letter-spac
   font-size: 11px;
   font-variant-numeric: tabular-nums;
 }
+
+/* ── 今日路线：与电脑端“今日安排”同步 ───────────────── */
+.route-overview {
+  margin-top: 12px;
+  padding: 16px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+}
+.route-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+}
+.route-kicker {
+  margin: 0;
+  color: var(--accent);
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+}
+.route-head h2 {
+  margin: 3px 0 0;
+  font-size: 23px;
+  line-height: 1.25;
+}
+.route-weather {
+  flex: 0 0 auto;
+  padding: 6px 9px;
+  color: var(--green);
+  background: var(--green-soft);
+  border-radius: 999px;
+  font-size: 10.5px;
+  font-weight: 700;
+}
+.route-map-shell {
+  margin-top: 12px;
+  overflow: hidden;
+  background: #e8eadf;
+  border: 1px solid var(--line);
+  border-radius: 15px;
+}
+#routeMap {
+  display: block;
+  width: 100%;
+  aspect-ratio: 1.35;
+  max-height: 270px;
+}
+.route-map-bg { fill: #e9ebdf; }
+.route-map-park { fill: #d7e2cd; }
+.route-map-road { fill: none; stroke: #faf7ed; stroke-width: 22; }
+.route-map-road-line { fill: none; stroke: #c9c8ba; stroke-width: 2; stroke-dasharray: 8 10; }
+.route-map-path { fill: none; stroke: var(--green); stroke-width: 10; stroke-linecap: round; stroke-linejoin: round; }
+.route-map-point { fill: var(--surface); stroke: var(--green); stroke-width: 5; }
+.route-map-number { fill: var(--green-deep); font: 700 26px var(--font-num); text-anchor: middle; }
+.route-map-label { fill: #35443b; font: 600 23px var(--font-body); text-anchor: middle; }
+.route-summary {
+  margin: 11px 0 0;
+  color: var(--ink-soft);
+  font-size: 11.5px;
+  line-height: 1.65;
+}
+.route-summary b { color: var(--ink); }
+.route-weight-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 7px;
+  margin-top: 12px;
+}
+.route-weight {
+  padding: 9px;
+  background: var(--surface-soft);
+  border-radius: 11px;
+}
+.route-weight-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 5px;
+  color: var(--muted);
+  font-size: 9.5px;
+}
+.route-weight-head b { color: var(--ink); }
+.route-weight-bar {
+  height: 5px;
+  margin-top: 7px;
+  overflow: hidden;
+  background: var(--line);
+  border-radius: 999px;
+}
+.route-weight-bar i {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--green);
+}
+.route-weight.play .route-weight-bar i { background: #7b6bb0; }
+.route-weight.sport .route-weight-bar i { background: var(--accent); }
+.route-stat-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 7px;
+  margin-top: 9px;
+}
+.route-stat {
+  padding: 9px 10px;
+  background: var(--surface-soft);
+  border-radius: 11px;
+}
+.route-stat b { display: block; font-size: 15px; line-height: 1.25; }
+.route-stat span { display: block; margin-top: 2px; color: var(--muted); font-size: 9.5px; }
 
 /* ── 概览小卡 ─────────────────────────────────────────── */
 .facts { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 10px; }

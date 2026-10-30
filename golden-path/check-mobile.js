@@ -64,7 +64,19 @@ check('移动端视口与安全区', /viewport-fit=cover/.test(html) && /width=d
 check('页面声明只读边界', /只读/.test(html));
 check('前端不含内联脚本（CSP 兼容）', !/<script(?![^>]*src=)[^>]*>[\s\S]*?<\/script>/.test(html));
 const appJs = read(path.join(PUBLIC_DIR, 'app.js'));
+const mobileCss = read(path.join(PUBLIC_DIR, 'styles.css'));
 check('前端只用相对接口（不跨域）', !/https?:\/\//.test(appJs.replace(/https:\/\/example\.edu\.cn/g, '')));
+check(
+  '手机主视图使用独立滚动容器',
+  /#mainView:not\(\[hidden\]\)[\s\S]*?height:\s*100dvh[\s\S]*?overflow:\s*hidden/.test(mobileCss) &&
+    /#mainView \.content[\s\S]*?overflow-y:\s*auto/.test(mobileCss) &&
+    /-webkit-overflow-scrolling:\s*touch/.test(mobileCss)
+);
+check(
+  '切页与滚动状态使用内容容器 scrollTop',
+  /content\.scrollTop\s*=\s*0/.test(appJs) &&
+    /\$\('content'\)\.addEventListener\(\s*'scroll'/.test(appJs)
+);
 
 // 4) 安全约束（源码级）
 check('服务端只读：写方法统一 405', /READ_ONLY/.test(serverSource) && /'POST'/.test(serverSource));

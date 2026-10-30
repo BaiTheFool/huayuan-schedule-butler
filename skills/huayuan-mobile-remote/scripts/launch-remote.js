@@ -20,7 +20,7 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 const { spawn, spawnSync } = require('child_process');
-const { findLatestNow } = require('../../huayuan-live-dashboard/scripts/launch-dashboard');
+const { findLatestNow, publishStableNow } = require('../../huayuan-live-dashboard/scripts/launch-dashboard');
 
 const SERVICE = 'huayuan-mobile-remote';
 const DEFAULT_PORT = 4320;
@@ -305,10 +305,24 @@ async function main() {
     return;
   }
 
-  const nowPath = path.resolve(argValue('--now', '') || findLatestNow() || '');
+  const candidateNow = path.resolve(argValue('--now', '') || findLatestNow() || '');
+  const nowPath = publishStableNow(candidateNow || null);
   if (!nowPath || !fs.existsSync(nowPath)) throw new Error('NO_NOW_JSON:请先完成初始化或运行 now.js');
   const nowDoc = readJson(nowPath);
   if (!nowDoc || !nowDoc.first_action) throw new Error('INVALID_NOW_JSON');
+  const sourceDir = candidateNow ? path.dirname(candidateNow) : path.dirname(nowPath);
+  const stableActivities = path.join(stateDir, 'live-activities.json');
+  const stablePlan = path.join(stateDir, 'live-plan.json');
+  const activityPath = path.resolve(
+    argValue('--activities', '') ||
+      (fs.existsSync(stableActivities)
+        ? stableActivities
+        : path.join(sourceDir, 'activity-feed.json'))
+  );
+  const planPath = path.resolve(
+    argValue('--plan', '') ||
+      (fs.existsSync(stablePlan) ? stablePlan : path.join(sourceDir, 'plan.json'))
+  );
 
   const old = readJson(statePath);
   if (old && path.resolve(old.nowPath || '') === nowPath && !hasFlag('--reset-pairing')) {
@@ -333,7 +347,27 @@ async function main() {
     if (await waitForHealth(port, 200)) continue;
     const child = spawn(
       process.execPath,
-      [serverPath, '--now', nowPath, '--port', String(port), '--host', host, '--token', token, '--code', code, '--version', version, '--discovery-port', String(discoveryPort)],
+      [
+        serverPath,
+        '--now',
+        nowPath,
+        '--activities',
+        activityPath,
+        '--plan',
+        planPath,
+        '--port',
+        String(port),
+        '--host',
+        host,
+        '--token',
+        token,
+        '--code',
+        code,
+        '--version',
+        version,
+        '--discovery-port',
+        String(discoveryPort),
+      ],
       { detached: true, stdio: 'ignore', windowsHide: true, cwd: __dirname }
     );
     child.unref();
@@ -353,6 +387,9 @@ async function main() {
     token,
     code,
     nowPath,
+    nowSource: candidateNow || null,
+    activityPath,
+    planPath,
     pid: chosen.pid,
     tunnel_pid: null,
     public_url: null,
