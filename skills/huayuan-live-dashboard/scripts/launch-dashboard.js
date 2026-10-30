@@ -8,14 +8,28 @@ const { spawn, spawnSync } = require('child_process');
 const DEFAULT_PORT = 4318;
 const MAX_PORT = 4338;
 const SERVICE = 'huayuan-live-dashboard';
-const REQUIRED_API_VERSION = 4;
+const REQUIRED_API_VERSION = 5;
 const stateDir =
   process.env.HUAYUAN_HOME || path.join(os.homedir(), '.workbuddy', 'huayuan-schedule-butler');
 const statePath = path.join(stateDir, 'live-dashboard.json');
+const pagePaths = {
+  today: '/',
+  todo: '/todo.html',
+  activities: '/activities.html',
+  mobile: '/mobile.html',
+};
 
 function argValue(name, fallback = null) {
   const index = process.argv.indexOf(name);
   return index >= 0 && process.argv[index + 1] ? process.argv[index + 1] : fallback;
+}
+
+function requestedPagePath() {
+  return pagePaths[String(argValue('--page', '')).toLowerCase()] || '/';
+}
+
+function dashboardUrl(port) {
+  return `http://127.0.0.1:${port}${requestedPagePath()}`;
 }
 
 function readJson(file) {
@@ -91,20 +105,23 @@ async function main() {
     console.log('SELF_CHECK_PASS');
     return;
   }
-  const nowPath = findLatestNow();
-  if (!nowPath || !fs.existsSync(nowPath)) {
-    throw new Error('NO_NOW_JSON:请先完成初始化或运行 now.js');
+  const candidateNow = findLatestNow();
+  const nowPath = candidateNow && fs.existsSync(candidateNow) ? candidateNow : null;
+  if (nowPath) {
+    const nowDoc = readJson(nowPath);
+    if (!nowDoc) throw new Error('INVALID_NOW_JSON');
   }
-  const nowDoc = readJson(nowPath);
-  if (!nowDoc || !nowDoc.first_action) throw new Error('INVALID_NOW_JSON');
 
   fs.mkdirSync(stateDir, { recursive: true });
   const oldState = readJson(statePath);
-  if (oldState && path.resolve(oldState.nowPath || '') === nowPath) {
+  const oldNowPath = oldState && oldState.nowPath ? path.resolve(oldState.nowPath) : null;
+  if (oldState && oldNowPath === nowPath) {
     const health = await waitForHealth(oldState.port, 400);
     if (health) {
-      const url = `http://127.0.0.1:${oldState.port}/`;
-      if (!process.argv.includes('--no-open')) openBrowser(url);
+      const url = dashboardUrl(oldState.port);
+      if (!process.argv.includes('--no-open') && (!health.browser_alive || requestedPagePath() !== '/')) {
+        openBrowser(url);
+      }
       console.log(`LIVE_DASHBOARD_READY:${url}`);
       return;
     }
@@ -117,7 +134,10 @@ async function main() {
     const health = await waitForHealth(port, 250);
     if (health) continue;
     const token = require('crypto').randomBytes(24).toString('hex');
-    const child = spawn(process.execPath, [serverPath, '--now', nowPath, '--port', String(port), '--token', token], {
+    const serverArgs = [serverPath];
+    if (nowPath) serverArgs.push('--now', nowPath);
+    serverArgs.push('--port', String(port), '--token', token);
+    const child = spawn(process.execPath, serverArgs, {
       detached: true,
       stdio: 'ignore',
       windowsHide: true,
@@ -139,6 +159,7 @@ async function main() {
         port: chosen.port,
         token: chosen.token,
         nowPath,
+        onboarding_mode: !nowPath,
         pid: null,
         started_at: new Date().toISOString(),
       },
@@ -147,8 +168,9 @@ async function main() {
     ),
     'utf8'
   );
-  const url = `http://127.0.0.1:${chosen.port}/`;
+  const url = dashboardUrl(chosen.port);
   if (!process.argv.includes('--no-open')) openBrowser(url);
+  if (!nowPath) console.log('LIVE_DASHBOARD_ONBOARDING_MODE:1');
   console.log(`LIVE_DASHBOARD_READY:${url}`);
 }
 

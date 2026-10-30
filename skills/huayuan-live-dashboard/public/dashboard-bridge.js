@@ -49,17 +49,26 @@
 
   function render(data) {
     const now = data.now || {};
+    const hasNow = Boolean(data.now);
     const first = now.first_action || {};
     const pending = Array.isArray(now.data_status && now.data_status.pending) ? now.data_status.pending : [];
     const sync = data.sync || {};
     const status = $('dashboardBriefStatus');
+    const kicker = document.querySelector('.dashboard-brief-kicker');
+    if (kicker) kicker.textContent = hasNow ? 'LIVE · 来自最新 now.json' : 'SETUP MODE · 还没有 now.json';
     status.classList.add('live');
-    status.innerHTML = `<i></i>${pending.length ? '部分数据 · 已更新' : '数据已同步'}`;
-    $('dashboardBriefAction').textContent = first.headline || '当前没有明确的第一动作';
-    $('dashboardBriefHint').textContent = first.next_hint || first.detail || '继续在左侧向专家提问。';
+    status.innerHTML = `<i></i>${
+      !hasNow ? '等待初始化' : pending.length ? '部分数据 · 已更新' : '数据已同步'
+    }`;
+    $('dashboardBriefAction').textContent = hasNow
+      ? first.headline || '当前没有明确的第一动作'
+      : '先补齐顶部红点，再开始安排今天';
+    $('dashboardBriefHint').textContent = hasNow
+      ? first.next_hint || first.detail || '继续在左侧向专家提问。'
+      : '所有初始化步骤、缺失信息和可复制指令都集中在驾驶舱顶部。';
     $('dashboardBriefSync').innerHTML = `${esc(sync.message || '建议定期刷新各平台待办。')} <a href="/todo.html">查看全部待办 →</a>`;
     const pendingBox = $('dashboardBriefPending');
-    pendingBox.hidden = pending.length === 0;
+    pendingBox.hidden = !hasNow || pending.length === 0;
     const pendingItems = pending.slice(0, 2).map((item) => {
       const text = String(item || '').replace(/\s+/g, ' ').trim();
       return text.length > 72 ? `${text.slice(0, 72)}…` : text;
@@ -73,7 +82,7 @@
 
     const prompts = Array.isArray(data.prompts) ? data.prompts.slice(0, 3) : [];
     const promptBox = $('dashboardBriefPrompts');
-    promptBox.hidden = prompts.length === 0;
+    promptBox.hidden = !hasNow || prompts.length === 0;
     promptBox.innerHTML = prompts
       .map((prompt) => `<button type="button" data-huayuan-prompt="${esc(prompt)}">复制：${esc(prompt)}</button>`)
       .join('');

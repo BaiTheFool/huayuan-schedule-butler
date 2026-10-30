@@ -13,6 +13,8 @@ const fs = require('fs');
 const path = require('path');
 
 const SYNC_INTERVAL_DAYS = 7;
+const INITIALIZE_PROMPT =
+  '开始初始化：请引导我依次完成学院信息、校园门户与教务、eCourse、雨课堂登录、作息偏好和当前教学周，并读取课表与待办。需要登录时一次只打开一个窗口，我完成后再继续。';
 const SYNC_PROMPT =
   '刷新我的校园待办：请重新读取教务、eCourse、雨课堂和校园门户，更新待办与日程，并告诉我新增、临近截止、已过期和发生变化的事项。';
 const ACTIVITY_PROMPT =
@@ -28,14 +30,19 @@ function mtimeIso(file) {
 
 /**
  * 建立一个只读快照读取器。
- * @param {{nowPath: string, activityPath?: string, planPath?: string}} options
+ * @param {{nowPath?: string|null, activityPath?: string, planPath?: string, homeDir?: string}} options
  */
-function createSnapshot({ nowPath, activityPath, planPath }) {
-  const nowFile = path.resolve(nowPath);
-  const activityFile = path.resolve(activityPath || path.join(path.dirname(nowFile), 'activity-feed.json'));
-  const planFile = path.resolve(planPath || path.join(path.dirname(nowFile), 'plan.json'));
+function createSnapshot({ nowPath, activityPath, planPath, homeDir }) {
+  const nowFile = nowPath ? path.resolve(nowPath) : null;
+  const home = path.resolve(
+    homeDir || process.env.HUAYUAN_HOME || path.join(require('os').homedir(), '.workbuddy', 'huayuan-schedule-butler')
+  );
+  const dataDir = nowFile ? path.dirname(nowFile) : home;
+  const activityFile = path.resolve(activityPath || path.join(dataDir, 'activity-feed.json'));
+  const planFile = path.resolve(planPath || path.join(dataDir, 'plan.json'));
 
   function readNow() {
+    if (!nowFile || !fs.existsSync(nowFile)) return null;
     return readJsonFile(nowFile);
   }
 
@@ -76,12 +83,12 @@ function createSnapshot({ nowPath, activityPath, planPath }) {
   }
 
   function taskList(nowDoc) {
-    const tasks = nowDoc.tasks || {};
+    const tasks = (nowDoc && nowDoc.tasks) || {};
     return [...(tasks.p0 || []), ...(tasks.p1 || []), ...(tasks.p2 || []), ...(tasks.p3 || [])];
   }
 
   function todoSnapshot(nowDoc) {
-    const tasks = nowDoc.tasks || {};
+    const tasks = (nowDoc && nowDoc.tasks) || {};
     const groups = [
       { key: 'p0', label: 'P0 · 必须优先', hint: '已过期、今天或明天截止', items: tasks.p0 || [] },
       { key: 'p1', label: 'P1 · 本周推进', hint: '三天内截止或你设定为高优先级', items: tasks.p1 || [] },
@@ -91,14 +98,14 @@ function createSnapshot({ nowPath, activityPath, planPath }) {
     return {
       groups,
       total: groups.reduce((sum, group) => sum + group.items.length, 0),
-      overdue: nowDoc.overdue || [],
-      completed_local: nowDoc.completed_local || [],
-      deferred: nowDoc.deferred || [],
+      overdue: (nowDoc && nowDoc.overdue) || [],
+      completed_local: (nowDoc && nowDoc.completed_local) || [],
+      deferred: (nowDoc && nowDoc.deferred) || [],
     };
   }
 
   function syncInfo() {
-    const dir = path.dirname(nowFile);
+    const dir = dataDir;
     const sources = [
       ['campus-sync.json', '校园门户'],
       ['jw-timetable.json', '教务系统'],
@@ -116,7 +123,22 @@ function createSnapshot({ nowPath, activityPath, planPath }) {
       })
       .filter(Boolean);
     const syncTimes = available.map((item) => item.at).sort();
-    const lastSyncAt = syncTimes.length ? syncTimes[syncTimes.length - 1] : mtimeIso(nowFile);
+    const lastSyncAt = syncTimes.length
+      ? syncTimes[syncTimes.length - 1]
+      : nowFile && fs.existsSync(nowFile)
+        ? mtimeIso(nowFile)
+        : null;
+    if (!lastSyncAt) {
+      return {
+        interval_days: SYNC_INTERVAL_DAYS,
+        last_sync_at: null,
+        age_days: null,
+        due: true,
+        prompt: INITIALIZE_PROMPT,
+        sources: available,
+        message: '还没有平台数据。先复制初始化指令到左侧对话，完成后这里会自动更新。',
+      };
+    }
     const ageMs = Math.max(0, Date.now() - new Date(lastSyncAt).getTime());
     const ageDays = Math.floor(ageMs / 86400000);
     const due = ageDays >= SYNC_INTERVAL_DAYS;
@@ -136,6 +158,7 @@ function createSnapshot({ nowPath, activityPath, planPath }) {
   }
 
   function promptsFor(nowDoc) {
+    if (!nowDoc) return [INITIALIZE_PROMPT];
     const prompts = [SYNC_PROMPT];
     const first = nowDoc.first_action || {};
     if (first.headline) prompts.push('关于“' + String(first.headline).slice(0, 42) + '”，请告诉我具体第一步怎么做。');
@@ -153,7 +176,7 @@ function createSnapshot({ nowPath, activityPath, planPath }) {
     const now = readNow();
     return {
       generated_at: new Date().toISOString(),
-      updated_at: mtimeIso(nowFile),
+      updated_at: nowFile && fs.existsSync(nowFile) ? mtimeIso(nowFile) : null,
       now,
       todo: todoSnapshot(now),
       sync: syncInfo(),
@@ -165,4 +188,4 @@ function createSnapshot({ nowPath, activityPath, planPath }) {
   return { nowFile, activityFile, planFile, readNow, readActivities, readPlan, todoSnapshot, syncInfo, promptsFor, dashboard };
 }
 
-module.exports = { createSnapshot, SYNC_INTERVAL_DAYS, SYNC_PROMPT, ACTIVITY_PROMPT };
+module.exports = { createSnapshot, SYNC_INTERVAL_DAYS, INITIALIZE_PROMPT, SYNC_PROMPT, ACTIVITY_PROMPT };

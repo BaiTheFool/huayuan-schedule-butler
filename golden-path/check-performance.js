@@ -45,12 +45,20 @@ check(
   `agent=${agentSkills.length} plugin=${pluginSkills.length} dir=${directorySkills.length}`
 );
 check(
-  '普通“现在该干什么”不自动 Widget',
-  /不自动生成 Widget/.test(agent)
+  '每个用户回合先打开外部驾驶舱',
+  /驾驶舱总闸/.test(agent) &&
+    /收到用户的任何有效指令后，先执行/.test(agent) &&
+    /launch-dashboard\.js/.test(agent) &&
+    /不得因为缺少课表、任务或初始化资料而跳过/.test(agent)
 );
 check(
-  '打开/网页/分屏只走外部网页驾驶舱',
-  /路径互斥规则/.test(agent) && /show_widget` 不执行/.test(agent)
+  '未初始化也必须进入驾驶舱引导模式',
+  /LIVE_DASHBOARD_ONBOARDING_MODE:1/.test(agent) &&
+    /没有 `now\.json`，也必须打开驾驶舱/.test(agent)
+);
+check(
+  '内嵌卡片不自动生成',
+  /不自动生成内嵌 Widget/.test(agent)
 );
 
 const intro = spawnSync(

@@ -1,72 +1,72 @@
 {
-  "name": "huayuan-schedule-butler-v2",
-  "version": "0.14.0",
-  "description": "Unifies SCUT undergraduate course schedules, assignments, exams and notices into explainable, editable task cards and day/week plans, including a weather-aware University Town campus walking-route planner with major input, official timetable import, exam-prep tasks and manual todos.",
-  "author": {
-    "name": "华园日程管家项目组",
-    "email": "wtm430181@qq.com"
-  },
-  "agents": [
-    "./agents/huayuan-schedule-butler.md"
-  ],
-  "skills": [
-    "./skills/huayuan-task-card",
-    "./skills/huayuan-browser-session",
-    "./skills/timeline-brief",
-    "./skills/huayuan-dashboard-widget",
-    "./skills/huayuan-live-dashboard",
-    "./skills/huayuan-campus-route",
-    "./skills/huayuan-campus-manual",
-    "./skills/huayuan-score-advisor",
-    "./skills/huayuan-mobile-remote"
-  ],
-  "expertType": "agent",
-  "agentName": "huayuan-schedule-butler",
-  "displayName": {
-    "en": "Huayuan Schedule Butler (Undergraduate)",
-    "zh": "华园日程管家（本科生）"
-  },
-  "profession": {
-    "en": "Huayuan Undergraduate Academic Planner",
-    "zh": "华园本科生日程规划助理"
-  },
-  "displayDescription": {
-    "en": "Unifies SCUT University Town timetables, assignments and campus opportunities into explainable plans, with a live first action, adaptive rescheduling, exam-prep tasks, weather-aware walking routes and a three-page split-screen dashboard.",
-    "zh": "面向华南理工大学大学城校区，聚合多平台课表、作业、考试、校园通知与活动；提供“现在干什么”、临时重排、T-14/T-7/T-3/T-1 复习任务、天气感知校园路线，以及“今日 / 全部待办 / 可参与事项”三页驾驶舱。"
-  },
-  "avatar": "avatars/expert.png",
-  "categoryId": "09-OperationsHR",
-  "defaultInitPrompt": {
-    "zh": "请告诉我你能帮我做什么，并引导我完成首次初始化",
-    "en": "Show me what you can do and guide me through first-time setup"
-  },
-  "plugin": "huayuan-schedule-butler-v2",
-  "tags": [
-    {
-      "en": "Schedule Planning",
-      "zh": "日程规划"
-    },
-    {
-      "en": "Academic Task Tracking",
-      "zh": "学业任务追踪"
-    },
-    {
-      "en": "Multi-source Consolidation",
-      "zh": "多源信息整合"
-    }
-  ],
-  "quickPrompts": [
-    {
-      "zh": "请告诉我你能帮我做什么，并引导我完成首次初始化",
-      "en": "Show me what you can do and guide me through first-time setup"
-    },
-    {
-      "zh": "我现在该干什么？请给出唯一的第一动作和接下来的安排",
-      "en": "What should I do right now? Give me the single next action and the following schedule"
-    },
-    {
-      "zh": "我要临时加一门课、一项作业或一段休息，请帮我重排本周计划",
-      "en": "Add a temporary class, assignment, or rest block, and reschedule my week"
-    }
-  ]
+    "name":  "huayuan-schedule-butler-v2",
+    "version":  "0.14.1",
+    "description":  "Unifies SCUT undergraduate course schedules, assignments, exams and notices into explainable plans. Every turn opens a guided four-page dashboard with setup red dots, copyable onboarding actions, University Town routes, all todos, campus activities and mobile companion controls.",
+    "author":  {
+                   "name":  "华园日程管家项目组",
+                   "email":  "wtm430181@qq.com"
+               },
+    "agents":  [
+                   "./agents/huayuan-schedule-butler.md"
+               ],
+    "skills":  [
+                   "./skills/huayuan-task-card",
+                   "./skills/huayuan-browser-session",
+                   "./skills/timeline-brief",
+                   "./skills/huayuan-dashboard-widget",
+                   "./skills/huayuan-live-dashboard",
+                   "./skills/huayuan-campus-route",
+                   "./skills/huayuan-campus-manual",
+                   "./skills/huayuan-score-advisor",
+                   "./skills/huayuan-mobile-remote"
+               ],
+    "expertType":  "agent",
+    "agentName":  "huayuan-schedule-butler",
+    "displayName":  {
+                        "en":  "Huayuan Schedule Butler (Undergraduate)",
+                        "zh":  "华园日程管家（本科生）"
+                    },
+    "profession":  {
+                       "en":  "Huayuan Undergraduate Academic Planner",
+                       "zh":  "华园本科生日程规划助理"
+                   },
+    "displayDescription":  {
+                               "en":  "Unifies SCUT University Town timetables, assignments and campus opportunities into explainable plans. Every turn opens a guided four-page dashboard with setup red dots, copyable onboarding actions, weather-aware routes, all todos, campus activities and mobile companion controls.",
+                               "zh":  "面向华南理工大学大学城校区，聚合多平台课表、作业、考试、校园通知与活动；每轮对话先打开带初始化红点和复制补全指令的四页驾驶舱，提供“现在干什么”、临时重排、复习任务、天气感知校园路线和手机工作台控制。"
+                           },
+    "avatar":  "avatars/expert.png",
+    "categoryId":  "09-OperationsHR",
+    "defaultInitPrompt":  {
+                              "zh":  "请告诉我你能帮我做什么，并引导我完成首次初始化",
+                              "en":  "Show me what you can do and guide me through first-time setup"
+                          },
+    "plugin":  "huayuan-schedule-butler-v2",
+    "tags":  [
+                 {
+                     "en":  "Schedule Planning",
+                     "zh":  "日程规划"
+                 },
+                 {
+                     "en":  "Academic Task Tracking",
+                     "zh":  "学业任务追踪"
+                 },
+                 {
+                     "en":  "Multi-source Consolidation",
+                     "zh":  "多源信息整合"
+                 }
+             ],
+    "quickPrompts":  [
+                         {
+                             "zh":  "请告诉我你能帮我做什么，并引导我完成首次初始化",
+                             "en":  "Show me what you can do and guide me through first-time setup"
+                         },
+                         {
+                             "zh":  "我现在该干什么？请给出唯一的第一动作和接下来的安排",
+                             "en":  "What should I do right now? Give me the single next action and the following schedule"
+                         },
+                         {
+                             "zh":  "我要临时加一门课、一项作业或一段休息，请帮我重排本周计划",
+                             "en":  "Add a temporary class, assignment, or rest block, and reschedule my week"
+                         }
+                     ]
 }

@@ -9,15 +9,15 @@ description: Serve a read-only mobile workbench of the latest Huayuan plan so a 
 
 把电脑上的「今日安排 / 全部待办 / 可参与事项 / 本周计划」放到手机上：手机浏览器打开电脑给出的地址，输入电脑显示的 6 位配对码即可。适合人不在电脑前时快速看一眼“现在该干什么”。
 
-它和另外两种可视化分工明确：
+电脑驾驶舱的第四个“手机工作台”标签是本技能的首选控制入口；它负责启动、停止、换配对码、显示地址和下载 APK。命令行用于驾驶舱不可用或需要公网隧道的情况。
 
 | 用户说法 | 走哪条路 |
 |---|---|
-| 看卡片 / 看驾驶舱（对话内） | `huayuan-dashboard-widget` 的 `show_widget` |
-| 打开驾驶舱 / 网页 / 分屏（电脑上） | `huayuan-live-dashboard` |
-| **手机 / 手机上 / 手机上打开 / 手机远程** | **本技能** |
+| 任何指令 | 先打开 `huayuan-live-dashboard` 外部驾驶舱 |
+| 看卡片（对话内） | 外部驾驶舱打开后，再按需用 `show_widget` |
+| **手机 / 手机上 / 手机上打开 / 手机远程** | **外部驾驶舱 `--page mobile` + 本技能控制** |
 
-只要用户句子里出现「手机」，就走本技能，不要误开电脑驾驶舱。
+用户句子里出现「手机」时，仍先确保电脑驾驶舱已打开，并定位到 `mobile.html`；不得跳过驾驶舱直接只发终端内容。
 
 ## 触发
 
@@ -28,7 +28,7 @@ description: Serve a read-only mobile workbench of the latest Huayuan plan so a 
 
 ## 执行
 
-1. 先确认最新结果存在（没有就先跑一次）：
+1. 先确认最新结果存在（没有就回到驾驶舱顶部红点完成初始化）：
 
 ```powershell
 node <huayuan-browser-session技能目录>\scripts\now.js

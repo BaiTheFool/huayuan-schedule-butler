@@ -6,6 +6,7 @@ const os = require('os');
 const path = require('path');
 const { spawn } = require('child_process');
 const { createSnapshot } = require('../lib/snapshot');
+const { buildOnboardingStatus } = require('../lib/onboarding');
 
 const argv = process.argv;
 const argValue = (name, fallback = null) => {
@@ -16,17 +17,21 @@ const argValue = (name, fallback = null) => {
 const port = Number(argValue('--port', '4318'));
 const token = argValue('--token', '');
 const timetableRefreshMode = argValue('--timetable-refresh-mode', 'auto');
-const nowPath = path.resolve(argValue('--now', ''));
-const activityPath = path.resolve(argValue('--activities', path.join(path.dirname(nowPath), 'activity-feed.json')));
+const homeDir = process.env.HUAYUAN_HOME || path.join(os.homedir(), '.workbuddy', 'huayuan-schedule-butler');
+const nowArg = argValue('--now', '');
+const nowPath = nowArg ? path.resolve(nowArg) : null;
+const activityPath = path.resolve(
+  argValue('--activities', path.join(nowPath ? path.dirname(nowPath) : homeDir, 'activity-feed.json'))
+);
 const publicDir = path.resolve(__dirname, '..', 'public');
-const snap = createSnapshot({ nowPath, activityPath });
+const snap = createSnapshot({ nowPath, activityPath, homeDir });
 const routeSkillDir = path.resolve(__dirname, '..', '..', 'huayuan-campus-route');
 const routePublicDir = path.join(routeSkillDir, 'public');
 const routeDataDir = path.join(routeSkillDir, 'data');
 const routeScriptsDir = path.join(routeSkillDir, 'scripts');
 const browserSkillDir = path.resolve(__dirname, '..', '..', 'huayuan-browser-session');
 const jwTimetableScript = path.join(browserSkillDir, 'scripts', 'jw-timetable.js');
-const API_VERSION = 4;
+const API_VERSION = 5;
 const SYNC_INTERVAL_DAYS = 7;
 const SYNC_PROMPT =
   '刷新我的校园待办：请重新读取教务、eCourse、雨课堂和校园门户，更新待办与日程，并告诉我新增、临近截止、已过期和发生变化的事项。';
@@ -40,7 +45,13 @@ const activityScript = path.resolve(
   'scripts',
   'activity-feed.js'
 );
+const mobileSkillDir = path.resolve(__dirname, '..', '..', 'huayuan-mobile-remote');
+const mobileLaunchScript = path.join(mobileSkillDir, 'scripts', 'launch-remote.js');
+const mobileStatePath = path.join(homeDir, 'mobile-remote.json');
+const mobileApkPath = path.join(mobileSkillDir, 'apk', 'huayuan-workbench.apk');
 let activityRefreshRunning = false;
+let lastBrowserHeartbeat = 0;
+let timetableScanCache = { at: 0, startDir: null, value: null };
 let timetableRefreshJob = {
   status: 'IDLE',
   running: false,
@@ -51,7 +62,7 @@ let timetableRefreshJob = {
 };
 
 function readNow() {
-  return JSON.parse(fs.readFileSync(nowPath, 'utf8'));
+  return snap.readNow();
 }
 
 function readJsonIfExists(filePath) {
@@ -64,11 +75,11 @@ function readJsonIfExists(filePath) {
 }
 
 function readPreferences() {
-  const home = process.env.HUAYUAN_HOME || path.join(os.homedir(), '.workbuddy', 'huayuan-schedule-butler');
+  const home = homeDir;
   const candidates = [
-    path.join(path.dirname(nowPath), 'preferences.json'),
+    nowPath ? path.join(path.dirname(nowPath), 'preferences.json') : null,
     path.join(home, 'preferences.json'),
-  ];
+  ].filter(Boolean);
   for (const candidate of candidates) {
     const value = readJsonIfExists(candidate);
     if (value) return value;
@@ -77,7 +88,14 @@ function readPreferences() {
 }
 
 function findLatestTimetable(startDir) {
-  const home = process.env.HUAYUAN_HOME || path.join(os.homedir(), '.workbuddy', 'huayuan-schedule-butler');
+  const cacheKey = path.resolve(startDir);
+  if (
+    timetableScanCache.startDir === cacheKey &&
+    Date.now() - timetableScanCache.at < 5000
+  ) {
+    return timetableScanCache.value;
+  }
+  const home = homeDir;
   const roots = Array.from(
     new Set([
       startDir,
@@ -115,16 +133,17 @@ function findLatestTimetable(startDir) {
       }
     }
   }
+  timetableScanCache = { at: Date.now(), startDir: cacheKey, value: best };
   return best;
 }
 
 function routeContext() {
   const now = readNow();
-  const dir = path.dirname(nowPath);
+  const dir = nowPath ? path.dirname(nowPath) : homeDir;
   const timetableResult = findLatestTimetable(dir);
   const timetable = timetableResult && timetableResult.data;
   const preferences = readPreferences();
-  const tasks = taskList(now).map((task) => ({
+  const tasks = taskList(now || {}).map((task) => ({
     ...task,
     done: Boolean(task.done),
   }));
@@ -138,6 +157,93 @@ function routeContext() {
     major: preferences && preferences.major ? preferences.major : null,
     tasks,
   };
+}
+
+function onboardingStatus(nowDoc = readNow()) {
+  const dataDir = nowPath ? path.dirname(nowPath) : homeDir;
+  return buildOnboardingStatus({
+    homeDir,
+    now: nowDoc,
+    hasTimetable: Boolean(findLatestTimetable(dataDir)),
+    hasActivities: fs.existsSync(activityPath),
+  });
+}
+
+function mobileLanUrls(port) {
+  const rows = [];
+  for (const entries of Object.values(os.networkInterfaces())) {
+    for (const entry of entries || []) {
+      if ((entry.family !== 'IPv4' && entry.family !== 4) || entry.internal || entry.address.startsWith('169.254.')) {
+        continue;
+      }
+      rows.push(`http://${entry.address}:${port}/`);
+    }
+  }
+  return [...new Set(rows)];
+}
+
+async function mobileHealth(port) {
+  if (!port) return false;
+  try {
+    const response = await fetch(`http://127.0.0.1:${port}/api/health`, {
+      signal: AbortSignal.timeout(1200),
+    });
+    if (!response.ok) return false;
+    const data = await response.json();
+    return data && data.service === 'huayuan-mobile-remote';
+  } catch {
+    return false;
+  }
+}
+
+async function mobileStatusPayload() {
+  const state = readJsonIfExists(mobileStatePath);
+  const running = Boolean(state && (await mobileHealth(state.port)));
+  return {
+    ok: true,
+    running,
+    initialized: Boolean(readNow()),
+    port: running ? state.port : null,
+    pairing_code: running ? state.code : null,
+    urls: running ? mobileLanUrls(state.port) : [],
+    public_url: running ? state.public_url || null : null,
+    public_verified: running ? state.public_verified !== false : null,
+    discovery_port: running ? state.discovery_port || null : null,
+    started_at: running ? state.started_at || null : null,
+    apk_url: '/download/app.apk',
+    prompt: snap.syncInfo().prompt,
+  };
+}
+
+function runMobileLauncher(args, timeoutMs = 20000) {
+  return new Promise((resolve, reject) => {
+    const child = spawn(process.execPath, [mobileLaunchScript, ...args], {
+      cwd: mobileSkillDir,
+      windowsHide: true,
+      env: { ...process.env, HUAYUAN_HOME: homeDir },
+    });
+    let stdout = '';
+    let stderr = '';
+    const timer = setTimeout(() => {
+      child.kill();
+      reject(new Error('MOBILE_CONTROL_TIMEOUT'));
+    }, timeoutMs);
+    child.stdout.on('data', (chunk) => {
+      stdout += chunk;
+    });
+    child.stderr.on('data', (chunk) => {
+      stderr += chunk;
+    });
+    child.on('error', (error) => {
+      clearTimeout(timer);
+      reject(error);
+    });
+    child.on('exit', (code) => {
+      clearTimeout(timer);
+      if (code === 0) resolve({ code, stdout: stdout.slice(-4000), stderr: stderr.slice(-1000) });
+      else reject(new Error((stderr || stdout || `MOBILE_CONTROL_EXIT_${code}`).trim().slice(-1000)));
+    });
+  });
 }
 
 function readActivities() {
@@ -176,7 +282,15 @@ function runActivityRefresh({ force = false } = {}) {
   if (activityRefreshRunning) return Promise.reject(new Error('ACTIVITY_REFRESH_BUSY'));
   if (!fs.existsSync(activityScript)) return Promise.reject(new Error('ACTIVITY_SCRIPT_MISSING'));
   activityRefreshRunning = true;
-  const args = [activityScript, '--output-dir', path.dirname(nowPath), '--days', '120', '--max-items', '30'];
+  const args = [
+    activityScript,
+    '--output-dir',
+    nowPath ? path.dirname(nowPath) : homeDir,
+    '--days',
+    '120',
+    '--max-items',
+    '30',
+  ];
   if (!force) args.push('--if-stale-hours', '6');
   return new Promise((resolve, reject) => {
     const child = spawn(process.execPath, args, { cwd: process.cwd(), windowsHide: true });
@@ -398,6 +512,7 @@ function dashboardIndexHtml() {
       <a class="active" href="/" aria-current="page">今日安排</a>
       <a href="/todo.html">全部待办</a>
       <a href="/activities.html">可参与事项</a>
+      <a href="/mobile.html">手机工作台</a>
     </nav>`;
   const brief = `
         <section class="dashboard-brief" aria-label="实时第一动作">
@@ -422,8 +537,14 @@ function dashboardIndexHtml() {
     .replace('src="app.js"', 'src="/route-assets/app.js"')
     .replace('<!-- HUAYUAN_PAGE_NAV -->', pageNav)
     .replace('<!-- HUAYUAN_DASHBOARD_BRIEF -->', brief)
-    .replace('</head>', '  <link rel="stylesheet" href="/dashboard-shell.css" />\n</head>')
-    .replace('</body>', '  <script src="/dashboard-bridge.js"></script>\n</body>');
+    .replace(
+      '</head>',
+      '  <link rel="stylesheet" href="/dashboard-shell.css" />\n  <link rel="stylesheet" href="/dashboard-attention.css" />\n</head>'
+    )
+    .replace(
+      '</body>',
+      '  <script src="/dashboard-bridge.js"></script>\n  <script src="/dashboard-attention.js"></script>\n</body>'
+    );
   return html;
 }
 
@@ -457,23 +578,91 @@ function contentType(file) {
 const server = http.createServer((req, res) => {
   const url = new URL(req.url, `http://127.0.0.1:${port}`);
   if (req.method === 'GET' && url.pathname === '/api/dashboard') {
-    try {
+    mobileStatusPayload().then((mobile) => {
       const now = readNow();
+      const onboarding = onboardingStatus(now);
+      onboarding.badges.mobile = mobile.running ? 0 : 1;
       sendJson(res, 200, {
         ok: true,
         service: 'huayuan-live-dashboard',
         api_version: API_VERSION,
+        browser_alive: Date.now() - lastBrowserHeartbeat < 15000,
         now_path: nowPath,
-        updated_at: fs.statSync(nowPath).mtime.toISOString(),
+        updated_at: nowPath && fs.existsSync(nowPath) ? fs.statSync(nowPath).mtime.toISOString() : null,
         now,
         todo: snap.todoSnapshot(now),
         sync: snap.syncInfo(),
         activities: snap.readActivities(),
         prompts: snap.promptsFor(now),
+        onboarding,
+        mobile,
       });
-    } catch (error) {
+    }).catch((error) => {
       sendJson(res, 503, { ok: false, error: String(error.message || error) });
+    });
+    return;
+  }
+  if (req.method === 'GET' && url.pathname === '/api/onboarding') {
+    mobileStatusPayload().then((mobile) => {
+      const onboarding = onboardingStatus();
+      onboarding.badges.mobile = mobile.running ? 0 : 1;
+      sendJson(res, 200, { ...onboarding, mobile });
+    }).catch((error) => {
+      sendJson(res, 503, { ok: false, error: String(error.message || error) });
+    });
+    return;
+  }
+  if (req.method === 'POST' && url.pathname === '/api/heartbeat') {
+    lastBrowserHeartbeat = Date.now();
+    sendJson(res, 200, { ok: true });
+    return;
+  }
+  if (req.method === 'GET' && url.pathname === '/api/mobile/status') {
+    mobileStatusPayload()
+      .then((mobile) => sendJson(res, 200, mobile))
+      .catch((error) => sendJson(res, 503, { ok: false, error: String(error.message || error) }));
+    return;
+  }
+  if (req.method === 'POST' && url.pathname === '/api/mobile/start') {
+    if (req.headers['x-huayuan-action'] !== 'start-mobile') {
+      sendJson(res, 403, { ok: false, error: 'INVALID_ACTION' });
+      return;
     }
+    if (!nowPath || !fs.existsSync(nowPath)) {
+      sendJson(res, 409, {
+        ok: false,
+        error: 'SETUP_REQUIRED',
+        message: '先完成初始化并生成 now.json，再启动手机工作台。',
+      });
+      return;
+    }
+    runMobileLauncher(['--now', nowPath, '--no-open'])
+      .then(async () => sendJson(res, 200, await mobileStatusPayload()))
+      .catch((error) => sendJson(res, 503, { ok: false, error: String(error.message || error) }));
+    return;
+  }
+  if (req.method === 'POST' && url.pathname === '/api/mobile/stop') {
+    if (req.headers['x-huayuan-action'] !== 'stop-mobile') {
+      sendJson(res, 403, { ok: false, error: 'INVALID_ACTION' });
+      return;
+    }
+    runMobileLauncher(['--stop'])
+      .then(async () => sendJson(res, 200, await mobileStatusPayload()))
+      .catch((error) => sendJson(res, 503, { ok: false, error: String(error.message || error) }));
+    return;
+  }
+  if (req.method === 'POST' && url.pathname === '/api/mobile/reset-pairing') {
+    if (req.headers['x-huayuan-action'] !== 'reset-mobile-pairing') {
+      sendJson(res, 403, { ok: false, error: 'INVALID_ACTION' });
+      return;
+    }
+    if (!nowPath || !fs.existsSync(nowPath)) {
+      sendJson(res, 409, { ok: false, error: 'SETUP_REQUIRED', message: '先完成初始化。' });
+      return;
+    }
+    runMobileLauncher(['--now', nowPath, '--no-open', '--reset-pairing'])
+      .then(async () => sendJson(res, 200, await mobileStatusPayload()))
+      .catch((error) => sendJson(res, 503, { ok: false, error: String(error.message || error) }));
     return;
   }
   if (req.method === 'GET' && url.pathname === '/api/route-context') {
@@ -537,6 +726,25 @@ const server = http.createServer((req, res) => {
     return;
   }
   if (req.method === 'GET' || req.method === 'HEAD') {
+    if (url.pathname === '/favicon.ico') {
+      res.writeHead(204, { 'Cache-Control': 'public, max-age=86400' });
+      res.end();
+      return;
+    }
+    if (url.pathname === '/download/app.apk') {
+      if (!fs.existsSync(mobileApkPath)) {
+        res.writeHead(404);
+        res.end('Not found');
+        return;
+      }
+      res.writeHead(200, {
+        'Content-Type': 'application/vnd.android.package-archive',
+        'Content-Disposition': 'attachment; filename="huayuan-workbench.apk"',
+        'Cache-Control': 'no-store',
+      });
+      fs.createReadStream(mobileApkPath).pipe(res);
+      return;
+    }
     if (url.pathname === '/' || url.pathname === '/index.html' || url.pathname === '/route.html') {
       const html = dashboardIndexHtml();
       res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' });
