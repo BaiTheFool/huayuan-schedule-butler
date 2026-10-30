@@ -1,4 +1,6 @@
-VERSION=0.10.2
+VERSION=0.11.0
+
+### 0.11.0 · 2026-10-28 · feat: huayuan-score-advisor GPA/conduct calculators + official-manual KB (0.11.0)
 
 # 华园日程管家 · 版本记录
 

@@ -102,6 +102,13 @@
 - 验证：全量门禁全绿——`GOLDEN_PATH:PASS 49/49`、`V060:PASS 32/32`、`WIDGET:PASS 32/32`、`V081:PASS 9/9`、`ACTIVITIES:PASS 6/6`、`PERFORMANCE:PASS 7/7`、`ECOURSE_UX:PASS 36/36`、`LIVE_DASHBOARD_SMOKE` exit 0、`SELF_CHECK:PASS 33/33`、`ACTIVITY_SELF_CHECK:PASS 8/8`。
 - 预防：新增技能/偏好字段时必须同步检查依赖 fixtures 的用例；fixtures 目录与 GOLDEN-PATH.md 的文件清单要保持一致；改功能后按 CONTRIBUTING §7 五处检查（生产脚本/JSON 结构/页面读取/排程逻辑/对应测试）。
 
+### #13 · 绩点计分：五级制"中等"绩点 ≠ 动态百分比表的 C · 0.11.0
+- 现象：`gpa-calculator.js --self-check` 两处失败——五级制「中等」课程按 2.3（动态表的 C）而非 2.7 折算；且端到端样例里 `level: 优秀` 的思政课被漏算进 GPA 预期。
+- 根因：手册附表「五级制 → 绩点」与「百分制动态转换 → 绩点」是**两张独立表**：五级制「中等」直接给 C→2.7（及格 1.7），而动态表里 70.1%-80% 分位的 C→2.3；初版实现把五级制映射进动态表的 GRADE_TO_POINT，造成 2.3。另：`conduct-calculator.js` 自检断言对 `H`（裸数字）误用了 `out.H.value`。
+- 解决：脚本新增 `FIVE_LEVEL_TO_POINT = { 优秀:4.0, 良好:3.7, 中等:2.7, 及格:1.7, 不及格:0.0 }`，五级制直接按该表折算、不再经过动态百分比表；同步修正知识文件 `001-绩点规则.md` 与自检/门禁断言。
+- 验证：`gpa-calculator.js --self-check` PASS 19/19、`conduct-calculator.js --self-check` PASS 13/13、`golden-path\check-score.js` PASS 16/16；`node golden-path\check.js` 全量不受影响。
+- 预防：实现手册计分规则时先区分「独立计分表」与「映射表」；五级/两级制按手册附表直接折算，动态百分比表只用于 rankPercentile 输入。计分脚本与 `knowledge/` 常量表是双份事实源，改动必须两边同步并在自检断言中固化样例值。
+
 ---
 
 ## 运行时错误日志（logs/errors.jsonl）使用说明

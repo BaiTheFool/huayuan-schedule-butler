@@ -16,7 +16,8 @@
     "./skills/huayuan-dashboard-widget",
     "./skills/huayuan-live-dashboard",
     "./skills/huayuan-campus-route",
-    "./skills/huayuan-campus-manual"
+    "./skills/huayuan-campus-manual",
+    "./skills/huayuan-score-advisor"
   ],
   "expertType": "agent",
   "agentName": "huayuan-schedule-butler",
