@@ -14,6 +14,7 @@ const argValue = (name, fallback = null) => {
 
 const port = Number(argValue('--port', '4318'));
 const token = argValue('--token', '');
+const timetableRefreshMode = argValue('--timetable-refresh-mode', 'auto');
 const nowPath = path.resolve(argValue('--now', ''));
 const activityPath = path.resolve(argValue('--activities', path.join(path.dirname(nowPath), 'activity-feed.json')));
 const publicDir = path.resolve(__dirname, '..', 'public');
@@ -44,6 +45,7 @@ let timetableRefreshJob = {
   started_at: null,
   finished_at: null,
   message: null,
+  fallback: null,
 };
 
 function readNow() {
@@ -204,7 +206,17 @@ function runActivityRefresh({ force = false } = {}) {
 
 function runTimetableRefresh() {
   if (timetableRefreshJob.running) return Promise.reject(new Error('TIMETABLE_REFRESH_BUSY'));
-  if (!fs.existsSync(jwTimetableScript)) return Promise.reject(new Error('JW_TIMETABLE_SCRIPT_MISSING'));
+  if (timetableRefreshMode === 'fallback' || !fs.existsSync(jwTimetableScript)) {
+    timetableRefreshJob = {
+      status: 'FALLBACK_REQUIRED',
+      running: false,
+      started_at: null,
+      finished_at: new Date().toISOString(),
+      message: '当前 WorkBuddy 权限不允许驾驶舱启动本地教务脚本。请允许本专家运行本地命令，或复制指令到左侧对话发送。',
+      fallback: 'agent_prompt',
+    };
+    return Promise.resolve(timetableRefreshJob);
+  }
   const outputDir = path.dirname(nowPath);
   timetableRefreshJob = {
     status: 'RUNNING',
@@ -212,6 +224,7 @@ function runTimetableRefresh() {
     started_at: new Date().toISOString(),
     finished_at: null,
     message: '正在连接教务系统；如需登录会打开专用 Chrome 窗口。',
+    fallback: null,
   };
   return new Promise((resolve) => {
     const child = spawn(
@@ -235,6 +248,7 @@ function runTimetableRefresh() {
         running: false,
         finished_at: new Date().toISOString(),
         message: '教务课表读取超时，请检查登录状态后重试。',
+        fallback: null,
       };
       resolve(timetableRefreshJob);
     }, 660000);
@@ -246,12 +260,17 @@ function runTimetableRefresh() {
     });
     child.on('error', (error) => {
       clearTimeout(timer);
+      const detail = String(error.code || error.message || error);
+      const permissionBlocked = ['EPERM', 'EACCES', 'ENOENT'].includes(error.code);
       timetableRefreshJob = {
         ...timetableRefreshJob,
-        status: 'FAILED',
+        status: permissionBlocked ? 'FALLBACK_REQUIRED' : 'FAILED',
         running: false,
         finished_at: new Date().toISOString(),
-        message: String(error.message || error).slice(0, 500),
+        message: permissionBlocked
+          ? `当前 WorkBuddy 权限或系统策略拒绝了本地脚本启动（${detail}）。请允许本专家运行本地命令/浏览器自动化，或复制指令到左侧对话发送。`
+          : String(error.message || error).slice(0, 500),
+        fallback: permissionBlocked ? 'agent_prompt' : null,
       };
       resolve(timetableRefreshJob);
     });
@@ -276,6 +295,7 @@ function runTimetableRefresh() {
         message: hasCourses
           ? `已更新教务课表${summaryLine ? `：${summaryLine.trim()}` : ''}`
           : (stderr || stdout || `JW_TIMETABLE_EXIT_${code}`).trim().split(/\r?\n/).slice(-1)[0].slice(0, 500),
+        fallback: null,
       };
       resolve(timetableRefreshJob);
     });

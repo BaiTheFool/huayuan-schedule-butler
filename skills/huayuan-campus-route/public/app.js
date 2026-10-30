@@ -1256,6 +1256,8 @@
         const status = $('timetableStatus');
         status.className = 'profile-status err';
         status.textContent = `驾驶舱课表读取失败：${result.message || result.error}`;
+      } else {
+        hideTimetableFallback();
       }
     }
     return true;
@@ -1302,6 +1304,20 @@
     }
   }
 
+  function showTimetableFallback(message) {
+    const box = $('timetableFallback');
+    const text = $('timetableFallbackMessage');
+    if (box) box.hidden = false;
+    if (text) {
+      text.textContent = message || '当前 WorkBuddy 权限不允许网页启动本地教务脚本。请允许本地命令/浏览器自动化，或复制指令到左侧对话发送。';
+    }
+  }
+
+  function hideTimetableFallback() {
+    const box = $('timetableFallback');
+    if (box) box.hidden = true;
+  }
+
   async function pollTimetableRefresh(button) {
     const response = await fetch('/api/timetable/status', { cache: 'no-store' });
     const data = await response.json();
@@ -1313,6 +1329,7 @@
     button.disabled = false;
     delete button.dataset.busy;
     if (data.status === 'SUCCESS') {
+      hideTimetableFallback();
       const loaded = await loadDashboardContext(true);
       if (loaded) {
         renderProfile();
@@ -1321,6 +1338,10 @@
       } else {
         toast('教务读取完成，但没有找到可用的 jw-timetable.json');
       }
+    } else if (data.status === 'FALLBACK_REQUIRED') {
+      showTimetableFallback(data.message);
+      renderProfile();
+      toast('当前环境不能直接启动教务脚本，请使用已出现的复制按钮');
     } else {
       renderProfile();
       toast(`教务课表读取失败：${data.message || data.status || '未知错误'}`);
@@ -1336,6 +1357,7 @@
     button.disabled = true;
     button.dataset.busy = '1';
     button.textContent = '正在连接教务…';
+    hideTimetableFallback();
     try {
       const response = await fetch('/api/timetable/refresh', {
         method: 'POST',
@@ -1508,6 +1530,7 @@
       if (active) active.scrollIntoView({ block: 'nearest' });
     });
     $('useLocationBtn').addEventListener('click', useLocationFromSearch);
+    $('copyTimetablePromptBtn').addEventListener('click', useTimetablePromptFallback);
     $('locationResults').addEventListener('pointerdown', (event) => {
       event.stopPropagation();
     });

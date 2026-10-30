@@ -98,7 +98,17 @@ fs.writeFileSync(
 
 const child = spawn(
   process.execPath,
-  [path.join(__dirname, '..', 'scripts', 'dashboard-server.js'), '--now', nowPath, '--port', String(port), '--token', token],
+  [
+    path.join(__dirname, '..', 'scripts', 'dashboard-server.js'),
+    '--now',
+    nowPath,
+    '--port',
+    String(port),
+    '--token',
+    token,
+    '--timetable-refresh-mode',
+    'fallback',
+  ],
   { stdio: ['ignore', 'ignore', 'pipe'] }
 );
 
@@ -134,6 +144,7 @@ async function wait() {
     check(/导入教务课表/.test(html) && /本地文件/.test(html), '课表入口区分教务读取和本地文件');
     check(/id="locationSearch"/.test(html) && /id="locationResults"/.test(html), '首页包含可搜索楼栋选择器');
     check(/设备定位/.test(html) && !/手机定位/.test(html), '定位文案使用设备而非手机');
+    check(/id="copyTimetablePromptBtn"/.test(html) && /id="timetableFallback"/.test(html), '教务读取被系统阻止时有复制指令降级入口');
     const shellCss = await (await fetch(`http://127.0.0.1:${port}/dashboard-shell.css`)).text();
     const sharedCss = await (await fetch(`http://127.0.0.1:${port}/styles.css`)).text();
     check(/\.huayuan-page-nav\s*\{[^}]*position:\s*sticky/s.test(shellCss), '今日页三标签吸顶');
@@ -147,6 +158,7 @@ async function wait() {
     check(/function filterLocations/.test(routeApp) && /\.includes\(target\)/.test(routeApp), '楼栋搜索按字段包含关系过滤');
     check(/pointerdown/.test(routeApp) && /picker\.contains/.test(routeApp), '下拉栏只在选择器外点击时关闭');
     check(/scheduleLocationPosition/.test(routeApp) && /addEventListener\('scroll', scheduleLocationPosition/.test(routeApp), '页面滚动时下拉栏跟随输入框定位');
+    check(/FALLBACK_REQUIRED/.test(routeApp) && /showTimetableFallback/.test(routeApp), 'EPERM 时前端显示对话读取入口');
     const todoScript = await (await fetch(`http://127.0.0.1:${port}/todo.js`)).text();
     const activityScript = await (await fetch(`http://127.0.0.1:${port}/activities.js`)).text();
     check(/execCommand\('copy'\)/.test(todoScript), '待办复制有本地降级');
@@ -190,6 +202,13 @@ async function wait() {
     check(timetableStatus.status === 200 && statusData.status === 'IDLE', '教务刷新状态接口正常');
     const deniedTimetable = await fetch(`http://127.0.0.1:${port}/api/timetable/refresh`, { method: 'POST' });
     check(deniedTimetable.status === 403, '教务刷新接口需要同源动作头');
+    const fallbackRefresh = await fetch(`http://127.0.0.1:${port}/api/timetable/refresh`, {
+      method: 'POST',
+      headers: { 'X-Huayuan-Action': 'refresh-timetable' },
+    });
+    check(fallbackRefresh.status === 202, '受限环境可启动降级流程');
+    const fallbackStatus = await (await fetch(`http://127.0.0.1:${port}/api/timetable/status`)).json();
+    check(fallbackStatus.status === 'FALLBACK_REQUIRED' && fallbackStatus.fallback === 'agent_prompt', '子进程受限时返回对话读取降级状态');
 
     const denied = await fetch(`http://127.0.0.1:${port}/api/shutdown`, { method: 'POST' });
     check(denied.status === 403, '关闭接口需要令牌');

@@ -62,6 +62,10 @@
               <input id="timetableFile" type="file" accept=".json,application/json" hidden />
             </div>
             <div class="profile-status" id="timetableStatus">当前：示例课表（虚构）</div>
+            <div class="timetable-fallback" id="timetableFallback" hidden>
+              <p id="timetableFallbackMessage">当前环境不允许网页直接启动教务读取。</p>
+              <button type="button" class="mini-btn" id="copyTimetablePromptBtn">复制教务读取指令</button>
+            </div>
           </div>
 
           <div class="location-picker">
