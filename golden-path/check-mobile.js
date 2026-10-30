@@ -78,6 +78,13 @@ check('不硬编码令牌或配对码', !/[0-9a-f]{40,}/.test(serverSource) && !
 check('启动器支持公网隧道与停止', /--tunnel/.test(launcherSource) && /--stop/.test(launcherSource));
 check('服务端提供局域网发现（UDP 广播）', /HUAYUAN_DISCOVER/.test(serverSource) && /require\('dgram'\)/.test(serverSource));
 check('启动器打印发现端口', /MOBILE_REMOTE_DISCOVERY/.test(launcherSource));
+check('服务端可直接下发 APK', /download\/app\.apk/.test(serverSource) && /application\/vnd\.android\.package-archive/.test(serverSource));
+check('配对页提供「装到手机桌面」入口', /download-card/.test(html) && /\/download\/app\.apk/.test(html));
+check('新手教程已入库', fs.existsSync(path.join(SKILL_DIR, 'references', '手机连接傻瓜教程.md')));
+check('SKILL 指向新手教程', /references\/手机连接傻瓜教程\.md/.test(skillMd));
+check('Agent 初始化后引导装到手机', /装到手机桌面/.test(agent) && /download\/app\.apk/.test(agent));
+const apkPath = path.join(SKILL_DIR, 'apk', 'huayuan-workbench.apk');
+check('随包 APK 存在且是 zip', fs.existsSync(apkPath) && fs.readFileSync(apkPath).subarray(0, 2).toString('ascii') === 'PK', fs.existsSync(apkPath) ? `${fs.statSync(apkPath).size} B` : 'missing');
 
 // 5) 端到端冒烟
 const smoke = spawnSync(process.execPath, [SMOKE], { encoding: 'utf8', timeout: 120000 });

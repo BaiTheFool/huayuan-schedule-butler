@@ -519,12 +519,14 @@
       ['教学周', week.number != null ? `第 ${week.number} 周${week.reliable === false ? '（待确认）' : ''}` : '未确认'],
       ['平台数据', sync.age_days === 0 ? '今天刷新过' : `约 ${sync.age_days != null ? sync.age_days : '?'} 天前`],
       ['配对设备', '这台手机'],
+      ['安卓 App', '可下载安装（见下方按钮）'],
     ]
       .map(([key, value]) => `<dt>${esc(key)}</dt><dd>${esc(value)}</dd>`)
       .join('');
 
     $('settingsActions').innerHTML = [
       { action: 'refresh', label: '刷新数据', cls: '' },
+      { action: 'download-apk', label: '下载安卓 App（可选，免记地址）', cls: '' },
       { action: 'copy-tasks', label: '复制「刷新我的校园待办」', cls: '' },
       { action: 'copy-activities', label: '复制「刷新校园活动」', cls: '' },
       { action: 'unpair', label: '解除这台手机的配对', cls: 'danger' },
@@ -536,6 +538,7 @@
       button.addEventListener('click', () => {
         const action = button.dataset.action;
         if (action === 'refresh') load({ silent: false });
+        if (action === 'download-apk') window.location.href = '/download/app.apk';
         if (action === 'copy-tasks') copyText('刷新我的校园待办：请重新读取教务、eCourse、雨课堂和校园门户，更新待办与日程，并告诉我新增、临近截止、已过期和发生变化的事项。');
         if (action === 'copy-activities') copyText('刷新校园活动：请重新拉取校团委、学生工作处、本科生院、研究生院、软件学院和就业在线的公开活动公告，筛出仍可报名的活动，并按截止时间排好。');
         if (action === 'unpair') {

@@ -70,6 +70,20 @@ node <本技能目录>\scripts\launch-remote.js --reset-pairing # 换配对码�
 `{service, port, version}`，不回令牌、不回配对码、不回任何数据；只应答私有地址来源。
 启动日志里会有 `MOBILE_REMOTE_DISCOVERY:udp://4327`。App 在「找不到电脑」时才会用到手动输入地址。
 
+## 首次引导：让用户装到手机（只问一次）
+
+初始化走完、用户已经看到结果页之后，问一次「要不要顺手装到手机？」。只给**一条**路线：
+
+1. **安卓 + 想装 App（推荐）**：让手机连同一个 Wi-Fi，浏览器打开
+   `http://<电脑IP>:<端口>/`，配对页底部点「装到手机桌面」下载 APK（`/download/app.apk`，
+   也可以直接输 `http://<电脑IP>:<端口>/download/app.apk`）；装好打开「华园工作台」，
+   它会自动发现电脑，输配对码即可。以后电脑换 IP 也不用改地址。
+2. **iPhone / 不想装 App**：浏览器打开同一地址 → 分享 →「添加到主屏幕」。
+3. **手机不在同一网络**：加 `--tunnel` 启动，把 `MOBILE_REMOTE_PUBLIC` 的 https 地址给用户。
+
+用户说不装就继续日常问答，不要追问第二次。完整话术见
+`references/手机连接傻瓜教程.md`（含逐条排查顺序，可直接照着念）。
+
 ## 回复模板（不超过 3 行）
 
 > 手机工作台已开：`<地址>`，配对码 `<6 位数字>`。
@@ -89,13 +103,15 @@ node <本技能目录>\scripts\launch-remote.js --reset-pairing # 换配对码�
 | `/api/pair` | `POST {code}` → 令牌 |
 | `/api/dashboard` | 需令牌；返回 now/todo/sync/activities/prompts/plan |
 | `/api/shutdown` | 需令牌；停止服务（启动器的 `--stop` 用它） |
-| UDP `4327` | 局域网发现：App 广播，回端口与版本（不含令牌/配对码） |
+| UDP `4327` | 局域网发现：App 广播，回端口与版本（不含令牌/配对码） | 
+| `/download/app.apk` | 随包的安卓 App（不需要令牌），配对页底部可直接下载 |
 
 前端是单页 PWA，`/manifest.webmanifest` + 192/512 PNG 图标可“添加到主屏幕”。`android-app/` 里还有一个 WebView 壳（APK），开屏会自动发现电脑，同时支持 `http://` 局域网地址与 `https://` 隧道地址。
 
 ## 数据与隐私
 
-- 只读 `now.json`、`plan.json`、`activity-feed.json` 三个运行产物，不读浏览器 Cookie、密码、令牌、学号或成绩页面；
+- 只读  
+ow.json`、`plan.json`、`activity-feed.json` 三个运行产物，不读浏览器 Cookie、密码、令牌、学号或成绩页面；
 - 不写任何文件（`test/smoke.js` 会断言服务端无写文件调用）；
 - 手机端不提供提交作业、报名、缴费、删除或修改学校数据的操作；
 - 配对码只在本机内存中，重启即换；令牌存在 `%HUAYUAN_HOME%\mobile-remote.json`（`HUAYUAN_HOME` 默认 `%USERPROFILE%\.workbuddy\huayuan-schedule-butler`）；
@@ -126,6 +142,6 @@ netsh advfirewall firewall add rule name="Huayuan Mobile 4320" dir=in action=all
 ## 测试
 
 ```powershell
-node skills\huayuan-mobile-remote\test\smoke.js   # 33 项：启动 → 配对 → 只读接口 → 发现 → 安全 → 停止
-node golden-path\check-mobile.js                   # 包级：注册 / Agent 入口 / 资源 / 安全 / 冒烟
+node skills\huayuan-mobile-remote\test\smoke.js   # 35 项：启动 → 配对 → 只读接口 → 发现 → 下载 → 安全 → 停止
+node golden-path\check-mobile.js                   # 包级：注册 / Agent 入口 / 资源 / 下载 / 安全 / 冒烟
 ```

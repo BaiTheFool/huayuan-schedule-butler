@@ -38,7 +38,7 @@ huayuan-schedule-butler/
 │  ├─ huayuan-live-dashboard/         # 外部网页驾驶舱（public/ + scripts/）
 │  ├─ huayuan-campus-manual/          # ★ 校园生存手册知识库（knowledge/ + SKILL.md）
 │  ├─ huayuan-score-advisor/          # ★ 绩点与操行分顾问（官方手册口径 + gpa/conduct 计分工具）
-│  └─ huayuan-mobile-remote/          # ★ 手机远程工作台（public/ PWA + scripts/ 服务端与启动器 + test/smoke.js）
+│  └─ huayuan-mobile-remote/          # ★ 手机远程工作台（public/ PWA + scripts/ + apk/ 随包 App + references/ 教程）
 ├─ golden-path/                       # 回归基线：check.js + check-vXXX.js + fixtures/（虚构样例）
 ├─ scripts/
 │  ├─ bump-version.ps1                # ★ 版本递增（改 VERSION.md + plugin.json）
@@ -68,7 +68,7 @@ node golden-path\check-v060.js        # 可视化路径
 node golden-path\check-performance.js # 性能
 node golden-path\check-activities.js  # 校园活动
 node golden-path\check-score.js       # 绩点/操行分计分工具（0.11.0）
-node golden-path\check-mobile.js      # 手机远程工作台（0.13.0，含 33 项冒烟）
+node golden-path\check-mobile.js      # 手机远程工作台（0.14.0，含 35 项冒烟）
 
 # 单步脚本（示例）
 node skills\huayuan-browser-session\scripts\first-run.js --wizard --login

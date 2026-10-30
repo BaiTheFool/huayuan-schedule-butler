@@ -262,6 +262,11 @@ async function main() {
     const icon = await fetch(`${base}/icon-192.png`);
     check('PNG 图标存在', icon.status === 200 && icon.headers.get('content-type') === 'image/png');
 
+    const apk = await fetch(`${base}/download/app.apk`);
+    const apkBytes = Buffer.from(await apk.arrayBuffer());
+    check('随包 APK 可下载', apk.status === 200 && apk.headers.get('content-type') === 'application/vnd.android.package-archive');
+    check('下载到的 APK 是合法安装包', apkBytes.subarray(0, 2).toString('ascii') === 'PK' && apkBytes.length > 20000, `${apkBytes.length} B`);
+
     const traversal = await fetch(`${base}/..%2f..%2fpackage.json`);
     check('路径穿越被拦（非 200）', traversal.status !== 200);
 

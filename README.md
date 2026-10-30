@@ -21,6 +21,8 @@
 - 完整演示脚本、固定样例与预期输出：[`GOLDEN-PATH.md`](GOLDEN-PATH.md)
 - 一条命令复跑黄金路径：`node golden-path\check.js`（49 项断言，离线、不用登录）
 
+> 版本 0.14.0 把**手机 App 直接放进包里**：`skills/huayuan-mobile-remote/apk/huayuan-workbench.apk` 由服务端以 `/download/app.apk` 下发（不需要令牌），配对页底部点「装到手机桌面」即可下载安装，装好后开屏自动发现电脑；新增 `skills/huayuan-mobile-remote/references/手机连接傻瓜教程.md`，Agent 在初始化结束后只问一次「要不要装到手机」，并按安卓 / iPhone / 外网三条路线给一条最短路径。回归：`check-mobile.js` 35 → 41 项、`smoke.js` 33 → 35 项。
+>
 > 版本 0.13.0 为手机工作台加**局域网自动发现**：服务端在 UDP `4327` 上应答 `HUAYUAN_DISCOVER/1`（只回端口与版本，不回令牌/配对码，只应答私有地址），Android 壳（WebView APK）开屏即可自动列出同一 Wi-Fi 下的电脑，找不到时再手动输入地址。配套更新 `smoke.js`（33 项，新增发现用例）与 `check-mobile.js`（35 项）。
 >
 > 版本 0.12.0 新增**手机远程工作台**：内置技能 `huayuan-mobile-remote` 把“今日安排 / 全部待办 / 可参与事项 / 本周计划”变成手机可直接打开的只读网页。电脑上一条命令启动，手机同 Wi-Fi 打开地址 + 输入 6 位配对码即可；需要走出局域网时加 `--tunnel` 用本机 `cloudflared` 的免账号快速隧道拿 https 地址。前端是可“添加到主屏幕”的 PWA（192/512 图标、深色模式、下拉刷新），只读、无写接口，令牌+配对码+失败限速+路径白名单；新增回归 `golden-path\check-mobile.js`（33 项）与 `skills\huayuan-mobile-remote\test\smoke.js`（32 项）。
@@ -375,11 +377,13 @@ MOBILE_REMOTE_PUBLIC:https://xxxx.trycloudflare.com   # 仅 --tunnel 且隧道�
 - **配对与鉴权**：6 位配对码换令牌（令牌存 `%HUAYUAN_HOME%\mobile-remote.json`），配对码连续错 8 次锁 5 分钟；除 `/api/health` 外所有接口都要令牌。
 - **可安装**：`manifest.webmanifest` + 192/512 PNG 图标，支持“添加到主屏幕”，深色模式、下拉刷新、断网时显示上次缓存。
 - **局域网发现**：服务端同时监听 UDP `4327`，手机 App 广播 `HUAYUAN_DISCOVER/1` 即回端口与版本（不含令牌/配对码）；`MOBILE_REMOTE_DISCOVERY:udp://4327` 出现在启动日志里。
+- **APK 下载**：配对页底部「装到手机桌面」→ `/download/app.apk`（随包约 35 KB，不需要令牌）；装好后 App 自动发现电脑，换 IP 也不用手改地址。
 - **公网访问**：`--tunnel` 用本机 `cloudflared`（免账号）开快速隧道；也可用任意虚拟组网（awl / Tailscale / 自建 FRP）把端口转发到手机。
 - **Android 壳（可选）**：`android-app/` 是一个不引第三方库的 WebView 壳，开屏自动发现电脑、记住地址，页面仍是同一套 PWA；构建见该目录 README。
 - **停止 / 换码**：`--stop` 停止服务与隧道；`--reset-pairing` 换新配对码，旧手机立即失效。
 - **防火墙**：首次监听会弹窗，允许“专用网络”；也可用 `netsh advfirewall firewall add rule name="Huayuan Mobile 4320" dir=in action=allow protocol=TCP localport=4320`。
-- **回归**：`node golden-path\check-mobile.js`（33 项）、`node skills\huayuan-mobile-remote\test\smoke.js`（32 项）。
+- **首次引导**：初始化结束后 Agent 只问一次「要不要装到手机」，按安卓 / iPhone / 外网给一条最短路线；话术见 `references/手机连接傻瓜教程.md`。
+- **回归**：`node golden-path\check-mobile.js`（41 项）、`node skills\huayuan-mobile-remote\test\smoke.js`（35 项）。
 
 ## 平台支持矩阵
 

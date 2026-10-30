@@ -1,4 +1,6 @@
-VERSION=0.13.0
+VERSION=0.14.0
+
+### 0.14.0 · 2026-10-30 · feat: serve the Android APK and guide first-time phone setup
 
 ### 0.13.0 · 2026-10-30 · feat: LAN discovery (UDP 4327) for the Android workbench shell
 - 服务端新增局域网发现：UDP `4327` 监听，收到 `HUAYUAN_DISCOVER/1` 只回 `{service, port, version}`，不回令牌、不回配对码、不回任何数据，且只应答私有地址来源；端口可用 `--discovery-port` 改。

@@ -296,6 +296,31 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
+  // 把随包的 Android 壳直接发给手机：配对页底部「装到手机桌面」就指到这里。
+  // 只是静态二进制，不需要令牌；文件不在时 404，不影响其它功能。
+  if (url.pathname === '/download/app.apk') {
+    const apkPath = path.resolve(__dirname, '..', 'apk', 'huayuan-workbench.apk');
+    if (!fs.existsSync(apkPath)) {
+      res.writeHead(404, { ...COMMON_HEADERS, 'Content-Type': 'text/plain; charset=utf-8' });
+      res.end('APK_NOT_BUNDLED');
+      return;
+    }
+    const stat = fs.statSync(apkPath);
+    res.writeHead(200, {
+      ...COMMON_HEADERS,
+      'Content-Type': 'application/vnd.android.package-archive',
+      'Content-Length': String(stat.size),
+      'Content-Disposition': 'attachment; filename="huayuan-workbench.apk"',
+      'Cache-Control': 'no-cache',
+    });
+    if (req.method === 'HEAD') {
+      res.end();
+      return;
+    }
+    fs.createReadStream(apkPath).pipe(res);
+    return;
+  }
+
   let pathname = url.pathname;
   try {
     pathname = decodeURIComponent(url.pathname);
