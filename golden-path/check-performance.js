@@ -59,7 +59,14 @@ check(
   '侧边浏览器通过 WorkBuddy present_files 打开',
   /present_files/.test(agent) &&
     /LIVE_DASHBOARD_ALREADY_OPEN:0/.test(agent) &&
-    /右侧内置浏览器面板/.test(agent)
+    /右侧内置浏览器面板/.test(agent) &&
+    /"files":\[/.test(agent)
+);
+check(
+  '禁止二次启动器或外部浏览器兜底',
+  /不得再次运行启动器/.test(agent) &&
+    /不得去掉 `--no-open`/.test(agent) &&
+    !/才重跑启动器且不加 `--no-open`/.test(agent)
 );
 check(
   '启动器区分侧边页面已开与需要重新打开',

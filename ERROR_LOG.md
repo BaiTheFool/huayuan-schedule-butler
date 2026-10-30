@@ -144,6 +144,12 @@
 - 验证：首次返回 `ALREADY_OPEN:0`，心跳后再次调用返回 `1`，`--page mobile` 返回 `0` 并给出 `mobile.html` URL；性能门禁新增 `present_files` 断言。
 - 预防：WorkBuddy 内可预览的 localhost/HTML 一律走 `present_files`；不要用 `start`、`open`、浏览器进程启动来模拟宿主侧栏。
 
+### #19 · 2026-10-30 · present_files 调用时机与宿主规则冲突（0.14.3）
+- 现象：0.14.2 已加载 `present_files`，但首个用户回合仍在 9 秒后再次执行不带 `--no-open` 的启动器，最终只显示普通链接，没有侧栏。
+- 根因：WorkBuddy 宿主明确规定 `present_files` 只能在本轮结果完成时作为最后工具调用；Agent 却要求“回合一开始立即打开”，模型在两个规则冲突时选择了第二次启动器。
+- 解决：先启动服务但保留 URL；完成用户请求后，最后调用 `present_files({"files":["<URL>"]})`，调用后只写最终文字。Agent 明令禁止二次启动和外部浏览器。
+- 验证：性能门禁新增参数 `files`、最终调用与“禁止二次启动器”断言；真实日志确认 `present_files` 在工具权限列表中可用。
+
 ---
 
 ## 运行时错误日志（logs/errors.jsonl）使用说明

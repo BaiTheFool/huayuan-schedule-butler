@@ -192,7 +192,10 @@ const liveSkill = fs.readFileSync(
 );
 check(
   '专家说明要求每轮先打开侧边驾驶舱',
-  /驾驶舱总闸/.test(agentText) && /任何有效指令后/.test(agentText) && /present_files/.test(agentText)
+  /驾驶舱总闸/.test(agentText) &&
+    /任何有效指令后/.test(agentText) &&
+    /present_files/.test(agentText) &&
+    /不得再次运行启动器/.test(agentText)
 );
 check('侧边驾驶舱技能覆盖自动打开与未初始化模式', /用户任何有效指令/.test(liveSkill) && /ONBOARDING_MODE/.test(liveSkill));
 check('Widget Skill 把“打开驾驶舱”转给侧边驾驶舱', /打开驾驶舱.*侧边网页驾驶舱/.test(widgetSkill));

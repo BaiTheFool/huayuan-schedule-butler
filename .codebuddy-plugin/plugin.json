@@ -1,7 +1,7 @@
 {
     "name":  "huayuan-schedule-butler-v2",
-    "version":  "0.14.2",
-    "description":  "Unifies SCUT undergraduate course schedules, assignments, exams and notices into explainable plans. Every turn opens a guided four-page dashboard in WorkBuddy's side browser with setup red dots, copyable onboarding actions, University Town routes, all todos, campus activities and mobile companion controls.",
+    "version":  "0.14.3",
+    "description":  "Unifies SCUT undergraduate course schedules, assignments, exams and notices into explainable plans. Every turn opens a guided four-page dashboard in WorkBuddy\u0027s side browser with setup red dots, copyable onboarding actions, University Town routes, all todos, campus activities and mobile companion controls.",
     "author":  {
                    "name":  "华园日程管家项目组",
                    "email":  "wtm430181@qq.com"
@@ -31,7 +31,7 @@
                        "zh":  "华园本科生日程规划助理"
                    },
     "displayDescription":  {
-                               "en":  "Unifies SCUT University Town timetables, assignments and campus opportunities into explainable plans. Every turn opens a guided four-page dashboard in WorkBuddy's side browser with setup red dots, copyable onboarding actions, weather-aware routes, all todos, campus activities and mobile companion controls.",
+                               "en":  "Unifies SCUT University Town timetables, assignments and campus opportunities into explainable plans. Every turn opens a guided four-page dashboard in WorkBuddy\u0027s side browser with setup red dots, copyable onboarding actions, weather-aware routes, all todos, campus activities and mobile companion controls.",
                                "zh":  "面向华南理工大学大学城校区，聚合多平台课表、作业、考试、校园通知与活动；每轮对话先在 WorkBuddy 右侧浏览器打开带初始化红点和复制补全指令的四页驾驶舱，提供“现在干什么”、临时重排、复习任务、天气感知校园路线和手机工作台控制。"
                            },
     "avatar":  "avatars/expert.png",

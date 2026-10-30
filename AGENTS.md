@@ -69,7 +69,7 @@ node golden-path\check-v060.js        # 可视化路径
 node golden-path\check-performance.js # 性能
 node golden-path\check-activities.js  # 校园活动
 node golden-path\check-score.js       # 绩点/操行分计分工具（0.11.0）
-node golden-path\check-mobile.js      # 手机远程工作台（0.14.2，含 35 项冒烟）
+node golden-path\check-mobile.js      # 手机远程工作台（0.14.3，含 35 项冒烟）
 
 # 单步脚本（示例）
 node skills\huayuan-browser-session\scripts\first-run.js --wizard --login

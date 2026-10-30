@@ -1,4 +1,4 @@
-VERSION=0.14.2
+VERSION=0.14.3
 
 # 华园日程管家 · 版本记录
 
@@ -7,6 +7,11 @@ VERSION=0.14.2
 > 规则：版本号一律由脚本递增，**不要手动改** VERSION.md 与 plugin.json 的版本号；确需大/中版本时用 `-Part major|minor`。
 
 ## 变更日志（新→旧）
+
+### 0.14.3 · 2026-10-30 · fix: make present_files the mandatory final side-panel action
+- WorkBuddy 宿主规定 `present_files` 只能作为“结果已完成”回合的最后一个工具调用；上一版让模型在回合开始立即打开，与宿主规则冲突，模型因此错误地二次运行启动器并打开外部 Chrome。
+- 改为：回合开始只启动本地驾驶舱服务；原请求处理完成后，最后一个工具调用必须是 `present_files({"files":[URL]})`，之后只写最终文字。
+- 删除 Agent 层的外部浏览器兜底，禁止第二次运行启动器或去掉 `--no-open`。右侧侧栏会与最终回复一起出现。
 
 ### 0.14.2 · 2026-10-30 · fix: open the guided dashboard in WorkBuddy's side browser
 - 驾驶舱启动器新增 `--no-open` 模式，只负责启动本地服务并返回状态，不再默认用 Windows `start` 拉起独立 Chrome。
