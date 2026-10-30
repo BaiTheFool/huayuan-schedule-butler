@@ -17,6 +17,10 @@ const browserSkill = fs.readFileSync(
   path.join(ROOT, 'skills', 'huayuan-browser-session', 'SKILL.md'),
   'utf8'
 );
+const dashboardLauncher = fs.readFileSync(
+  path.join(ROOT, 'skills', 'huayuan-live-dashboard', 'scripts', 'launch-dashboard.js'),
+  'utf8'
+);
 const plugin = JSON.parse(
   fs.readFileSync(path.join(ROOT, '.codebuddy-plugin', 'plugin.json'), 'utf8')
 );
@@ -45,11 +49,22 @@ check(
   `agent=${agentSkills.length} plugin=${pluginSkills.length} dir=${directorySkills.length}`
 );
 check(
-  '每个用户回合先打开外部驾驶舱',
+  '每个用户回合先确保侧边驾驶舱打开',
   /驾驶舱总闸/.test(agent) &&
     /收到用户的任何有效指令后，先执行/.test(agent) &&
-    /launch-dashboard\.js/.test(agent) &&
+    /launch-dashboard\.js --no-open/.test(agent) &&
     /不得因为缺少课表、任务或初始化资料而跳过/.test(agent)
+);
+check(
+  '侧边浏览器通过 WorkBuddy present_files 打开',
+  /present_files/.test(agent) &&
+    /LIVE_DASHBOARD_ALREADY_OPEN:0/.test(agent) &&
+    /右侧内置浏览器面板/.test(agent)
+);
+check(
+  '启动器区分侧边页面已开与需要重新打开',
+  /LIVE_DASHBOARD_ALREADY_OPEN:/.test(dashboardLauncher) &&
+    /requestedPagePath\(\)/.test(dashboardLauncher)
 );
 check(
   '未初始化也必须进入驾驶舱引导模式',

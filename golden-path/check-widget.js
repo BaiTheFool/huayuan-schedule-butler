@@ -183,17 +183,20 @@ const again = build(['--now', PARTIAL]);
 check('两次生成的 widget_code 完全一致', again.doc.widget_code === partial.doc.widget_code, `${partial.doc.meta.bytes} B vs ${again.doc.meta.bytes} B`);
 
 // ── 7 Widget 与网页驾驶舱路由 ──────────────────────────────────────
-group('[7] 每轮外部驾驶舱优先，内嵌卡片只在明确要求时出现');
+group('[7] 每轮优先侧边驾驶舱，内嵌卡片只在明确要求时出现');
 const agentText = fs.readFileSync(path.join(PKG_ROOT, 'agents', 'huayuan-schedule-butler.md'), 'utf8');
 const widgetSkill = fs.readFileSync(path.join(WIDGET_DIR, 'SKILL.md'), 'utf8');
 const liveSkill = fs.readFileSync(
   path.join(PKG_ROOT, 'skills', 'huayuan-live-dashboard', 'SKILL.md'),
   'utf8'
 );
-check('专家说明要求每轮先打开外部驾驶舱', /驾驶舱总闸/.test(agentText) && /任何有效指令后/.test(agentText));
-check('外部驾驶舱技能覆盖自动打开与未初始化模式', /用户任何有效指令/.test(liveSkill) && /ONBOARDING_MODE/.test(liveSkill));
-check('Widget Skill 把“打开驾驶舱”转给外部驾驶舱', /打开驾驶舱.*外部网页驾驶舱/.test(widgetSkill));
-check('Widget 只在明确“看卡片”时生成', /在对话里看卡片/.test(widgetSkill) && /不能替代外部驾驶舱/.test(widgetSkill));
+check(
+  '专家说明要求每轮先打开侧边驾驶舱',
+  /驾驶舱总闸/.test(agentText) && /任何有效指令后/.test(agentText) && /present_files/.test(agentText)
+);
+check('侧边驾驶舱技能覆盖自动打开与未初始化模式', /用户任何有效指令/.test(liveSkill) && /ONBOARDING_MODE/.test(liveSkill));
+check('Widget Skill 把“打开驾驶舱”转给侧边驾驶舱', /打开驾驶舱.*侧边网页驾驶舱/.test(widgetSkill));
+check('Widget 只在明确“看卡片”时生成', /在对话里看卡片/.test(widgetSkill) && /不能替代侧边驾驶舱/.test(widgetSkill));
 
 const failed = results.filter((item) => !item.ok);
 console.log(`\n========================================================`);

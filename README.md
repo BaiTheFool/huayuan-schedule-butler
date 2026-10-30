@@ -45,6 +45,8 @@
 >
 > 版本 0.14.1 将**驾驶舱设为固定入口**：每个用户回合先确保外部驾驶舱打开；没有初始化数据也进入引导驾驶舱。顶部按学院、平台授权、偏好、教学周、课表、待办和活动列出缺失项，标签页红点与本页具体红点联动，每项都能复制补全指令。新增第四页“手机工作台”，可直接启动/停止、换配对码、查看地址与发现端口并下载 APK。
 >
+> 版本 0.14.2 修正**驾驶舱打开位置**：启动器只启动本地服务，由 Agent 调用 WorkBuddy 原生 `present_files` 在右侧内置浏览器面板打开，不再默认弹出独立 Chrome。已打开时用心跳判断并避免重复开页；只有宿主不支持内置侧边浏览器时才回退外部浏览器。手机问题会直接在侧栏定位到第四页。
+>
 > 版本 0.11.0 新增**专业入口 + 教务课表导入**：路线页面可以直接填写专业（保存在本机），并导入 `jw-timetable.json`；导入时先校验是不是大学城校区、有多少门课、当前第几周，五山课表会被拒绝。命令行用 `--major` 和 `--timetable` 对应。
 >
 > 版本 0.10.1 为一日路线接入**天气**：晴/多云/小雨/大雨/高温/寒冷/空气污染会改变运动与放松地点、步行时间、缓冲和提醒；页面可手动选，也可用 Open-Meteo 实时天气（无需 Key，失败自动退回手动）。只覆盖大学城校区，五山课表会被明确拒绝而不是硬套。
@@ -346,7 +348,7 @@ node skills/huayuan-dashboard-widget/scripts/build-widget.js --now <输出目录
 node skills/huayuan-dashboard-widget/scripts/build-widget.js --self-check                      # 10 项自检
 ```
 
-脚本输出 `title / widget_code / loading_messages / text_fallback / meta`，由 Agent 直接传给 WorkBuddy 原生 `show_widget`。**不启动本地服务器、不落地 HTML 文件、不引外部脚本、不调网络**；`show_widget` 失败时降级成一条"第一动作 + 下一步"文字。外部网页驾驶舱在每个用户回合开始时已经确保打开；只有用户明确说“在对话里看卡片 / 看卡片”时才额外生成内嵌卡片，它不能替代外部驾驶舱。
+脚本输出 `title / widget_code / loading_messages / text_fallback / meta`，由 Agent 直接传给 WorkBuddy 原生 `show_widget`。**不启动本地服务器、不落地 HTML 文件、不引外部脚本、不调网络**；`show_widget` 失败时降级成一条"第一动作 + 下一步"文字。侧边网页驾驶舱在每个用户回合开始时已经确保打开；只有用户明确说“在对话里看卡片 / 看卡片”时才额外生成内嵌卡片，它不能替代侧边驾驶舱。
 
 ## 内置技能 huayuan-campus-route
 

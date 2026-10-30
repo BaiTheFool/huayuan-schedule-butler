@@ -122,6 +122,9 @@ async function main() {
       if (!process.argv.includes('--no-open') && (!health.browser_alive || requestedPagePath() !== '/')) {
         openBrowser(url);
       }
+      const alreadyOpen =
+        Boolean(health.browser_alive) && requestedPagePath() === '/' ? '1' : '0';
+      console.log(`LIVE_DASHBOARD_ALREADY_OPEN:${alreadyOpen}`);
       console.log(`LIVE_DASHBOARD_READY:${url}`);
       return;
     }
@@ -171,6 +174,7 @@ async function main() {
   const url = dashboardUrl(chosen.port);
   if (!process.argv.includes('--no-open')) openBrowser(url);
   if (!nowPath) console.log('LIVE_DASHBOARD_ONBOARDING_MODE:1');
+  console.log('LIVE_DASHBOARD_ALREADY_OPEN:0');
   console.log(`LIVE_DASHBOARD_READY:${url}`);
 }
 

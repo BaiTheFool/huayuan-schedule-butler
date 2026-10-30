@@ -22,7 +22,7 @@
 
 - 把华南理工大学本科生散落在 **教务系统、eCourse、雨课堂、校园门户** 的课表/作业/考试/通知，统一整理成**可追溯、可修改、可解释**的日程。
 - **驾驶舱总闸**：每个用户回合先执行 `launch-dashboard.js`；即使没有 `now.json` 也进入初始化驾驶舱。驾驶舱提供双层红点、缺失项清单和可复制补全指令；手机问题使用第四个“手机工作台”标签。
-- 内置 9 个技能：`huayuan-task-card`（任务卡）、`huayuan-browser-session`（浏览器读取）、`timeline-brief`（时间轴）、`huayuan-dashboard-widget`（对话内卡片）、`huayuan-live-dashboard`（外部网页驾驶舱）、`huayuan-campus-route`（大学城一日路线）、`huayuan-campus-manual`（生存手册知识库）、`huayuan-score-advisor`（绩点与操行分顾问，官方 2026 手册口径 + 计分工具）、`huayuan-mobile-remote`（手机远程工作台：只读 PWA + 配对码 + 局域网发现 + 可选公网隧道）。
+- 内置 9 个技能：`huayuan-task-card`（任务卡）、`huayuan-browser-session`（浏览器读取）、`timeline-brief`（时间轴）、`huayuan-dashboard-widget`（对话内卡片）、`huayuan-live-dashboard`（侧边网页驾驶舱）、`huayuan-campus-route`（大学城一日路线）、`huayuan-campus-manual`（生存手册知识库）、`huayuan-score-advisor`（绩点与操行分顾问，官方 2026 手册口径 + 计分工具）、`huayuan-mobile-remote`（手机远程工作台：只读 PWA + 配对码 + 局域网发现 + 可选公网隧道）。
 - 演示与发版基线：`golden-path/check.js`（49 项断言，离线、不登录、样例数据全虚构）。
 
 ## 2. 目录地图
@@ -36,7 +36,7 @@ huayuan-schedule-butler/
 │  ├─ huayuan-task-card/              # 任务卡模型、去重、排程算法、check_plan.py
 │  ├─ timeline-brief/                 # 纯文本时间轴（≤8 行）
 │  ├─ huayuan-dashboard-widget/       # show_widget 内嵌卡片
-│  ├─ huayuan-live-dashboard/         # 外部网页驾驶舱（public/ + scripts/）
+│  ├─ huayuan-live-dashboard/         # 侧边网页驾驶舱（public/ + scripts/）
 │  ├─ huayuan-campus-manual/          # ★ 校园生存手册知识库（knowledge/ + SKILL.md）
 │  ├─ huayuan-score-advisor/          # ★ 绩点与操行分顾问（官方手册口径 + gpa/conduct 计分工具）
 │  └─ huayuan-mobile-remote/          # ★ 手机远程工作台（public/ PWA + scripts/ + apk/ 随包 App + references/ 教程）
@@ -69,7 +69,7 @@ node golden-path\check-v060.js        # 可视化路径
 node golden-path\check-performance.js # 性能
 node golden-path\check-activities.js  # 校园活动
 node golden-path\check-score.js       # 绩点/操行分计分工具（0.11.0）
-node golden-path\check-mobile.js      # 手机远程工作台（0.14.1，含 35 项冒烟）
+node golden-path\check-mobile.js      # 手机远程工作台（0.14.2，含 35 项冒烟）
 
 # 单步脚本（示例）
 node skills\huayuan-browser-session\scripts\first-run.js --wizard --login

@@ -11,7 +11,7 @@ description: Start and open a local read-only split-screen dashboard that visual
 
 ## 触发
 
-专家收到用户任何有效指令后，都必须先执行本技能，再处理原请求。用户没有提到驾驶舱也要打开；用户只要求“看卡片”时，先打开外部驾驶舱，再按需生成内嵌卡片。
+专家收到用户任何有效指令后，都必须先执行本技能，再处理原请求。用户没有提到驾驶舱也要打开；用户只要求“看卡片”时，先打开侧边驾驶舱，再按需生成内嵌卡片。
 
 未初始化、没有 `now.json` 不是跳过理由。启动器会打印：
 
@@ -25,8 +25,14 @@ LIVE_DASHBOARD_READY:http://127.0.0.1:<端口>/
 1. 直接启动；不要先调用 `now.js`，也不要求用户先找文件：
 
 ```powershell
-node <本技能目录>\scripts\launch-dashboard.js
+node <本技能目录>\scripts\launch-dashboard.js --no-open
 ```
+
+启动器只创建本地服务，不直接拉起外部浏览器。读取输出：
+
+- `LIVE_DASHBOARD_ALREADY_OPEN:0`：立即调用 WorkBuddy 内置工具 `present_files`，传入 `LIVE_DASHBOARD_READY` 的 URL，在右侧内置浏览器面板打开；
+- `LIVE_DASHBOARD_ALREADY_OPEN:1`：侧边页面仍在线，不要重复打开；
+- 宿主不提供 `present_files`：才去掉 `--no-open` 重跑一次，作为外部浏览器兜底。
 
 2. 看到 `LIVE_DASHBOARD_READY:<url>` 后，在处理原请求的回答里保留一行：
 
@@ -35,8 +41,10 @@ node <本技能目录>\scripts\launch-dashboard.js
 用户问手机、手机连接或手机安装时使用 `--page mobile`，直接定位到第四个“手机工作台”标签：
 
 ```powershell
-node <本技能目录>\scripts\launch-dashboard.js --page mobile
+node <本技能目录>\scripts\launch-dashboard.js --no-open --page mobile
 ```
+
+拿到 `mobile.html` URL 后同样用 `present_files` 在右侧面板打开，不启动外部浏览器。
 
 驾驶舱里的“重新导入课表”直接读取教务时，需要 WorkBuddy 允许本专家运行本地命令并启动浏览器。受限环境若返回 `EPERM`，不要要求用户永久开启全部权限；引导其点击页面上的“复制教务读取指令”，在左侧对话完成读取，或使用“本地文件”作为备用。
 

@@ -20,10 +20,12 @@ skills: [huayuan-task-card, huayuan-browser-session, timeline-brief, huayuan-das
 收到用户的任何有效指令后，先执行：
 
 ```powershell
-node <huayuan-live-dashboard技能目录>\scripts\launch-dashboard.js
+node <huayuan-live-dashboard技能目录>\scripts\launch-dashboard.js --no-open
 ```
 
 即使尚未初始化、没有 `now.json`，也必须打开驾驶舱：脚本会进入 `LIVE_DASHBOARD_ONBOARDING_MODE:1`。只有确认得到 `LIVE_DASHBOARD_READY:<url>` 后才处理用户请求。不得因为缺少课表、任务或初始化资料而跳过。
+
+脚本输出 `LIVE_DASHBOARD_ALREADY_OPEN:0` 时，立即调用 WorkBuddy 内置工具 `present_files` 并传入该 URL，让驾驶舱出现在右侧内置浏览器面板；`ALREADY_OPEN:1` 时不要重复打开。只有宿主没有 `present_files` 时，才重跑启动器且不加 `--no-open` 作为外部浏览器兜底。
 
 驾驶舱是补全信息的唯一主界面：顶部列出缺失项，标签页显示红点，每项都可复制补全指令。聊天区只给一句“驾驶舱已打开”和当前结论，不重复长篇步骤。
 
@@ -31,7 +33,7 @@ node <huayuan-live-dashboard技能目录>\scripts\launch-dashboard.js
 
 1. 首次使用、未初始化：引导初始化。
 2. “我现在该干什么 / 接下来做什么”：运行 `now.js`，给唯一第一动作。
-3. “看卡片 / 在对话里看卡片”：在外部驾驶舱已打开后，再调用内嵌 Widget。
+3. “看卡片 / 在对话里看卡片”：在侧边驾驶舱已打开后，再调用内嵌 Widget。
 5. “刷新我的校园待办”：复用已保存配置与偏好，重新读取四平台并汇总变化，不重走初始化。
 6. “刷新校园活动 / 最近有什么活动”：抓取公开活动公告并筛出可参与事项。
 7. “看时间轴”：调用 `timeline-brief`。
@@ -98,7 +100,7 @@ node <huayuan-browser-session技能目录>\scripts\now.js
 2. 一条关键原因；
 3. 后续一到两段或一个下一步。
 
-不自动生成内嵌 Widget；外部网页驾驶舱已在每轮开始时打开。
+不自动生成内嵌 Widget；侧边网页驾驶舱已在每轮开始时打开。
 
 必须遵守：
 
@@ -238,15 +240,15 @@ node <timeline-brief技能目录>\scripts\timeline-brief.js --now <now.json> --h
 
 最多 8 行；用户没说“详细”时不展开完整周表。
 
-### 外部网页驾驶舱（每轮默认）
+### 侧边网页驾驶舱（每轮默认）
 
 ```powershell
-node <huayuan-live-dashboard技能目录>\scripts\launch-dashboard.js
+node <huayuan-live-dashboard技能目录>\scripts\launch-dashboard.js --no-open
 ```
 
-不需要先手动寻找 `now.json`；启动器会读最新文件，没有时进入初始化模式。看到 `LIVE_DASHBOARD_READY:<url>` 后，在回答中保留一行：“驾驶舱已打开：<url>。”
+不需要先手动寻找 `now.json`；启动器会读最新文件，没有时进入初始化模式。`LIVE_DASHBOARD_ALREADY_OPEN:0` 时用 `present_files` 在右侧打开 URL；为 `1` 时不重复打开。回答中保留一行：“驾驶舱已在右侧打开。”
 
-网页只读、无聊天框；左侧继续 WorkBuddy 对话，右侧每 2 秒更新。三页均有标签红点；今日页顶部集中列出未补齐资料和可复制指令。未完成初始化时，不运行 `now.js`，引导用户复制驾驶舱里的第一条初始化指令。
+侧边网页只读、无聊天框；左侧继续 WorkBuddy 对话，右侧每 2 秒更新。四页均有标签红点；今日页顶部集中列出未补齐资料和可复制指令。未完成初始化时，不运行 `now.js`，引导用户复制驾驶舱里的第一条初始化指令。
 
 ## 回答风格
 

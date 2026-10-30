@@ -1,4 +1,4 @@
-VERSION=0.14.1
+VERSION=0.14.2
 
 # 华园日程管家 · 版本记录
 
@@ -7,6 +7,11 @@ VERSION=0.14.1
 > 规则：版本号一律由脚本递增，**不要手动改** VERSION.md 与 plugin.json 的版本号；确需大/中版本时用 `-Part major|minor`。
 
 ## 变更日志（新→旧）
+
+### 0.14.2 · 2026-10-30 · fix: open the guided dashboard in WorkBuddy's side browser
+- 驾驶舱启动器新增 `--no-open` 模式，只负责启动本地服务并返回状态，不再默认用 Windows `start` 拉起独立 Chrome。
+- Agent 通过 WorkBuddy 内置 `present_files` 打开本地 `http://127.0.0.1` 地址，驾驶舱显示在右侧内置浏览器面板；`LIVE_DASHBOARD_ALREADY_OPEN:1` 时避免重复打开。
+- 只有宿主不提供 `present_files` 时，才回退到外部浏览器；手机问题同样用 `--page mobile` 在侧边面板定位第四页。
 
 ### 0.14.1 · 2026-10-30 · feat: make the dashboard the mandatory guided control surface
 - 每个用户回合先确保外部驾驶舱已打开；页面仍在时通过心跳避免重复弹窗，页面关闭后自动重开。

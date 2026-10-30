@@ -137,6 +137,13 @@
 - 验证：驾驶舱 smoke 89/89；真实空 Home 启动输出 `LIVE_DASHBOARD_ONBOARDING_MODE:1`、`now=null`、9 个缺失项；手机启动/停止与 APK 下载均通过。
 - 预防：驾驶舱入口不得依赖 `now.json` 才能启动；所有新标签页必须接入共享 onboarding/attention 状态和红点测试。
 
+### #18 · 2026-10-30 · 驾驶舱误开独立 Chrome（0.14.2）
+- 现象：要求“每轮先打开驾驶舱”后，Windows 上弹出一个独立 Chrome 窗口，没有出现在 WorkBuddy 右侧内置浏览器面板。
+- 根因：`launch-dashboard.js` 默认调用 `cmd.exe /c start <url>`；这是操作系统级外部浏览器启动，不是宿主预览工具。
+- 解决：Agent 统一用 `--no-open` 启动本地服务，再调用 WorkBuddy 原生 `present_files(<localhost URL>)` 在右侧面板预览；页面心跳返回 `LIVE_DASHBOARD_ALREADY_OPEN:1` 时避免重复开页。仅当宿主没有 `present_files` 才回退外部浏览器。
+- 验证：首次返回 `ALREADY_OPEN:0`，心跳后再次调用返回 `1`，`--page mobile` 返回 `0` 并给出 `mobile.html` URL；性能门禁新增 `present_files` 断言。
+- 预防：WorkBuddy 内可预览的 localhost/HTML 一律走 `present_files`；不要用 `start`、`open`、浏览器进程启动来模拟宿主侧栏。
+
 ---
 
 ## 运行时错误日志（logs/errors.jsonl）使用说明
