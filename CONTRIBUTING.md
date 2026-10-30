@@ -9,7 +9,7 @@
 5. 由维护者合并到 `main`；
 6. 打包并安装成 WorkBuddy 专家测试。
 
-当前版本：`0.12.0`  
+当前版本：`0.14.0`
 仓库：<https://github.com/BaiTheFool/huayuan-schedule-butler>  
 主分支：`main`
 
@@ -622,7 +622,7 @@ powershell -ExecutionPolicy Bypass -File scripts\bump-version.ps1 -Message "<一
 - Chrome 是当前主链路，其他浏览器回退仍需完善。
 - `golden-path` 全量测试当前**全部通过**（`GOLDEN_PATH:PASS 49/49`、`SCORE_GATE:PASS 16/16` 等）。历史上的基线缺口（上游 v0.9.0 遗留：fixtures 缺 `preferences.json`、技能数断言 5→6）已在 0.10.1 修复并记录于 `ERROR_LOG.md` #11/#12。修复这类问题时**不要**删断言或改预期来"通过"，先按 #12 的做法补真实 fixture / 同步正确断言。
 - `huayuan-score-advisor` 计分口径基于《2026 本科生手册》官方条文（学籍管理办法 2026 修订第 39 条等）；**各院（系）综合测评实施细则可在校级办法基础上微调加分认定**，计分结果以院（系）细则与官方最新通知为准。四分制 GPA 的动态转换需要课程班排名，只有分数时工具会标记无法精算。
-- 当前开发版本是 `0.12.0`；本地版本和开放平台审核版本可能不同步。
+- 当前开发版本是 `0.14.0`；本地版本和开放平台审核版本可能不同步。
 - 文档维护契约：`AGENTS.md`（Agent 交接）与 `CONTRIBUTING.md`（团队协作）必须由开发者自行保持与代码同步，发现过时直接改。
 
 ---

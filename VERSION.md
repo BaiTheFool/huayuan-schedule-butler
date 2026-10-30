@@ -1,6 +1,18 @@
 VERSION=0.14.0
 
-### 0.14.0 · 2026-10-30 · feat: serve the Android APK and guide first-time phone setup
+# 华园日程管家 · 版本记录
+
+> 本文件是版本的**单一事实源**。机器可读行固定为第一行：`VERSION=x.y.z`。
+> 发版流程：改代码 → `powershell -ExecutionPolicy Bypass -File scripts\bump-version.ps1 -Message "<一句话变更>"`（自动 patch+1 并同步 `plugin.json`）→ 跑 `node golden-path\check.js` → 提交。
+> 规则：版本号一律由脚本递增，**不要手动改** VERSION.md 与 plugin.json 的版本号；确需大/中版本时用 `-Part major|minor`。
+
+## 变更日志（新→旧）
+
+### 0.14.0 · 2026-10-30 · feat: integrate team branches with the complete main feature set
+- 在 `0.13.8` 主干上整合校园生存手册、绩点与操行分顾问、手机远程工作台，保留三页驾驶舱、大学城路线、地图与楼栋搜索、全部待办、教务自动读取及受限环境降级。
+- 桌面驾驶舱与手机工作台共用只读快照层，避免两端展示不同结论。
+- 手机工作台提供 PWA/APK、6 位配对码、令牌鉴权、局域网发现和可选公网隧道，并随包提供安卓安装包与首次安装引导。
+- 插件注册技能共 9 个，Agent、插件清单与实际技能目录保持一致。
 
 ### 0.13.0 · 2026-10-30 · feat: LAN discovery (UDP 4327) for the Android workbench shell
 - 服务端新增局域网发现：UDP `4327` 监听，收到 `HUAYUAN_DISCOVER/1` 只回 `{service, port, version}`，不回令牌、不回配对码、不回任何数据，且只应答私有地址来源；端口可用 `--discovery-port` 改。
@@ -16,14 +28,6 @@ VERSION=0.14.0
 - 新增回归：`skills/huayuan-mobile-remote/test/smoke.js`（32 项）、`golden-path/check-mobile.js`（33 项）。
 
 ### 0.11.0 · 2026-10-28 · feat: huayuan-score-advisor GPA/conduct calculators + official-manual KB (0.11.0)
-
-# 华园日程管家 · 版本记录
-
-> 本文件是版本的**单一事实源**。机器可读行固定为第一行：`VERSION=x.y.z`。
-> 发版流程：改代码 → `powershell -ExecutionPolicy Bypass -File scripts\bump-version.ps1 -Message "<一句话变更>"`（自动 patch+1 并同步 `plugin.json`）→ 跑 `node golden-path\check.js` → 提交。
-> 规则：版本号一律由脚本递增，**不要手动改** VERSION.md 与 plugin.json 的版本号；确需大/中版本时用 `-Part major|minor`。
-
-## 变更日志（新→旧）
 
 ### 0.10.2 · 2026-10-28 · 共同开发指南整合与测试基线修复
 - 新增 `CONTRIBUTING.md`（共同开发指南）到仓库，并把其协作规范（分支/PR/测试门禁/打包/版本规则/隐私红线）整合进 `AGENTS.md`，新增「开发者自更新契约」硬要求。
