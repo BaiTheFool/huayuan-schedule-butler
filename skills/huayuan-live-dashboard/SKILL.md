@@ -30,7 +30,8 @@ node <本技能目录>\scripts\launch-dashboard.js --no-open
 
 启动器只创建本地服务，不直接拉起外部浏览器。读取输出：
 
-- `LIVE_DASHBOARD_ALREADY_OPEN:0`：先处理原请求；本轮完成时，最后一个工具调用必须是 `present_files({"files":["<URL>"]})`，在右侧内置浏览器面板打开；
+- `LIVE_DASHBOARD_SIDEBAR_FILE`：启动器在本次会话工作区生成的跳板 HTML 绝对路径；它打开后立即重定向到本地驾驶舱；
+- `LIVE_DASHBOARD_ALREADY_OPEN:0`：先处理原请求；本轮完成时，最后一个工具调用必须是 `present_files({"files":["<LIVE_DASHBOARD_SIDEBAR_FILE>"]})`，在右侧内置浏览器面板打开；
 - `LIVE_DASHBOARD_ALREADY_OPEN:1`：侧边页面仍在线，不要重复打开；
 - 禁止再次运行启动器，禁止去掉 `--no-open`，禁止打开外部浏览器；`present_files` 后只写最终文字，不再调用工具。
 
@@ -44,7 +45,7 @@ node <本技能目录>\scripts\launch-dashboard.js --no-open
 node <本技能目录>\scripts\launch-dashboard.js --no-open --page mobile
 ```
 
-拿到 `mobile.html` URL 后，完成手机相关处理后用 `present_files({"files":["<mobile URL>"]})` 作为最后工具调用，不启动外部浏览器。
+拿到 `LIVE_DASHBOARD_SIDEBAR_FILE` 后，完成手机相关处理后用 `present_files({"files":["<SIDEBAR_FILE>"]})` 作为最后工具调用，不启动外部浏览器。
 
 驾驶舱里的“重新导入课表”直接读取教务时，需要 WorkBuddy 允许本专家运行本地命令并启动浏览器。受限环境若返回 `EPERM`，不要要求用户永久开启全部权限；引导其点击页面上的“复制教务读取指令”，在左侧对话完成读取，或使用“本地文件”作为备用。
 

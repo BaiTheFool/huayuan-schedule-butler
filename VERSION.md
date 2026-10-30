@@ -1,4 +1,4 @@
-VERSION=0.14.3
+VERSION=0.14.4
 
 # 华园日程管家 · 版本记录
 
@@ -7,6 +7,11 @@ VERSION=0.14.3
 > 规则：版本号一律由脚本递增，**不要手动改** VERSION.md 与 plugin.json 的版本号；确需大/中版本时用 `-Part major|minor`。
 
 ## 变更日志（新→旧）
+
+### 0.14.4 · 2026-10-30 · fix: use a local redirect file for side-panel preview
+- 实测确认当前 WorkBuddy 的 `present_files.files` 只接受本地文件路径；直接传 `http://127.0.0.1` 会使工具调用失败，侧栏不会打开。
+- 启动器现在在本次会话工作区生成 `huayuan-dashboard-launch.html` 跳板文件，打开后立即 `location.replace()` 到驾驶舱地址。
+- Agent 的最后一个工具调用改为 `present_files({"files":["<LIVE_DASHBOARD_SIDEBAR_FILE>"]})`；不再向 `present_files` 传 URL，也不二次启动外部浏览器。
 
 ### 0.14.3 · 2026-10-30 · fix: make present_files the mandatory final side-panel action
 - WorkBuddy 宿主规定 `present_files` 只能作为“结果已完成”回合的最后一个工具调用；上一版让模型在回合开始立即打开，与宿主规则冲突，模型因此错误地二次运行启动器并打开外部 Chrome。

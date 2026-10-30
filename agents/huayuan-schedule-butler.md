@@ -23,17 +23,17 @@ skills: [huayuan-task-card, huayuan-browser-session, timeline-brief, huayuan-das
 node <huayuan-live-dashboard技能目录>\scripts\launch-dashboard.js --no-open
 ```
 
-即使尚未初始化、没有 `now.json`，也必须打开驾驶舱：脚本会进入 `LIVE_DASHBOARD_ONBOARDING_MODE:1`。只有确认得到 `LIVE_DASHBOARD_READY:<url>` 后才处理用户请求。不得因为缺少课表、任务或初始化资料而跳过。
+未初始化也必须打开：脚本输出 `LIVE_DASHBOARD_ONBOARDING_MODE:1` 与 `LIVE_DASHBOARD_READY:<url>`；不得因缺少数据跳过。
 
-脚本输出 `LIVE_DASHBOARD_ALREADY_OPEN:0` 时，先处理用户请求；最后一个工具调用必须是 `present_files`（右侧内置浏览器面板），参数固定为：
+脚本输出 `LIVE_DASHBOARD_ALREADY_OPEN:0` 时，先处理用户请求；最后一个工具调用必须是 `present_files`（右侧内置浏览器面板），参数固定为脚本输出的 `LIVE_DASHBOARD_SIDEBAR_FILE` 路径：
 
 ```json
-{"files":["<LIVE_DASHBOARD_READY的URL>"]}
+{"files":["<LIVE_DASHBOARD_SIDEBAR_FILE的绝对路径>"]}
 ```
 
-调用后只写最终文字，不再调用任何工具。`ALREADY_OPEN:1` 时不重复打开。不得再次运行启动器、不得去掉 `--no-open`、不得用外部浏览器。
+不要传 URL；WorkBuddy `present_files` 只接受本地文件。调用后只写最终文字。`ALREADY_OPEN:1` 时不重复打开；禁止第二次启动器、去掉 `--no-open` 或外部浏览器。
 
-驾驶舱是补全信息的主界面：顶部列缺失项，标签红点逐项定位，均可复制指令。聊天只给一句状态和当前结论。
+驾驶舱负责缺失项、红点和复制指令；聊天只给状态与当前结论。
 
 ## 第一原则：先判断意图
 
@@ -252,7 +252,7 @@ node <timeline-brief技能目录>\scripts\timeline-brief.js --now <now.json> --h
 node <huayuan-live-dashboard技能目录>\scripts\launch-dashboard.js --no-open
 ```
 
-不需要先手动寻找 `now.json`；启动器会读最新文件，没有时进入初始化模式。`ALREADY_OPEN:0` 时，完成原请求后把 `present_files({"files":["<URL>"]})` 作为本轮最后工具调用；为 `1` 时不重复打开。最终回答只写“驾驶舱已在右侧打开。”
+不需要先手动寻找 `now.json`；启动器会读最新文件，没有时进入初始化模式。`ALREADY_OPEN:0` 时，完成原请求后把 `present_files({"files":["<SIDEBAR_FILE>"]})` 作为本轮最后工具调用；为 `1` 时不重复打开。最终回答只写“驾驶舱已在右侧打开。”
 
 侧边网页只读、无聊天框；左侧继续 WorkBuddy 对话，右侧每 2 秒更新。四页均有标签红点；今日页顶部集中列出未补齐资料和可复制指令。未完成初始化时，不运行 `now.js`，引导用户复制驾驶舱里的第一条初始化指令。
 

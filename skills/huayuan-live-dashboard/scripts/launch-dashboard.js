@@ -32,6 +32,27 @@ function dashboardUrl(port) {
   return `http://127.0.0.1:${port}${requestedPagePath()}`;
 }
 
+function writeSidebarBootstrap(url) {
+  const file = path.join(process.cwd(), 'huayuan-dashboard-launch.html');
+  const target = JSON.stringify(url);
+  const html = `<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta http-equiv="refresh" content="0;url=${url.replace(/"/g, '&quot;')}">
+  <title>正在打开华园驾驶舱</title>
+</head>
+<body>
+  <p>正在打开驾驶舱……</p>
+  <p><a href="${url.replace(/"/g, '&quot;')}">若未自动跳转，请点这里</a></p>
+  <script>location.replace(${target});</script>
+</body>
+</html>`;
+  fs.writeFileSync(file, html, 'utf8');
+  return file;
+}
+
 function readJson(file) {
   try {
     return JSON.parse(fs.readFileSync(file, 'utf8'));
@@ -125,6 +146,7 @@ async function main() {
       const alreadyOpen =
         Boolean(health.browser_alive) && requestedPagePath() === '/' ? '1' : '0';
       console.log(`LIVE_DASHBOARD_ALREADY_OPEN:${alreadyOpen}`);
+      console.log(`LIVE_DASHBOARD_SIDEBAR_FILE:${writeSidebarBootstrap(url)}`);
       console.log(`LIVE_DASHBOARD_READY:${url}`);
       return;
     }
@@ -175,6 +197,7 @@ async function main() {
   if (!process.argv.includes('--no-open')) openBrowser(url);
   if (!nowPath) console.log('LIVE_DASHBOARD_ONBOARDING_MODE:1');
   console.log('LIVE_DASHBOARD_ALREADY_OPEN:0');
+  console.log(`LIVE_DASHBOARD_SIDEBAR_FILE:${writeSidebarBootstrap(url)}`);
   console.log(`LIVE_DASHBOARD_READY:${url}`);
 }
 

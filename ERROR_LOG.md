@@ -150,6 +150,12 @@
 - 解决：先启动服务但保留 URL；完成用户请求后，最后调用 `present_files({"files":["<URL>"]})`，调用后只写最终文字。Agent 明令禁止二次启动和外部浏览器。
 - 验证：性能门禁新增参数 `files`、最终调用与“禁止二次启动器”断言；真实日志确认 `present_files` 在工具权限列表中可用。
 
+### #20 · 2026-10-30 · present_files 不接受 localhost URL（0.14.4）
+- 现象：0.14.3 已正确把 `present_files` 作为最后工具调用，但调用 3 秒后返回 unknown failure，右侧面板仍为空。
+- 根因：WorkBuddy 当前 `presentFiles` 处理器把 `files` 逐项交给 `normalizePresentFilesLocalInput`，只保留绝对本地路径或 `file://` 路径；`http://127.0.0.1` 被过滤，最终因“没有文件注册到所属会话”而失败。工具文档中“可传 URL”的描述与当前实现不一致。
+- 解决：启动器在本次会话 cwd 生成 `huayuan-dashboard-launch.html`，该 HTML 用 `location.replace()` 跳到驾驶舱；Agent 把该本地文件传给 `present_files`，让 WorkBuddy 打开 HTML 预览后再进入 localhost。
+- 预防：与 WorkBuddy 宿主工具交互时以实际处理器实现为准；`present_files.files` 只传本会话工作区内的绝对文件路径。
+
 ---
 
 ## 运行时错误日志（logs/errors.jsonl）使用说明
