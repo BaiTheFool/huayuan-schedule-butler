@@ -1123,7 +1123,7 @@ input[type="range"]::-moz-range-thumb {
   border: 1px solid var(--line);
   border-radius: 20px;
   overflow: hidden;
-  background: #eef0e4;
+  background: #fbf9f2;
   box-shadow: var(--shadow-md);
 }
 
@@ -1239,41 +1239,10 @@ input[type="range"]::-moz-range-thumb {
 
 .map-bg { fill: #f1f0e6; }
 
-.campus-ground {
-  fill: #e4e9d8;
-  stroke: #cdd4bd;
-  stroke-width: 2;
-}
-
-.campus-boundary {
-  fill: none;
-  stroke: rgba(120, 130, 100, 0.45);
-  stroke-width: 2;
-  stroke-dasharray: 7 7;
-}
-
-.road-casing { fill: none; stroke: rgba(120, 112, 92, 0.16); stroke-width: 15; stroke-linecap: round; stroke-linejoin: round; }
-.road { fill: none; stroke: #fbf8ef; stroke-width: 11; stroke-linecap: round; stroke-linejoin: round; }
-.road-center { fill: none; stroke: rgba(180, 170, 145, 0.55); stroke-width: 1; stroke-dasharray: 5 7; }
-.footpath { fill: none; stroke: rgba(130, 122, 101, 0.32); stroke-width: 2; stroke-dasharray: 3 4; }
-
-.outer-road { fill: none; stroke: #f7f3e7; stroke-width: 18; }
-.outer-road-edge { fill: none; stroke: rgba(120, 112, 92, 0.18); stroke-width: 21; }
-.outer-road-line { fill: none; stroke: rgba(180, 170, 145, 0.6); stroke-width: 1.2; stroke-dasharray: 9 9; }
-
-.building {
-  fill: #f7f4e9;
-  stroke: rgba(110, 100, 78, 0.3);
-  stroke-width: 1.2;
-  filter: url(#softShadow);
-}
-
-.building.accent { fill: #ece4d2; }
-.building.sport { fill: #e8ddd0; }
-.building.dorm { fill: #f2e9d8; }
-.building-label { font-size: 11px; font-weight: 700; fill: #6b6251; text-anchor: middle; letter-spacing: 0.04em; }
-.building-label.small { font-size: 9px; font-weight: 600; }
-.building-label.left { text-anchor: start; }
+/* 官方地图底图：轻微暖色蒙版 + 细边框，避免照片压过界面配色 */
+.map-photo { image-rendering: auto; }
+.map-tint { fill: #f8f4e9; opacity: 0.14; pointer-events: none; }
+.map-frame { fill: none; stroke: rgba(120, 112, 92, 0.22); stroke-width: 1.5; }
 
 .route-arrow {
   fill: var(--orange);
@@ -1283,42 +1252,18 @@ input[type="range"]::-moz-range-thumb {
 }
 
 .stop-badge .badge-count {
-  font-size: 8px;
+  font-size: 11px;
   font-weight: 700;
   fill: #8a451f;
   text-anchor: start;
   stroke: none;
 }
 
-.lake { fill: #bcd8d4; stroke: #9ec4c0; stroke-width: 1.4; }
-.lake-shine { fill: none; stroke: rgba(255, 255, 255, 0.5); stroke-width: 2; }
-
-.track-outer { fill: #d9c6ae; stroke: #c7b296; stroke-width: 1.5; }
-.track-inner { fill: #9fbb8c; stroke: #8aa677; stroke-width: 1; }
-.track-line { fill: none; stroke: rgba(255, 255, 255, 0.6); stroke-width: 1; }
-
-.tree { fill: #b7c9a4; opacity: 0.72; }
-.tree-dark { fill: #a4ba90; opacity: 0.55; }
-
-.map-road-label {
-  font-size: 9px;
-  font-weight: 600;
-  fill: rgba(110, 102, 82, 0.65);
-  letter-spacing: 0.16em;
-}
-
-.area-label {
-  font-size: 10px;
-  font-weight: 700;
-  fill: rgba(100, 110, 88, 0.45);
-  letter-spacing: 0.22em;
-}
-
 .poi { cursor: pointer; }
 .poi .poi-halo { fill: rgba(255, 253, 247, 0.92); stroke: var(--c, var(--green)); stroke-width: 2; }
-.poi .poi-icon { font-size: 13px; text-anchor: middle; dominant-baseline: central; }
+.poi .poi-icon { font-size: 17px; text-anchor: middle; dominant-baseline: central; }
 .poi .poi-label {
-  font-size: 9px;
+  font-size: 12px;
   font-weight: 600;
   fill: #5f5a4d;
   text-anchor: middle;
@@ -1346,16 +1291,16 @@ input[type="range"]::-moz-range-thumb {
   100% { transform: scale(1.85); opacity: 0; }
 }
 
-.route-halo { fill: none; stroke: rgba(255, 253, 247, 0.92); stroke-width: 10; stroke-linecap: round; stroke-linejoin: round; }
-.route-line { fill: none; stroke: var(--orange); stroke-width: 4.6; stroke-linecap: round; stroke-linejoin: round; stroke-dasharray: 1 0; }
-.route-dash { fill: none; stroke: rgba(255, 253, 247, 0.85); stroke-width: 1.6; stroke-linecap: round; stroke-dasharray: 2 9; animation: route-flow 2.4s linear infinite; }
+.route-halo { fill: none; stroke: rgba(255, 253, 247, 0.92); stroke-width: 13; stroke-linecap: round; stroke-linejoin: round; }
+.route-line { fill: none; stroke: var(--orange); stroke-width: 6.2; stroke-linecap: round; stroke-linejoin: round; stroke-dasharray: 1 0; }
+.route-dash { fill: none; stroke: rgba(255, 253, 247, 0.85); stroke-width: 2.2; stroke-linecap: round; stroke-dasharray: 2 9; animation: route-flow 2.4s linear infinite; }
 
 @keyframes route-flow { to { stroke-dashoffset: -22; } }
 
 .stop-badge circle { fill: #fffdf7; stroke: var(--orange); stroke-width: 1.5; filter: url(#softShadow); }
-.stop-badge text { font-size: 9px; font-weight: 700; fill: #8a451f; text-anchor: middle; dominant-baseline: central; }
+.stop-badge text { font-size: 12.5px; font-weight: 700; fill: #8a451f; text-anchor: middle; dominant-baseline: central; }
 
-.gps-dot { fill: #2b7fd4; stroke: #fffdf7; stroke-width: 2.5; }
+.gps-dot { fill: #2b7fd4; stroke: #fffdf7; stroke-width: 3; }
 .gps-pulse { fill: none; stroke: #2b7fd4; stroke-width: 1.5; opacity: 0.6; animation: gps-pulse 1.9s ease-out infinite; transform-box: fill-box; transform-origin: center; }
 
 @keyframes gps-pulse {
