@@ -5,6 +5,7 @@ const http = require('http');
 const os = require('os');
 const path = require('path');
 const { spawn } = require('child_process');
+const { createSnapshot } = require('../lib/snapshot');
 
 const argv = process.argv;
 const argValue = (name, fallback = null) => {
@@ -18,6 +19,7 @@ const timetableRefreshMode = argValue('--timetable-refresh-mode', 'auto');
 const nowPath = path.resolve(argValue('--now', ''));
 const activityPath = path.resolve(argValue('--activities', path.join(path.dirname(nowPath), 'activity-feed.json')));
 const publicDir = path.resolve(__dirname, '..', 'public');
+const snap = createSnapshot({ nowPath, activityPath });
 const routeSkillDir = path.resolve(__dirname, '..', '..', 'huayuan-campus-route');
 const routePublicDir = path.join(routeSkillDir, 'public');
 const routeDataDir = path.join(routeSkillDir, 'data');
@@ -464,10 +466,10 @@ const server = http.createServer((req, res) => {
         now_path: nowPath,
         updated_at: fs.statSync(nowPath).mtime.toISOString(),
         now,
-        todo: todoSnapshot(now),
-        sync: syncInfo(nowPath),
-        activities: readActivities(),
-        prompts: promptsFor(now),
+        todo: snap.todoSnapshot(now),
+        sync: snap.syncInfo(),
+        activities: snap.readActivities(),
+        prompts: snap.promptsFor(now),
       });
     } catch (error) {
       sendJson(res, 503, { ok: false, error: String(error.message || error) });

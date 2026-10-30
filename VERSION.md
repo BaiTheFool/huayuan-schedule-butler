@@ -1,4 +1,19 @@
-VERSION=0.11.0
+VERSION=0.14.0
+
+### 0.14.0 · 2026-10-30 · feat: serve the Android APK and guide first-time phone setup
+
+### 0.13.0 · 2026-10-30 · feat: LAN discovery (UDP 4327) for the Android workbench shell
+- 服务端新增局域网发现：UDP `4327` 监听，收到 `HUAYUAN_DISCOVER/1` 只回 `{service, port, version}`，不回令牌、不回配对码、不回任何数据，且只应答私有地址来源；端口可用 `--discovery-port` 改。
+- 启动器把插件版本（读 `VERSION.md` 首行）传给服务端，并新增 `MOBILE_REMOTE_DISCOVERY:udp://4327` 输出；`mobile-remote.json` 记录 `discovery_port`。
+- 交付侧新增 Android 壳 `android-app/`（不引第三方库的 WebView 壳）：开屏广播发现电脑、列出可连地址、手动地址兜底、记住上次地址、顶部「刷新 / 地址」、外链交给系统浏览器；页面仍是同一套只读 PWA。
+- 回归：`smoke.js` 32 → 33 项（新增广播发现用例，用独立发现端口避免与本机实例抢端口）；`check-mobile.js` 33 → 35 项（源码级发现与启动器输出断言）。
+
+### 0.12.0 · 2026-10-30 · feat: add mobile remote workbench (read-only PWA, pairing code, optional cloudflared tunnel)
+- 新增内置技能 `huayuan-mobile-remote`：手机浏览器直接打开「今日安排 / 全部待办 / 可参与事项 / 本周计划」的只读工作台；`launch-remote.js` 一条命令起服务，打印局域网地址与 6 位配对码，`--tunnel` 用本机 `cloudflared` 免账号快速隧道拿到公网 https 地址。
+- 新增共享只读快照层 `huayuan-live-dashboard/lib/snapshot.js`：网页驾驶舱与手机端共用同一份 `now/todo/sync/activities/prompts` 组装逻辑，端到端结论一致（`dashboard-server.js` 同步改为引用它，API 版本仍为 3）。
+- 手机端为可安装 PWA：`manifest.webmanifest` + 程序化生成的 192/512/180 PNG 图标、深色模式、下拉刷新、断网回退到 localStorage 缓存；底部四个 Tab + 设置页（复制刷新指令、解除配对）。
+- 安全：除 `/api/health` 外所有接口要求令牌（`timingSafeEqual`）；配对码错 8 次锁 5 分钟；静态资源只从 `public/` 白名单读取；统一 CSP / nosniff / frame 保护；服务端零写文件。
+- 新增回归：`skills/huayuan-mobile-remote/test/smoke.js`（32 项）、`golden-path/check-mobile.js`（33 项）。
 
 ### 0.11.0 · 2026-10-28 · feat: huayuan-score-advisor GPA/conduct calculators + official-manual KB (0.11.0)
 

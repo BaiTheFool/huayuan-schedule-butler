@@ -109,6 +109,27 @@
 - 验证：`gpa-calculator.js --self-check` PASS 19/19、`conduct-calculator.js --self-check` PASS 13/13、`golden-path\check-score.js` PASS 16/16；`node golden-path\check.js` 全量不受影响。
 - 预防：实现手册计分规则时先区分「独立计分表」与「映射表」；五级/两级制按手册附表直接折算，动态百分比表只用于 rankPercentile 输入。计分脚本与 `knowledge/` 常量表是双份事实源，改动必须两边同步并在自检断言中固化样例值。
 
+### #14 · 2026-10-30 · 手机远程工作台（0.12.0）
+- 现象：手机工作台首轮自测时，时间轴上的状态圆点被撑成 32×28 的色块并压住标题；配对页与主界面同时渲染；无头浏览器复测时旧 CSS/JS 仍在生效，误判「修复无效」。
+- 根因：① 圆点用了 `class="dot task"`，与待办卡片的 `.task { width:100%; padding:13px 14px }` 撞名，宽高被后者覆盖；② `.pair { display:flex }` 是作者样式，会盖掉浏览器对 `[hidden]` 的 `display:none`，所以两个视图同时可见；③ `styles.css` / `app.js` 走 `Cache-Control: max-age=60`，同一浏览器实例里连续截图拿到的是缓存版本。
+- 解决：① 圆点修饰类改为 `kind-rest` / `kind-task` / `kind-personal` / `kind-fixed`，待办卡片类改为 `task-card`，并在 CSS 里加 `[hidden] { display:none !important }`；② 无头预览脚本（本地 `.tmp-mobile/shot.js`，不入库）先 `Network.setCacheDisabled` 再导航；③ 手机端用 `text-wrap: balance` 与 `overflow-wrap: anywhere` 处理长标题与长路径。
+- 验证：`node skills\huayuan-mobile-remote\test\smoke.js` 32/32、`node golden-path\check-mobile.js` 33/33；390×844 无头截图五个 Tab + 配对页均无控制台报错、无横向滚动（`scrollWidth = 390`）。
+- 预防规则：新增页面级 class 前先 grep 是否已被其它组件占用（`.task`、`.dot`、`.block`、`.tag` 都是高撞名风险）；带 `display` 的容器必须显式处理 `[hidden]`；用浏览器缓存验证前端改动时，一律先禁用缓存。
+
+### #15 · 2026-10-30 · 校园网下 cloudflared 快速隧道被判「不可达」（0.12.0）
+- 现象：`launch-remote.js --tunnel` 拿到 `https://xxx.trycloudflare.com` 后，`fetch` 永远超时，被判定 `TUNNEL_UNREACHABLE` 并杀掉隧道；但同一域名在手机上其实能打开。
+- 根因：① 校园网 DNS 不解析 `*.trycloudflare.com`（`curl: (6) Could not resolve host`），而隧道边缘其实已连上（日志有 `Registered tunnel connection`）；② 隧道刚建时 DoH 有 10–30 秒传播延迟；③ Node 的 `fetch` 访问 `dns.alidns.com` 直接 `fetch failed`（同一 URL 用 curl 正常），`doh.pub` 还会返回 40 秒 NXDOMAIN 负缓存；④ Cloudflare 返回两个边缘 IP，只探测第一个会偶发失败。
+- 解决：`resolveHost()` 改用 **curl 查 DoH**（阿里 → 腾讯 → Cloudflare，`Answer` 可能是对象或数组），拿到 IP 后用 `curl --resolve` 绕过本机 DNS 验证；验证窗口放宽到 75 秒、逐个 IP 探测；DNS 始终查不到但隧道已注册时保留进程并输出 `MOBILE_REMOTE_PUBLIC_UNVERIFIED`，不再误杀。
+- 验证：`--tunnel` 第二次尝试即拿到 `MOBILE_REMOTE_PUBLIC`（`public_verified=true`），公网 `api/health`、`/api/pair`、`/api/dashboard` 全部 200；headless Edge 加载公网地址，设置页显示「公网隧道（https）」。
+- 预防规则：验证「公网域名」不要依赖本机 DNS（校园网/运营商污染很常见），DoH + `--resolve` 是唯一可控路径；隧道类探测必须给 DNS 传播留时间；进程存活比一次探测失败更重要（宁可标「未验证」也不要杀掉可用隧道）。
+
+### #16 · 2026-10-30 · Android 壳（0.13.0）：模拟器网络不可用、中文路径构建
+- 现象：APK 在 Android 11 模拟器里手动填 `10.0.2.2:4320` 报 `Failed to connect`；`adb shell ping 10.0.2.2` 直接 `Network is unreachable`；同一份代码在真机 Wi-Fi 下无此问题。
+- 根因：本机装了 awl / vgate / Tailscale 等多块虚拟网卡，模拟器 slirp NAT 没能建立默认路由（模拟器状态栏 Wi-Fi 图标带 `?`）；这不是 App 或服务端问题。另：AGP 对非 ASCII 工程路径敏感，直接在含中文的交付目录里构建容易踩 `android.overridePathCheck` 之外的新坑。
+- 解决：验证走 `adb reverse tcp:4320 tcp:4320`，让设备 `127.0.0.1:4320` 转发到宿主，完成「发现/手输地址 → 配对 → 页面渲染」全链路；APK 构建统一在 ASCII 临时目录（`C:\gcc-tmp\hywb`）执行，产物再拷回中文交付目录。
+- 验证：Android 11 模拟器里 APK 打开配对页、输入 6 位配对码、进入工作台；发现列表曾成功列出 `http://10.0.2.2:4345/`（一次），说明广播应答链路可用；服务端 UDP 探针 100% 回复。
+- 预防规则：**模拟器 ≠ 手机**，Android 网络问题先用 `adb reverse` 排除 NAT；真机验收再测 Wi-Fi 广播。Android 工程一律在 ASCII 路径构建；`usesCleartextTraffic` + `networkSecurityConfig` 必须同时给，否则 Android 9+ 直接拒绝局域网 http。
+
 ---
 
 ## 运行时错误日志（logs/errors.jsonl）使用说明
