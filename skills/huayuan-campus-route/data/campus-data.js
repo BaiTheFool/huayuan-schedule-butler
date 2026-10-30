@@ -4,7 +4,8 @@
  * 华南理工大学大学城校区 · 校园路线基础数据
  *
  * 坐标系：GCJ-02（高德/腾讯/360 地图同一套火星坐标）。
- * 页面不加载在线底图，只按真实经纬度画示意图；因此：
+ * 路线页面用官方校园地图做底图（public/assets/campus-map-official.jpg），
+ * 路线、序号与标记按经纬度经校准投影叠加；因此：
  *   - 标 coord_confidence=high 的点来自地图 POI 检索，可点击「真实地图」核对；
  *   - 标 medium/low 的点是按其与已知楼栋的相对位置估算，只用于示意，不用于导航。
  *
@@ -29,7 +30,7 @@
     coord_system: 'GCJ-02',
     center: { lat: 23.0486, lng: 113.4041 },
     bounds: { south: 23.0432, west: 113.3988, north: 23.0534, east: 113.4088 },
-    map_note: '校园步行示意图按真实 POI 经纬度绘制，用于安排行程与估算步行时间，不替代导航底图。',
+    map_note: '底图为学校官方校园地图，路线与标记按经纬度投影叠加；用于安排行程与估算步行时间，不替代导航。',
   };
 
   const WEEKDAYS = [1, 2, 3, 4, 5, 6, 7];
@@ -314,9 +315,9 @@
       short: '校医院',
       category: 'service',
       icon: '🏥',
-      lat: 23.0512,
-      lng: 113.4038,
-      coord_confidence: 'medium',
+      lat: 23.052854,
+      lng: 113.403292,
+      coord_confidence: 'high',
       coord_source: '第二饭堂侧边，按二饭位置估算',
       hours: [
         {
@@ -371,7 +372,7 @@
     { id: 't1', name: 'T1 礼堂', short: 'T1', aliases: ['礼堂', '学术大讲堂'], group: '公共设施', lat: 23.0494009, lng: 113.4014257 },
     { id: 'computer-center', name: '计算中心', short: '计算中心', aliases: ['机房', '计算中心楼'], group: '实验楼', lat: 23.0492722, lng: 113.4022813 },
     { id: 'physics-center', name: '大学物理实验中心', short: '物理实验中心', aliases: ['物理实验', '实验中心'], group: '实验楼', lat: 23.0488810, lng: 113.4028972 },
-    { id: 'swimming', name: '游泳馆', short: '游泳馆', aliases: ['游泳池'], group: '运动场馆', lat: 23.0520883, lng: 113.3993430 },
+    { id: 'swimming', name: '游泳馆', short: '游泳馆', aliases: ['游泳池'], group: '运动场馆', lat: 23.049823, lng: 113.404581 },
     { id: 'music-hall', name: '音乐厅', short: '音乐厅', aliases: ['学术报告厅'], group: '公共设施', lat: 23.0487072, lng: 113.3995187 },
     ...['C2', 'C3', 'C4', 'C5', 'C6', 'C7', 'C8', 'C9', 'C10', 'C12', 'C13', 'C14', 'C15', 'C16', 'C17'].map((code) => ({
       id: code.toLowerCase(),
@@ -432,13 +433,13 @@
       coord_confidence: 'low',
     })),
     { id: 'numeric-dorms', name: '数字编号宿舍（1–200栋）', short: '数字宿舍', aliases: ['1栋', '100栋', '200栋', '生活区数字楼'], group: '宿舍', lat: 23.0491, lng: 113.4008, coord: 'gcj02', source: '校园地图资料汇编（生活区）', coord_confidence: 'low' },
-    { id: 'academic-hall', name: '学术大讲堂', short: '学术大讲堂', aliases: ['大讲堂'], group: '公共设施', lat: 23.04725, lng: 113.40470, coord: 'gcj02', source: '官方校园导览图', coord_confidence: 'medium' },
+    { id: 'academic-hall', name: '学术大讲堂', short: '学术大讲堂', aliases: ['大讲堂'], group: '公共设施', lat: 23.04725, lng: 113.40470, coord: 'gcj02', source: '官方校园导览图', coord_confidence: 'high' },
     { id: 'international-center', name: '国际学术中心', short: '国际学术中心', aliases: ['国际中心'], group: '公共设施', lat: 23.05225, lng: 113.40350, coord: 'gcj02', source: '官方校园导览图', coord_confidence: 'low' },
     { id: 'wensu-pavilion', name: '文溯阁', short: '文溯阁', aliases: ['自习空间', '学生活动空间'], group: '公共设施', lat: 23.04715, lng: 113.40495, coord: 'gcj02', source: '校园地图资料汇编', coord_confidence: 'low' },
     { id: 'wenyuan-pavilion', name: '文渊阁', short: '文渊阁', aliases: ['自习空间', '学生活动空间'], group: '公共设施', lat: 23.04705, lng: 113.40515, coord: 'gcj02', source: '校园地图资料汇编', coord_confidence: 'low' },
     { id: 'moon-lake', name: '月湖', short: '月湖', aliases: ['湖心岛', '景观水系'], group: '公共设施', lat: 23.0490, lng: 113.4070, coord: 'gcj02', source: '校园地图资料汇编', coord_confidence: 'low' },
     { id: 'qin-lake', name: '沁湖 / 琴湖', short: '琴湖', aliases: ['沁湖', '韵湖', '湖心岛'], group: '公共设施', lat: 23.0464, lng: 113.4064, coord: 'gcj02', source: '校园地图资料汇编', coord_confidence: 'low' },
-    { id: 'south-field', name: '南操场', short: '南操场', aliases: ['运动场', '南区田径场'], group: '运动场馆', lat: 23.04485, lng: 113.4037, coord: 'gcj02', source: '校园地图资料汇编', coord_confidence: 'low' },
+    { id: 'south-field', name: '南操场', short: '南操场', aliases: ['运动场', '南区田径场'], group: '运动场馆', lat: 23.043859, lng: 113.406123, coord: 'gcj02', source: '官方校园地图标号点校准（2026-11）', coord_confidence: 'medium' },
   ];
 
   const EXTRA_LOCATION_ALIAS_OVERRIDES = {
@@ -475,6 +476,99 @@
     a5: ['A5栋', '公共教学楼A5'],
   };
 
+  /**
+   * 官图校准坐标（2026-11）
+   *
+   * 依据《华南理工大学大学城校区校园地图》：先在官图上检出 A1–A5、B1–B13、C1–C17、
+   * D1–D5、E1–E2 共 41 个楼栋标号点的像素中心，再用其中与旧数据一致（残差 < 30 px）的
+   * 27 个点做稳健仿射拟合，得到「经纬度 ↔ 图片像素」的投影，再据此换算出下列坐标。
+   *
+   * 修正内容：旧 B 区整体偏西约 500 m、E 区偏西南约 600 m，C 区与图书馆西北偏 50–150 m；
+   * 门禁、热水、开放时间等非几何信息不受影响。改坐标后步行距离随之变化，但排程规则与
+   * 校验（不重叠、不超时、不影响固定事项）不变。
+   *
+   * 每项为 [lat, lng, coord_confidence]。
+   */
+  const OFFICIAL_COORDS = {
+    // 教学楼 A 区（图上标号点）
+    a1: [23.048179, 113.406050, 'high'],
+    a2: [23.048987, 113.405918, 'high'],
+    a3: [23.049809, 113.405726, 'high'],
+    a4: [23.050685, 113.406174, 'high'],
+    a5: [23.050850, 113.406752, 'high'],
+    a6: [23.051016, 113.407331, 'low'], // 官图未标 A6，按 A4→A5 的步长外推
+    // 学院楼 B 区
+    b1: [23.046077, 113.411052, 'high'],
+    b2: [23.043983, 113.410000, 'high'],
+    b3: [23.046563, 113.410011, 'high'],
+    b4: [23.044318, 113.408943, 'high'],
+    b5: [23.046914, 113.409218, 'high'],
+    b6: [23.044659, 113.408166, 'high'],
+    b7: [23.047269, 113.408430, 'high'],
+    b8: [23.045028, 113.407368, 'high'],
+    b9: [23.048382, 113.407872, 'high'],
+    b10: [23.049502, 113.407743, 'high'],
+    b11: [23.050680, 113.408058, 'high'],
+    b12: [23.042413, 113.408796, 'high'],
+    // 生活区 C 区
+    c1: [23.047147, 113.402191, 'high'],
+    c2: [23.047504, 113.401118, 'high'],
+    c3: [23.047764, 113.401996, 'high'],
+    c4: [23.048243, 113.400499, 'high'],
+    c5: [23.048314, 113.401509, 'high'],
+    c6: [23.049156, 113.401363, 'high'],
+    c7: [23.049069, 113.400068, 'high'],
+    c8: [23.049755, 113.400733, 'high'],
+    c9: [23.050355, 113.400741, 'high'],
+    c10: [23.051107, 113.401147, 'high'],
+    c11: [23.051049, 113.399939, 'high'],
+    c12: [23.051926, 113.399352, 'high'],
+    c13: [23.052488, 113.400190, 'high'],
+    c14: [23.052890, 113.401166, 'high'],
+    c15: [23.053273, 113.402211, 'high'],
+    c16: [23.052552, 113.402166, 'high'],
+    c17: [23.051857, 113.401376, 'high'],
+    // 生活区 D 区
+    d1: [23.046757, 113.402656, 'high'],
+    d2: [23.047293, 113.402780, 'high'],
+    d3: [23.047832, 113.402900, 'high'],
+    d4: [23.048139, 113.402531, 'high'],
+    d5: [23.048429, 113.402202, 'high'],
+    // 生活区 E 区（2025 年新宿舍，官图右上）
+    e1: [23.053931, 113.407636, 'high'],
+    e2: [23.054282, 113.408650, 'high'],
+    e3: [23.054298, 113.409612, 'low'], // 标号点检出失败，按 E2 步长外推
+    // 公共设施
+    library: [23.047046, 113.406195, 'high'],
+    cafe: [23.046955, 113.406334, 'medium'],
+    canteen1: [23.049001, 113.402690, 'high'],
+    canteen2: [23.051812, 113.403052, 'high'],
+    gym: [23.048859, 113.404506, 'high'],
+    field: [23.045687, 113.404679, 'high'],
+    'academic-hall': [23.047323, 113.407634, 'high'],
+    'music-hall': [23.046496, 113.405654, 'high'],
+    eastgate: [23.047928, 113.408993, 'high'],
+    lake: [23.051353, 113.407925, 'medium'],
+    'qin-lake': [23.051353, 113.407925, 'medium'],
+    'moon-lake': [23.045260, 113.406658, 'medium'],
+    c11study: [23.051049, 113.399939, 'high'],
+  };
+
+  function applyOfficialCoords(list) {
+    for (const item of list) {
+      const coord = OFFICIAL_COORDS[item.id];
+      if (!coord) continue;
+      item.lat = coord[0];
+      item.lng = coord[1];
+      item.coord = 'gcj02';
+      item.coord_confidence = coord[2] || 'high';
+      item.coord_source = '官方校园地图标号点校准（2026-11）';
+    }
+  }
+
+  applyOfficialCoords(POIS);
+  applyOfficialCoords(EXTRA_LOCATION_RECORDS);
+
   const LOCATIONS = [
     ...POIS.map((poi) => ({
       id: poi.id,
@@ -493,20 +587,24 @@
 
   /** 步行网络：POI 与路口节点。边为双向，长度按球面距离 × 绕行系数。 */
   const WALK_NODES = [
-    // 路口 / 广场
-    { id: 'j_c1_gate', name: 'C1 东侧路口', lat: 23.04735, lng: 113.4021, kind: 'junction' },
-    { id: 'j_canteen1', name: '一饭路口', lat: 23.04795, lng: 113.4032, kind: 'junction' },
-    { id: 'j_plaza', name: '图书馆北广场', lat: 23.04755, lng: 113.40455, kind: 'junction' },
-    { id: 'j_a1', name: 'A1 西侧', lat: 23.04785, lng: 113.4051, kind: 'junction' },
-    { id: 'j_a3', name: 'A3 西侧', lat: 23.049, lng: 113.4051, kind: 'junction' },
-    { id: 'j_a4', name: 'A4 西侧', lat: 23.0502, lng: 113.4051, kind: 'junction' },
-    { id: 'j_a5', name: 'A5 西侧', lat: 23.0511, lng: 113.4051, kind: 'junction' },
-    { id: 'j_canteen2', name: '二饭路口', lat: 23.05085, lng: 113.4042, kind: 'junction' },
-    { id: 'j_c11', name: 'C11 东侧路口', lat: 23.05055, lng: 113.4011, kind: 'junction' },
-    { id: 'j_field', name: '田径场北入口', lat: 23.0457, lng: 113.40325, kind: 'junction' },
-    { id: 'j_library', name: '图书馆西侧', lat: 23.04675, lng: 113.40455, kind: 'junction' },
-    { id: 'j_east', name: '东侧环路', lat: 23.0482, lng: 113.4065, kind: 'junction' },
-    { id: 'j_ne', name: '东北路口', lat: 23.0509, lng: 113.40645, kind: 'junction' },
+    // 路口 / 广场（坐标随楼栋按官图校准后同步重算，偏移量约为楼栋外 40–50 m 的路侧）
+    { id: 'j_c1_gate', name: 'C1 东侧路口', lat: 23.047261, lng: 113.402563, kind: 'junction' },
+    { id: 'j_canteen1', name: '一饭路口', lat: 23.048861, lng: 113.402984, kind: 'junction' },
+    { id: 'j_plaza', name: '图书馆北广场', lat: 23.047460, lng: 113.406244, kind: 'junction' },
+    { id: 'j_a1', name: 'A1 西侧', lat: 23.048158, lng: 113.405605, kind: 'junction' },
+    { id: 'j_a3', name: 'A3 西侧', lat: 23.049784, lng: 113.405282, kind: 'junction' },
+    { id: 'j_a4', name: 'A4 西侧', lat: 23.050661, lng: 113.405730, kind: 'junction' },
+    { id: 'j_a5', name: 'A5 西侧', lat: 23.050821, lng: 113.406307, kind: 'junction' },
+    { id: 'j_canteen2', name: '二饭路口', lat: 23.051527, lng: 113.403203, kind: 'junction' },
+    { id: 'j_c11', name: 'C11 东侧路口', lat: 23.051073, lng: 113.400363, kind: 'junction' },
+    { id: 'j_field', name: '田径场北入口', lat: 23.046181, lng: 113.404591, kind: 'junction' },
+    { id: 'j_library', name: '图书馆西侧', lat: 23.046973, lng: 113.405782, kind: 'junction' },
+    { id: 'j_east', name: '东侧环路', lat: 23.048113, lng: 113.408277, kind: 'junction' },
+    { id: 'j_ne', name: '东北路口', lat: 23.048934, lng: 113.408422, kind: 'junction' },
+    // 文樵路主干（生活区与教学区之间的南北向道路），让东西向路线贴着路走
+    { id: 'j_wq_n', name: '文樵路北口', lat: 23.051531, lng: 113.403281, kind: 'junction' },
+    { id: 'j_wq_m', name: '文樵路中段', lat: 23.049304, lng: 113.403722, kind: 'junction' },
+    { id: 'j_wq_s', name: '文樵路南口', lat: 23.047176, lng: 113.404168, kind: 'junction' },
   ];
 
   const WALK_EDGES = [
@@ -546,6 +644,13 @@
     ['j_east', 'j_ne'],
     ['j_east', 'lake'],
     ['j_east', 'eastgate'],
+    ['j_canteen2', 'j_wq_n'],
+    ['j_wq_n', 'j_wq_m'],
+    ['j_wq_m', 'j_canteen1'],
+    ['j_wq_m', 'j_wq_s'],
+    ['j_wq_s', 'j_c1_gate'],
+    ['j_wq_s', 'j_field'],
+    ['j_wq_s', 'j_library'],
   ];
 
   const PRESETS = [

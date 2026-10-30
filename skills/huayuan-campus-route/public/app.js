@@ -113,26 +113,40 @@
 
   const $ = (id) => document.getElementById(id);
   const svg = $('map');
-  const view = { x: 0, y: 0, w: 1000, h: 1000 };
 
   // ---------- 坐标 ----------
 
+  // 底图是官方校园地图（1280×1468），坐标 = 经纬度经校准投影后的图片像素，
+  // 再等比缩到 1000 宽的画布，避免整页尺寸变化。
+  const MAP = window.HuayuanCampusMap || null;
   const W = 1000;
-  const H = 1000;
-  const PAD = 48;
-  const B = CAMPUS.bounds;
+  const H = MAP ? Math.round((W * MAP.IMAGE.height) / MAP.IMAGE.width) : 1000;
+  const IMG_SCALE = MAP ? W / MAP.IMAGE.width : 1;
 
-  function x(lng) {
-    return PAD + ((lng - B.west) / (B.east - B.west)) * (W - 2 * PAD);
-  }
-
-  function y(lat) {
-    return PAD + ((B.north - lat) / (B.north - B.south)) * (H - 2 * PAD);
+  /** 经纬度 → 画布坐标 */
+  function project(lat, lng) {
+    if (!MAP) return [0, 0];
+    const p = MAP.toImagePixel(lat, lng);
+    return [p.x * IMG_SCALE, p.y * IMG_SCALE];
   }
 
   function xy(poi) {
-    return [x(poi.lng), y(poi.lat)];
+    return project(poi.lat, poi.lng);
   }
+
+  // 初始视野收到校区范围：默认视野比整张图小一圈，四周留白不会把地图压小
+  const HOME = (() => {
+    const pts = LOCATIONS.map((poi) => project(poi.lat, poi.lng)).filter(([px, py]) => Number.isFinite(px) && Number.isFinite(py));
+    if (!pts.length) return { x: 0, y: 0, w: W, h: H };
+    const pad = 26;
+    const x0 = Math.max(0, Math.min(...pts.map((p) => p[0])) - pad);
+    const y0 = Math.max(0, Math.min(...pts.map((p) => p[1])) - pad);
+    const x1 = Math.min(W, Math.max(...pts.map((p) => p[0])) + pad);
+    const y1 = Math.min(H, Math.max(...pts.map((p) => p[1])) + pad);
+    return { x: x0, y: y0, w: x1 - x0, h: y1 - y0 };
+  })();
+
+  const view = { ...HOME };
 
   function esc(text) {
     return String(text == null ? '' : text)
@@ -161,150 +175,37 @@
       <filter id="softShadow" x="-30%" y="-30%" width="160%" height="160%">
         <feDropShadow dx="0" dy="2" stdDeviation="2.4" flood-color="#5b503a" flood-opacity="0.16"/>
       </filter>
+      <clipPath id="mapClip"><rect x="0" y="0" width="${W}" height="${H}"/></clipPath>
     </defs>`);
 
-    parts.push(`<rect class="map-bg" x="0" y="0" width="1000" height="1000"/>`);
+    parts.push(`<rect class="map-bg" x="0" y="0" width="${W}" height="${H}"/>`);
 
-    // 校园边界
-    const boundary = [
-      [23.0437, 113.3995], [23.0436, 113.4058], [23.0446, 113.4073],
-      [23.0469, 113.4082], [23.0514, 113.4082], [23.0531, 113.4066],
-      [23.0532, 113.4005], [23.0518, 113.3992], [23.0491, 113.3988],
-      [23.0461, 113.3989],
-    ];
-    const boundaryPoints = boundary.map(([lat, lng]) => `${x(lng).toFixed(1)},${y(lat).toFixed(1)}`).join(' ');
-    parts.push(`<polygon class="campus-ground" points="${boundaryPoints}"/>`);
-    parts.push(`<polygon class="campus-boundary" points="${boundaryPoints}"/>`);
-
-    // 外围道路
-    const eastX = x(113.40845);
-    const northY = y(23.05335);
-    parts.push(`<path class="outer-road-edge" d="M ${eastX} ${y(23.0433)} L ${eastX} ${y(23.0535)}"/>`);
-    parts.push(`<path class="outer-road" d="M ${eastX} ${y(23.0433)} L ${eastX} ${y(23.0535)}"/>`);
-    parts.push(`<path class="outer-road-line" d="M ${eastX} ${y(23.0433)} L ${eastX} ${y(23.0535)}"/>`);
-    parts.push(`<path class="outer-road-edge" d="M ${x(113.3990)} ${northY} L ${x(113.4088)} ${northY}"/>`);
-    parts.push(`<path class="outer-road" d="M ${x(113.3990)} ${northY} L ${x(113.4088)} ${northY}"/>`);
-    parts.push(`<path class="outer-road-line" d="M ${x(113.3990)} ${northY} L ${x(113.4088)} ${northY}"/>`);
-
-    // 绿色地块
-    parts.push(`<ellipse cx="${x(113.4022)}" cy="${y(23.0518)}" rx="86" ry="56" fill="#dfe6d1" opacity=".75"/>`);
-    parts.push(`<ellipse cx="${x(113.4068)}" cy="${y(23.0458)}" rx="72" ry="50" fill="#e1e8d3" opacity=".7"/>`);
-
-    // 琴湖
-    const lx = x(113.4071);
-    const ly = y(23.0478);
-    const lakePath = `M ${lx - 66} ${ly - 6}
-      C ${lx - 58} ${ly - 48}, ${lx + 18} ${ly - 60}, ${lx + 56} ${ly - 26}
-      C ${lx + 82} ${ly + 2}, ${lx + 44} ${ly + 44}, ${lx + 2} ${ly + 40}
-      C ${lx - 40} ${ly + 36}, ${lx - 80} ${ly + 18}, ${lx - 66} ${ly - 6} Z`;
-    parts.push(`<path class="lake" d="${lakePath}"/>`);
-    parts.push(`<path class="lake-shine" d="M ${lx - 38} ${ly - 22} C ${lx - 10} ${ly - 36}, ${lx + 22} ${ly - 32}, ${lx + 40} ${ly - 20}"/>`);
-    parts.push(`<text class="area-label" x="${lx}" y="${ly + 34}" text-anchor="middle">琴 湖</text>`);
-
-    // 田径场
-    const fx = x(113.40334);
-    const fy = y(23.04506);
-    parts.push(`<g transform="rotate(-8 ${fx} ${fy})">
-      <ellipse class="track-outer" cx="${fx}" cy="${fy}" rx="76" ry="46"/>
-      <ellipse class="track-inner" cx="${fx}" cy="${fy}" rx="54" ry="27"/>
-      <ellipse class="track-line" cx="${fx}" cy="${fy}" rx="66" ry="38"/>
-      <ellipse class="track-line" cx="${fx}" cy="${fy}" rx="60" ry="34"/>
+    // 官方校园地图底图 + 统一暖色蒙版：让路线和标记在照片上依然清楚
+    parts.push(`<g clip-path="url(#mapClip)">
+      <image class="map-photo" href="${esc(MAP ? MAP.IMAGE.src : '')}" x="0" y="0" width="${W}" height="${H}" preserveAspectRatio="xMidYMid meet"/>
+      <rect class="map-tint" x="0" y="0" width="${W}" height="${H}"/>
     </g>`);
 
-    // 道路：路口之间的主路 + 楼栋支路
-    for (const [a, b] of WALK_EDGES) {
-      const na = NODE.get(a);
-      const nb = NODE.get(b);
-      if (!na || !nb) continue;
-      const bothJunction = a.startsWith('j_') && b.startsWith('j_');
-      const d = `M ${x(na.lng).toFixed(1)} ${y(na.lat).toFixed(1)} L ${x(nb.lng).toFixed(1)} ${y(nb.lat).toFixed(1)}`;
-      if (bothJunction) {
-        parts.push(`<path class="road-casing" d="${d}"/>`);
-        parts.push(`<path class="road" d="${d}"/>`);
-        parts.push(`<path class="road-center" d="${d}"/>`);
-      } else {
-        parts.push(`<path class="footpath" d="${d}"/>`);
-      }
-    }
-
-    // 树
-    let seed = 19;
-    const rnd = () => {
-      seed = (seed * 9301 + 49297) % 233280;
-      return seed / 233280;
-    };
-    const trees = [];
-    for (let i = 0; i < 90; i += 1) {
-      const lat = B.south + 0.0012 + rnd() * (B.north - B.south - 0.0024);
-      const lng = B.west + 0.0008 + rnd() * (B.east - B.west - 0.0016);
-      const px = x(lng);
-      const py = y(lat);
-      const tooClose = BUILDINGS.some((bdef) => {
-        const p = POI.get(bdef.id);
-        if (!p) return false;
-        const [bx, by] = xy(p);
-        return Math.abs(bx - px) < bdef.w * 0.72 + 12 && Math.abs(by - py) < bdef.h * 0.72 + 12;
-      });
-      if (tooClose) continue;
-      if (Math.hypot(px - lx, py - ly) < 95) continue;
-      if (Math.hypot(px - fx, py - fy) < 95) continue;
-      trees.push({ px, py, r: 4 + rnd() * 4, dark: rnd() > 0.55 });
-    }
-    for (const t of trees) {
-      parts.push(`<circle class="${t.dark ? 'tree-dark' : 'tree'}" cx="${t.px.toFixed(1)}" cy="${t.py.toFixed(1)}" r="${t.r.toFixed(1)}"/>`);
-    }
-
-    // 建筑
-    const buildingLabel = {
-      library: '图书馆',
-      canteen1: '一饭',
-      canteen2: '二饭',
-      gym: '体育馆',
-      c1: 'C1',
-      c11: 'C11',
-    };
-    for (const def of BUILDINGS) {
-      const p = POI.get(def.id);
-      if (!p) continue;
-      const [bx, by] = xy(p);
-      const accent = def.id.startsWith('a') ? '' : def.id === 'gym' ? ' sport' : def.id.startsWith('c') ? ' dorm' : '';
-      parts.push(`<rect class="building${accent}" data-poi="${def.id}" x="${(bx - def.w / 2).toFixed(1)}" y="${(by - def.h / 2).toFixed(1)}" width="${def.w}" height="${def.h}" rx="3.5"/>`);
-      if (def.id.startsWith('a')) {
-        parts.push(`<text class="building-label" x="${bx}" y="${by + 3}" pointer-events="none">${def.id.toUpperCase()}</text>`);
-      } else if (buildingLabel[def.id]) {
-        if (def.id === 'library') {
-          parts.push(`<text class="building-label small left" x="${(bx - def.w / 2 + 5).toFixed(1)}" y="${by + 3}" pointer-events="none">${buildingLabel[def.id]}</text>`);
-        } else {
-          parts.push(`<text class="building-label small" x="${bx}" y="${(by + def.h / 2 - 5).toFixed(1)}" pointer-events="none">${buildingLabel[def.id]}</text>`);
-        }
-      }
-    }
-
-    // 道路文字
-    parts.push(`<text class="map-road-label" x="${eastX + 11}" y="${y(23.049)}" transform="rotate(90 ${eastX + 11} ${y(23.049)})">外环东路</text>`);
-    parts.push(`<text class="map-road-label" x="${x(113.402)}" y="${northY - 10}">中环东路</text>`);
-
-    // 路线层放在建筑与标记之下，避免压住地点图标
+    // 路线层在标记之下，标记不压路线终点
     parts.push(`<g id="routeLayer"></g>`);
 
-    // POI 标记
-    const noLabel = new Set(['library', 'canteen1', 'canteen2', 'gym', 'c1', 'c11', 'field', 'lake', 'cafe', 'hospital']);
-    for (const p of POIS) {
-      if (p.category === 'class' || p.id === 'c11study' || p.id === 'cafe') continue;
+    // 地标标记：楼栋编号图面已有，只叠常用设施，避免和图上中文重名
+    const pinIds = (MAP && MAP.PINS) || [];
+    const pinLabels = (MAP && MAP.LABELS) || {};
+    const pins = [];
+    for (const id of pinIds) {
+      const p = POI.get(id);
+      if (!p) continue;
       const [px, py] = xy(p);
-      const showLabel = !noLabel.has(p.id);
-      const labelDy = p.category === 'gate' ? -14 : 20;
-      const mx = p.id === 'cafe' ? px + 17 : px;
-      const my = p.id === 'cafe' ? py + 9 : py;
-      parts.push(`<g class="poi" data-poi="${p.id}" style="--c:${colorOf(p.category)}" transform="translate(${mx.toFixed(1)} ${my.toFixed(1)})">
-        <circle class="poi-halo-ring" r="11"/>
-        <circle class="poi-halo" r="9.5"/>
+      const label = pinLabels[id] || '';
+      pins.push(`<g class="poi" data-poi="${p.id}" style="--c:${colorOf(p.category)}" transform="translate(${px.toFixed(1)} ${py.toFixed(1)})">
+        <circle class="poi-halo-ring" r="15"/>
+        <circle class="poi-halo" r="13.5"/>
         <text class="poi-icon" y="0.6">${p.icon}</text>
-        ${showLabel ? `<text class="poi-label" y="${labelDy}">${esc(p.short)}</text>` : ''}
+        ${label ? `<text class="poi-label" y="27">${esc(label)}</text>` : ''}
       </g>`);
     }
-
-    // 动态层
+    parts.push(`<g id="poiLayer">${pins.join('')}</g>`);
     parts.push(`<g id="badgeLayer"></g>`);
     parts.push(`<g id="gpsLayer"></g>`);
 
@@ -524,15 +425,52 @@
 
   // ---------- 渲染：路线 ----------
 
-  function pathFromPoints(points) {
-    return points.map((p, i) => `${i === 0 ? 'M' : 'L'} ${x(p.lng).toFixed(1)} ${y(p.lat).toFixed(1)}`).join(' ');
+  function pathFromSegments(segments) {
+    return segments
+      .map((seg) =>
+        seg
+          .map((p, i) => {
+            const [px, py] = project(p.lat, p.lng);
+            return `${i === 0 ? 'M' : 'L'} ${px.toFixed(1)} ${py.toFixed(1)}`;
+          })
+          .join(' ')
+      )
+      .join(' ');
+  }
+
+  /**
+   * 路线折线：优先用每段步行 leg 的真实点位（沿路网），
+   * 没有 leg（同一地点连续停留或数据缺失）时才用停留点直连。
+   */
+  function routeSegments(plan) {
+    const segments = [];
+    let last = null;
+    for (const block of plan.blocks) {
+      const leg = block.type === 'walk' && block.leg;
+      const pts = leg && Array.isArray(block.leg.points) ? block.leg.points : null;
+      if (!pts || pts.length < 2) continue;
+      const first = pts[0];
+      const sameAsLast =
+        last && Math.abs(last.lat - first.lat) < 1e-7 && Math.abs(last.lng - first.lng) < 1e-7;
+      if (sameAsLast && segments.length) {
+        for (const p of pts.slice(1)) segments[segments.length - 1].push(p);
+      } else {
+        segments.push(pts.slice());
+      }
+      last = pts[pts.length - 1];
+    }
+    if (!segments.length) {
+      const fallback = (plan.route && plan.route.points) || [];
+      if (fallback.length > 1) segments.push(fallback);
+    }
+    return segments;
   }
 
   function renderRoute(plan) {
     const routeLayer = $('routeLayer');
     const badgeLayer = $('badgeLayer');
     const gpsLayer = $('gpsLayer');
-    const points = (plan.route && plan.route.points) || [];
+    const segments = routeSegments(plan);
     const arrows = [];
     for (const block of plan.blocks) {
       if (block.type !== 'walk' || !block.leg || !block.leg.points || block.leg.points.length < 2) continue;
@@ -541,15 +479,13 @@
       const a = pts[mid - 1];
       const b = pts[mid];
       if (!a || !b) continue;
-      const ax = x(a.lng);
-      const ay = y(a.lat);
-      const bx = x(b.lng);
-      const by = y(b.lat);
+      const [ax, ay] = project(a.lat, a.lng);
+      const [bx, by] = project(b.lat, b.lng);
       const angle = (Math.atan2(by - ay, bx - ax) * 180) / Math.PI;
       arrows.push(`<path class="route-arrow" d="M -3.6 -3.2 L 4.2 0 L -3.6 3.2 Z" transform="translate(${((ax + bx) / 2).toFixed(1)} ${((ay + by) / 2).toFixed(1)}) rotate(${angle.toFixed(1)})"/>`);
     }
-    if (points.length > 1) {
-      const d = pathFromPoints(points);
+    if (segments.length) {
+      const d = pathFromSegments(segments);
       routeLayer.innerHTML = `<path class="route-halo" d="${d}"/><path class="route-line" d="${d}"/><path class="route-dash" d="${d}"/>${arrows.join('')}`;
     } else {
       routeLayer.innerHTML = '';
@@ -563,37 +499,36 @@
       grouped.get(p.id).count += 1;
     });
     const badgeOffset = {
-      library: [-12, -31],
-      cafe: [20, 4],
-      canteen1: [-16, -26],
-      canteen2: [14, -27],
-      c11: [0, -27],
-      c1: [0, -25],
-      field: [0, -12],
-      gym: [0, -25],
-      a1: [0, -33],
-      a2: [0, -33],
-      a3: [0, -33],
-      a4: [0, -33],
-      a5: [0, -33],
+      library: [-20, -46],
+      cafe: [28, 6],
+      canteen1: [-24, -40],
+      canteen2: [20, -42],
+      c11: [0, -40],
+      c1: [0, -38],
+      field: [0, -20],
+      gym: [0, -40],
+      a1: [0, -48],
+      a2: [0, -48],
+      a3: [0, -48],
+      a4: [0, -48],
+      a5: [0, -48],
     };
     const badges = [];
     for (const item of grouped.values()) {
       const [px, py] = xy(item.poi);
-      const offset = badgeOffset[item.poi.id] || [0, -22];
+      const offset = badgeOffset[item.poi.id] || [0, -34];
       badges.push(`<g class="stop-badge" transform="translate(${(px + offset[0]).toFixed(1)} ${(py + offset[1]).toFixed(1)})">
-        <circle r="7.2"/><text>${item.first}</text>
+        <circle r="11.5"/><text>${item.first}</text>
         ${item.count > 1 ? `<text class="badge-count" x="9" y="-7">×${item.count}</text>` : ''}
       </g>`);
     }
     badgeLayer.innerHTML = badges.join('');
 
     if (plan.gps && plan.gps.in_campus) {
-      const gx = x(plan.gps.lng);
-      const gy = y(plan.gps.lat);
+      const [gx, gy] = project(plan.gps.lat, plan.gps.lng);
       gpsLayer.innerHTML = `<g transform="translate(${gx.toFixed(1)} ${gy.toFixed(1)})">
-        <circle class="gps-pulse" r="13"/>
-        <circle class="gps-dot" r="6"/>
+        <circle class="gps-pulse" r="19"/>
+        <circle class="gps-dot" r="9"/>
       </g>`;
     } else {
       gpsLayer.innerHTML = '';
@@ -1565,10 +1500,7 @@
     $('zoomIn').addEventListener('click', () => zoom(0.78));
     $('zoomOut').addEventListener('click', () => zoom(1.28));
     $('zoomReset').addEventListener('click', () => {
-      view.x = 0;
-      view.y = 0;
-      view.w = W;
-      view.h = H;
+      Object.assign(view, HOME);
       applyView();
     });
 

@@ -408,6 +408,7 @@ function dashboardIndexHtml() {
 function resolveMountedFile(pathname) {
   const mounts = [
     ['/route-assets/', routePublicDir],
+    ['/assets/', path.join(routePublicDir, 'assets')],
     ['/route-data/', routeDataDir],
     ['/route-scripts/', routeScriptsDir],
   ];
