@@ -425,42 +425,241 @@
 
   // ---------- 渲染：路线 ----------
 
-  function pathFromSegments(segments) {
-    return segments
-      .map((seg) =>
-        seg
-          .map((p, i) => {
-            const [px, py] = project(p.lat, p.lng);
-            return `${i === 0 ? 'M' : 'L'} ${px.toFixed(1)} ${py.toFixed(1)}`;
-          })
-          .join(' ')
-      )
-      .join(' ');
+  // ---------- 沿路寻路（用官图生成的代价网格）----------
+
+  const WALKGRID = window.HuayuanWalkGrid || null;
+  let gridCache = null;
+
+  function walkCost(x, y) {
+    if (!WALKGRID) return 1;
+    if (x < 0 || y < 0 || x >= WALKGRID.WIDTH || y >= WALKGRID.HEIGHT) return 9;
+    if (!gridCache) gridCache = WALKGRID.decode();
+    return gridCache[y * WALKGRID.WIDTH + x];
+  }
+
+  /** 端点落在楼体/水面格上时，就近挪到可走的格子 */
+  function nearestWalkable(x, y, radius = 7) {
+    if (walkCost(x, y) < 9) return [x, y];
+    let best = null;
+    let bestD = Infinity;
+    for (let dy = -radius; dy <= radius; dy += 1) {
+      for (let dx = -radius; dx <= radius; dx += 1) {
+        if (walkCost(x + dx, y + dy) >= 9) continue;
+        const d = dx * dx + dy * dy;
+        if (d < bestD) {
+          bestD = d;
+          best = [x + dx, y + dy];
+        }
+      }
+    }
+    return best || [x, y];
+  }
+
+  function minHeap() {
+    const items = [];
+    return {
+      get size() {
+        return items.length;
+      },
+      push(pri, node) {
+        items.push([pri, node]);
+        let i = items.length - 1;
+        while (i > 0) {
+          const p = (i - 1) >> 1;
+          if (items[p][0] <= items[i][0]) break;
+          [items[p], items[i]] = [items[i], items[p]];
+          i = p;
+        }
+      },
+      pop() {
+        const top = items[0];
+        const last = items.pop();
+        if (items.length) {
+          items[0] = last;
+          let i = 0;
+          for (;;) {
+            const l = i * 2 + 1;
+            const r = l + 1;
+            let m = i;
+            if (l < items.length && items[l][0] < items[m][0]) m = l;
+            if (r < items.length && items[r][0] < items[m][0]) m = r;
+            if (m === i) break;
+            [items[m], items[i]] = [items[i], items[m]];
+            i = m;
+          }
+        }
+        return top;
+      },
+    };
   }
 
   /**
-   * 路线折线：优先用每段步行 leg 的真实点位（沿路网），
-   * 没有 leg（同一地点连续停留或数据缺失）时才用停留点直连。
+   * 在官图代价网格上找一条“贴路”的走法，返回画布坐标点列；
+   * 找不到（或没有网格数据）时返回 null，由调用方退化为直线。
    */
-  function routeSegments(plan) {
+  function findWalkPath(fromPx, toPx) {
+    if (!WALKGRID) return null;
+    const cell = WALKGRID.CELL;
+    const gw = WALKGRID.WIDTH;
+    const gh = WALKGRID.HEIGHT;
+    const sx = clamp(Math.round(fromPx[0] / cell), 0, gw - 1);
+    const sy = clamp(Math.round(fromPx[1] / cell), 0, gh - 1);
+    const gx = clamp(Math.round(toPx[0] / cell), 0, gw - 1);
+    const gy = clamp(Math.round(toPx[1] / cell), 0, gh - 1);
+    if (Math.hypot(gx - sx, gy - sy) < 2) return null;
+    const [ax, ay] = nearestWalkable(sx, sy);
+    const [bx, by] = nearestWalkable(gx, gy);
+
+    // 只在两端点附近的开阔走廊里搜索，避免绕大圈
+    const padX = 34;
+    const padY = 34;
+    const x0 = clamp(Math.min(ax, bx) - padX, 0, gw - 1);
+    const x1 = clamp(Math.max(ax, bx) + padX, 0, gw - 1);
+    const y0 = clamp(Math.min(ay, by) - padY, 0, gh - 1);
+    const y1 = clamp(Math.max(ay, by) + padY, 0, gh - 1);
+    const cols = x1 - x0 + 1;
+
+    const open = minHeap();
+    const gScore = new Float32Array(cols * (y1 - y0 + 1)).fill(Infinity);
+    const came = new Int32Array(cols * (y1 - y0 + 1)).fill(-1);
+    const closed = new Uint8Array(cols * (y1 - y0 + 1));
+    const index = (x, y) => (y - y0) * cols + (x - x0);
+    const startI = index(ax, ay);
+    const goalI = index(bx, by);
+    gScore[startI] = 0;
+    open.push(0, startI);
+
+    const DIRS = [
+      [1, 0, 1], [-1, 0, 1], [0, 1, 1], [0, -1, 1],
+      [1, 1, 1.4142], [1, -1, 1.4142], [-1, 1, 1.4142], [-1, -1, 1.4142],
+    ];
+
+    let found = false;
+    let guard = 0;
+    while (open.size && guard < 200000) {
+      guard += 1;
+      const [pri, node] = open.pop();
+      if (closed[node]) continue;
+      closed[node] = 1;
+      if (node === goalI) {
+        found = true;
+        break;
+      }
+      const cx = (node % cols) + x0;
+      const cy = Math.floor(node / cols) + y0;
+      for (const [dx, dy, step] of DIRS) {
+        const nx = cx + dx;
+        const ny = cy + dy;
+        if (nx < x0 || nx > x1 || ny < y0 || ny > y1) continue;
+        const ni = index(nx, ny);
+        if (closed[ni]) continue;
+        const terrain = walkCost(nx, ny);
+        const ng = gScore[node] + step * (terrain + 1);
+        if (ng >= gScore[ni]) continue;
+        gScore[ni] = ng;
+        came[ni] = node;
+        const h = Math.hypot(nx - bx, ny - by) * 1.15;
+        open.push(ng + h, ni);
+      }
+    }
+    if (!found) return null;
+
+    const cells = [];
+    let cur = goalI;
+    while (cur !== startI && cur >= 0) {
+      cells.push(cur);
+      cur = came[cur];
+    }
+    cells.push(startI);
+    cells.reverse();
+    const pts = cells.map((i) => [
+      ((i % cols) + x0 + 0.5) * cell * IMG_SCALE,
+      (Math.floor(i / cols) + y0 + 0.5) * cell * IMG_SCALE,
+    ]);
+    // 起点/终点若被吸附到了路上，补一小段连接线，让路线真正走到楼门口
+    const near = (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1]) < 3.2;
+    if (!near(pts[0], fromPx)) pts.unshift([fromPx[0], fromPx[1]]);
+    if (!near(pts[pts.length - 1], toPx)) pts.push([toPx[0], toPx[1]]);
+    return pts;
+  }
+
+  /** Douglas-Peucker 简化：去掉近似共线的点，保留拐弯 */
+  function simplifyPath(points, tol = 3.4) {
+    if (points.length < 3) return points;
+    const seg = (p, a, b) => {
+      const vx = b[0] - a[0];
+      const vy = b[1] - a[1];
+      const len2 = vx * vx + vy * vy;
+      if (len2 < 1e-6) return Math.hypot(p[0] - a[0], p[1] - a[1]);
+      let t = ((p[0] - a[0]) * vx + (p[1] - a[1]) * vy) / len2;
+      t = Math.max(0, Math.min(1, t));
+      return Math.hypot(p[0] - (a[0] + t * vx), p[1] - (a[1] + t * vy));
+    };
+    const keep = new Uint8Array(points.length);
+    keep[0] = 1;
+    keep[points.length - 1] = 1;
+    const stack = [[0, points.length - 1]];
+    while (stack.length) {
+      const [i0, i1] = stack.pop();
+      let far = -1;
+      let farD = tol;
+      for (let i = i0 + 1; i < i1; i += 1) {
+        const d = seg(points[i], points[i0], points[i1]);
+        if (d > farD) {
+          farD = d;
+          far = i;
+        }
+      }
+      if (far > 0) {
+        keep[far] = 1;
+        stack.push([i0, far], [far, i1]);
+      }
+    }
+    return points.filter((_, i) => keep[i]);
+  }
+
+  /**
+   * Chaikin 切角平滑：每轮把折线的角切掉，得到圆润且不会过冲（不会打结）的曲线。
+   * 3 轮之后点足够密，直接按折线输出即可，视觉上就是柔和曲线。
+   */
+  function smoothPath(points, rounds = 3) {
+    let pts = points.filter(
+      (p, i) => i === 0 || Math.hypot(p[0] - points[i - 1][0], p[1] - points[i - 1][1]) > 0.8
+    );
+    if (pts.length < 3) {
+      if (pts.length === 2) {
+        return `M ${pts[0][0].toFixed(1)} ${pts[0][1].toFixed(1)} L ${pts[1][0].toFixed(1)} ${pts[1][1].toFixed(1)}`;
+      }
+      return '';
+    }
+    for (let r = 0; r < rounds; r += 1) {
+      const out = [pts[0]];
+      for (let i = 0; i < pts.length - 1; i += 1) {
+        const p = pts[i];
+        const q = pts[i + 1];
+        out.push([p[0] * 0.75 + q[0] * 0.25, p[1] * 0.75 + q[1] * 0.25]);
+        out.push([p[0] * 0.25 + q[0] * 0.75, p[1] * 0.25 + q[1] * 0.75]);
+      }
+      out.push(pts[pts.length - 1]);
+      pts = out;
+    }
+    return pts.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p[0].toFixed(1)} ${p[1].toFixed(1)}`).join(' ');
+  }
+
+  /** 把每天的各段步行串成画布坐标的折线（沿路寻路，失败则退回直线） */
+  function routeSegmentsPx(plan) {
     const segments = [];
-    let last = null;
     for (const block of plan.blocks) {
       const leg = block.type === 'walk' && block.leg;
       const pts = leg && Array.isArray(block.leg.points) ? block.leg.points : null;
       if (!pts || pts.length < 2) continue;
-      const first = pts[0];
-      const sameAsLast =
-        last && Math.abs(last.lat - first.lat) < 1e-7 && Math.abs(last.lng - first.lng) < 1e-7;
-      if (sameAsLast && segments.length) {
-        for (const p of pts.slice(1)) segments[segments.length - 1].push(p);
-      } else {
-        segments.push(pts.slice());
-      }
-      last = pts[pts.length - 1];
+      const from = project(pts[0].lat, pts[0].lng);
+      const to = project(pts[pts.length - 1].lat, pts[pts.length - 1].lng);
+      const walked = findWalkPath(from, to);
+      segments.push(walked && walked.length > 1 ? walked : pts.map((p) => project(p.lat, p.lng)));
     }
     if (!segments.length) {
-      const fallback = (plan.route && plan.route.points) || [];
+      const fallback = ((plan.route && plan.route.points) || []).map((p) => project(p.lat, p.lng));
       if (fallback.length > 1) segments.push(fallback);
     }
     return segments;
@@ -470,7 +669,7 @@
     const routeLayer = $('routeLayer');
     const badgeLayer = $('badgeLayer');
     const gpsLayer = $('gpsLayer');
-    const segments = routeSegments(plan);
+    const segments = routeSegmentsPx(plan);
     const arrows = [];
     for (const block of plan.blocks) {
       if (block.type !== 'walk' || !block.leg || !block.leg.points || block.leg.points.length < 2) continue;
@@ -485,7 +684,10 @@
       arrows.push(`<path class="route-arrow" d="M -3.6 -3.2 L 4.2 0 L -3.6 3.2 Z" transform="translate(${((ax + bx) / 2).toFixed(1)} ${((ay + by) / 2).toFixed(1)}) rotate(${angle.toFixed(1)})"/>`);
     }
     if (segments.length) {
-      const d = pathFromSegments(segments);
+      const d = segments
+        .map((seg) => smoothPath(simplifyPath(seg)))
+        .filter(Boolean)
+        .join(' ');
       routeLayer.innerHTML = `<path class="route-halo" d="${d}"/><path class="route-line" d="${d}"/><path class="route-dash" d="${d}"/>${arrows.join('')}`;
     } else {
       routeLayer.innerHTML = '';
