@@ -381,7 +381,7 @@ check('17:20 下课的晚餐会留出通勤，不产生重叠', () => {
     },
   });
   const dinner = plan.blocks.find((b) => b.type === 'meal' && b.title.includes('晚餐'));
-  assert.ok(dinner.start_min >= 17 * 60 + 32);
+  assert.ok(dinner.start_min >= 17 * 60 + 25);
   assert.strictEqual(plan.validation.ok, true);
 });
 

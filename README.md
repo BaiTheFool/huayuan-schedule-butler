@@ -39,6 +39,8 @@
 >
 > 版本 0.13.6 修复**楼栋下拉栏随页面滚动错位**：页面或侧栏滚动时，下拉列表会实时跟随输入框重新定位；输入框滚出窗口后自动收起。
 >
+> 版本 0.13.8 将**路线底图换成高德标准地图**（GCJ-02，联网加载）：保留校园 POI、路线、编号和定位叠加，地图可缩放/拖动；Leaflet 资源放在本地 `public/vendor/`，不申请高德 API Key，底部保留“底图 © 高德地图”标注。
+>
 > 版本 0.13.7 将**三个页面标签设为吸顶导航**：今日安排、全部待办、可参与事项在页面滚动时始终固定在顶部，并适配桌面、窄屏和手机高度。
 >
 > 版本 0.11.0 新增**专业入口 + 教务课表导入**：路线页面可以直接填写专业（保存在本机），并导入 `jw-timetable.json`；导入时先校验是不是大学城校区、有多少门课、当前第几周，五山课表会被拒绝。命令行用 `--major` 和 `--timetable` 对应。
@@ -348,15 +350,11 @@ node skills/huayuan-dashboard-widget/scripts/build-widget.js --self-check       
 
 按**当天课表**和**大学城校区开放时间**排一条能走通的一日路线，回答“今天怎么走 / 上完课顺路去哪个饭堂 / 图书馆闭馆前怎么安排”：
 
-![华园一日路线预览](skills/huayuan-campus-route/assets/preview.png)
-
-填入专业并导入 `jw-timetable.json` 后，顶部会显示课程数与教学周（下图为示例数据）：
-
-![专业与课表导入预览](skills/huayuan-campus-route/assets/preview-import.png)
+![华园一日路线 · 高德标准地图](skills/huayuan-campus-route/assets/preview-map.jpg)
 
 考试与待办：导入考试后自动拆复习任务，也可以手动加待办（下图为虚构示例考试）：
 
-![考试与待办预览](skills/huayuan-campus-route/assets/preview-tasks.png)
+![考试与待办预览](skills/huayuan-campus-route/assets/preview-tasks.jpg)
 
 ```bash
 node skills/huayuan-campus-route/scripts/day-route.js --demo --date 2026-10-29 --preset balanced
@@ -378,7 +376,7 @@ node skills/huayuan-campus-route/test/check-route.js
 - 每段路算步行/骑行时间，课间人流、天气、高峰会加时；产物 `day-route.json` / `day-route.md` 带每段依据、开放时间校验和天气说明。
 - 可视化页面 `skills/huayuan-campus-route/public/index.html`，**不用起服务器**，双击即可：切画像、拖权重、选天气、开骑行、导入课表/考试、加待办、点“定位我”或“模拟在图书馆”、导出 Markdown。
 - 只覆盖**大学城校区**；读到五山/广州国际校区会返回 `CAMPUS_UNSUPPORTED`，不硬套。图书馆、热水、门禁为官方来源；饭堂/体育馆时段是参考值，页面标“以现场为准”。
-- 设备定位只在用户点击后读取，浏览器本地换算 WGS-84 → GCJ-02，不上传；被拒绝或超时会明确提示。地图是按真实 POI 经纬度绘制的**示意图**，不是导航底图，不接实时路况 API。
+- 设备定位只在用户点击后读取，浏览器本地换算 WGS-84 → GCJ-02，不上传；被拒绝或超时会明确提示。地图底图是**高德标准地图**（GCJ-02），路线与点位是规划叠加层，不是导航底图，不接实时路况 API。
 - 20 项扩展逐条状态、复用点与建议下一步：[`docs/ROADMAP-20.md`](docs/ROADMAP-20.md)。
 - 完整使用说明（页面按钮、CLI 参数、常见问题）：[`skills/huayuan-campus-route/USAGE.md`](skills/huayuan-campus-route/USAGE.md)。
 
