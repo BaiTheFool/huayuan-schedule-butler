@@ -435,12 +435,15 @@
   function buildingForRoom(room) {
     const text = String(room || '').trim();
     if (!text) return null;
+    if (/田径场|操场|运动场/.test(text)) return 'field';
+    if (/体育馆|羽毛球馆|篮球馆/.test(text)) return 'gym';
     const match = text.match(/^A\s*[-_]?\s*([1-5])(?=\d|\D|$)/i);
     if (match) return `a${match[1]}`;
     return null;
   }
 
-  function normalizeClasses(timetable, weekday, weekNumber) {    const courses = (timetable && timetable.courses) || [];
+  function normalizeClasses(timetable, weekday, weekNumber) {
+    const courses = (timetable && timetable.courses) || [];
     const warnings = [];
     const list = [];
     for (const course of courses) {

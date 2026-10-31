@@ -112,27 +112,18 @@
   };
 
   const $ = (id) => document.getElementById(id);
-  const svg = $('map');
-  const view = { x: 0, y: 0, w: 1000, h: 1000 };
-
-  // ---------- 坐标 ----------
-
-  const W = 1000;
-  const H = 1000;
-  const PAD = 48;
-  const B = CAMPUS.bounds;
-
-  function x(lng) {
-    return PAD + ((lng - B.west) / (B.east - B.west)) * (W - 2 * PAD);
-  }
-
-  function y(lat) {
-    return PAD + ((B.north - lat) / (B.north - B.south)) * (H - 2 * PAD);
-  }
-
-  function xy(poi) {
-    return [x(poi.lng), y(poi.lat)];
-  }
+  let map = null;
+  let streetLayer = null;
+  let routeGroup = null;
+  let stopGroup = null;
+  let gpsGroup = null;
+  let routeSeq = 0;
+  let routeLayers = [];
+  const markerById = new Map();
+  const CAMPUS_BOUNDS = [
+    [CAMPUS.bounds.south, CAMPUS.bounds.west],
+    [CAMPUS.bounds.north, CAMPUS.bounds.east],
+  ];
 
   function esc(text) {
     return String(text == null ? '' : text)
@@ -153,167 +144,237 @@
     return R.categories[type] || R.categories.rest;
   }
 
-  // ---------- 地图底图 ----------
+  // ---------- 高德标准底图 ----------
 
-  function buildMap() {
-    const parts = [];
-    parts.push(`<defs>
-      <filter id="softShadow" x="-30%" y="-30%" width="160%" height="160%">
-        <feDropShadow dx="0" dy="2" stdDeviation="2.4" flood-color="#5b503a" flood-opacity="0.16"/>
-      </filter>
-    </defs>`);
+  const TILE_URL =
+    'https://webrd0{s}.is.autonavi.com/appmaptile?lang=zh_cn&size=1&scale=1&style=8&x={x}&y={y}&z={z}';
 
-    parts.push(`<rect class="map-bg" x="0" y="0" width="1000" height="1000"/>`);
-
-    // 校园边界
-    const boundary = [
-      [23.0437, 113.3995], [23.0436, 113.4058], [23.0446, 113.4073],
-      [23.0469, 113.4082], [23.0514, 113.4082], [23.0531, 113.4066],
-      [23.0532, 113.4005], [23.0518, 113.3992], [23.0491, 113.3988],
-      [23.0461, 113.3989],
-    ];
-    const boundaryPoints = boundary.map(([lat, lng]) => `${x(lng).toFixed(1)},${y(lat).toFixed(1)}`).join(' ');
-    parts.push(`<polygon class="campus-ground" points="${boundaryPoints}"/>`);
-    parts.push(`<polygon class="campus-boundary" points="${boundaryPoints}"/>`);
-
-    // 外围道路
-    const eastX = x(113.40845);
-    const northY = y(23.05335);
-    parts.push(`<path class="outer-road-edge" d="M ${eastX} ${y(23.0433)} L ${eastX} ${y(23.0535)}"/>`);
-    parts.push(`<path class="outer-road" d="M ${eastX} ${y(23.0433)} L ${eastX} ${y(23.0535)}"/>`);
-    parts.push(`<path class="outer-road-line" d="M ${eastX} ${y(23.0433)} L ${eastX} ${y(23.0535)}"/>`);
-    parts.push(`<path class="outer-road-edge" d="M ${x(113.3990)} ${northY} L ${x(113.4088)} ${northY}"/>`);
-    parts.push(`<path class="outer-road" d="M ${x(113.3990)} ${northY} L ${x(113.4088)} ${northY}"/>`);
-    parts.push(`<path class="outer-road-line" d="M ${x(113.3990)} ${northY} L ${x(113.4088)} ${northY}"/>`);
-
-    // 绿色地块
-    parts.push(`<ellipse cx="${x(113.4022)}" cy="${y(23.0518)}" rx="86" ry="56" fill="#dfe6d1" opacity=".75"/>`);
-    parts.push(`<ellipse cx="${x(113.4068)}" cy="${y(23.0458)}" rx="72" ry="50" fill="#e1e8d3" opacity=".7"/>`);
-
-    // 琴湖
-    const lx = x(113.4071);
-    const ly = y(23.0478);
-    const lakePath = `M ${lx - 66} ${ly - 6}
-      C ${lx - 58} ${ly - 48}, ${lx + 18} ${ly - 60}, ${lx + 56} ${ly - 26}
-      C ${lx + 82} ${ly + 2}, ${lx + 44} ${ly + 44}, ${lx + 2} ${ly + 40}
-      C ${lx - 40} ${ly + 36}, ${lx - 80} ${ly + 18}, ${lx - 66} ${ly - 6} Z`;
-    parts.push(`<path class="lake" d="${lakePath}"/>`);
-    parts.push(`<path class="lake-shine" d="M ${lx - 38} ${ly - 22} C ${lx - 10} ${ly - 36}, ${lx + 22} ${ly - 32}, ${lx + 40} ${ly - 20}"/>`);
-    parts.push(`<text class="area-label" x="${lx}" y="${ly + 34}" text-anchor="middle">琴 湖</text>`);
-
-    // 田径场
-    const fx = x(113.40334);
-    const fy = y(23.04506);
-    parts.push(`<g transform="rotate(-8 ${fx} ${fy})">
-      <ellipse class="track-outer" cx="${fx}" cy="${fy}" rx="76" ry="46"/>
-      <ellipse class="track-inner" cx="${fx}" cy="${fy}" rx="54" ry="27"/>
-      <ellipse class="track-line" cx="${fx}" cy="${fy}" rx="66" ry="38"/>
-      <ellipse class="track-line" cx="${fx}" cy="${fy}" rx="60" ry="34"/>
-    </g>`);
-
-    // 道路：路口之间的主路 + 楼栋支路
-    for (const [a, b] of WALK_EDGES) {
-      const na = NODE.get(a);
-      const nb = NODE.get(b);
-      if (!na || !nb) continue;
-      const bothJunction = a.startsWith('j_') && b.startsWith('j_');
-      const d = `M ${x(na.lng).toFixed(1)} ${y(na.lat).toFixed(1)} L ${x(nb.lng).toFixed(1)} ${y(nb.lat).toFixed(1)}`;
-      if (bothJunction) {
-        parts.push(`<path class="road-casing" d="${d}"/>`);
-        parts.push(`<path class="road" d="${d}"/>`);
-        parts.push(`<path class="road-center" d="${d}"/>`);
-      } else {
-        parts.push(`<path class="footpath" d="${d}"/>`);
-      }
-    }
-
-    // 树
-    let seed = 19;
-    const rnd = () => {
-      seed = (seed * 9301 + 49297) % 233280;
-      return seed / 233280;
-    };
-    const trees = [];
-    for (let i = 0; i < 90; i += 1) {
-      const lat = B.south + 0.0012 + rnd() * (B.north - B.south - 0.0024);
-      const lng = B.west + 0.0008 + rnd() * (B.east - B.west - 0.0016);
-      const px = x(lng);
-      const py = y(lat);
-      const tooClose = BUILDINGS.some((bdef) => {
-        const p = POI.get(bdef.id);
-        if (!p) return false;
-        const [bx, by] = xy(p);
-        return Math.abs(bx - px) < bdef.w * 0.72 + 12 && Math.abs(by - py) < bdef.h * 0.72 + 12;
-      });
-      if (tooClose) continue;
-      if (Math.hypot(px - lx, py - ly) < 95) continue;
-      if (Math.hypot(px - fx, py - fy) < 95) continue;
-      trees.push({ px, py, r: 4 + rnd() * 4, dark: rnd() > 0.55 });
-    }
-    for (const t of trees) {
-      parts.push(`<circle class="${t.dark ? 'tree-dark' : 'tree'}" cx="${t.px.toFixed(1)}" cy="${t.py.toFixed(1)}" r="${t.r.toFixed(1)}"/>`);
-    }
-
-    // 建筑
-    const buildingLabel = {
-      library: '图书馆',
-      canteen1: '一饭',
-      canteen2: '二饭',
-      gym: '体育馆',
-      c1: 'C1',
-      c11: 'C11',
-    };
-    for (const def of BUILDINGS) {
-      const p = POI.get(def.id);
-      if (!p) continue;
-      const [bx, by] = xy(p);
-      const accent = def.id.startsWith('a') ? '' : def.id === 'gym' ? ' sport' : def.id.startsWith('c') ? ' dorm' : '';
-      parts.push(`<rect class="building${accent}" data-poi="${def.id}" x="${(bx - def.w / 2).toFixed(1)}" y="${(by - def.h / 2).toFixed(1)}" width="${def.w}" height="${def.h}" rx="3.5"/>`);
-      if (def.id.startsWith('a')) {
-        parts.push(`<text class="building-label" x="${bx}" y="${by + 3}" pointer-events="none">${def.id.toUpperCase()}</text>`);
-      } else if (buildingLabel[def.id]) {
-        if (def.id === 'library') {
-          parts.push(`<text class="building-label small left" x="${(bx - def.w / 2 + 5).toFixed(1)}" y="${by + 3}" pointer-events="none">${buildingLabel[def.id]}</text>`);
-        } else {
-          parts.push(`<text class="building-label small" x="${bx}" y="${(by + def.h / 2 - 5).toFixed(1)}" pointer-events="none">${buildingLabel[def.id]}</text>`);
-        }
-      }
-    }
-
-    // 道路文字
-    parts.push(`<text class="map-road-label" x="${eastX + 11}" y="${y(23.049)}" transform="rotate(90 ${eastX + 11} ${y(23.049)})">外环东路</text>`);
-    parts.push(`<text class="map-road-label" x="${x(113.402)}" y="${northY - 10}">中环东路</text>`);
-
-    // 路线层放在建筑与标记之下，避免压住地点图标
-    parts.push(`<g id="routeLayer"></g>`);
-
-    // POI 标记
-    const noLabel = new Set(['library', 'canteen1', 'canteen2', 'gym', 'c1', 'c11', 'field', 'lake', 'cafe', 'hospital']);
-    for (const p of POIS) {
-      if (p.category === 'class' || p.id === 'c11study' || p.id === 'cafe') continue;
-      const [px, py] = xy(p);
-      const showLabel = !noLabel.has(p.id);
-      const labelDy = p.category === 'gate' ? -14 : 20;
-      const mx = p.id === 'cafe' ? px + 17 : px;
-      const my = p.id === 'cafe' ? py + 9 : py;
-      parts.push(`<g class="poi" data-poi="${p.id}" style="--c:${colorOf(p.category)}" transform="translate(${mx.toFixed(1)} ${my.toFixed(1)})">
-        <circle class="poi-halo-ring" r="11"/>
-        <circle class="poi-halo" r="9.5"/>
-        <text class="poi-icon" y="0.6">${p.icon}</text>
-        ${showLabel ? `<text class="poi-label" y="${labelDy}">${esc(p.short)}</text>` : ''}
-      </g>`);
-    }
-
-    // 动态层
-    parts.push(`<g id="badgeLayer"></g>`);
-    parts.push(`<g id="gpsLayer"></g>`);
-
-    svg.innerHTML = parts.join('');
-    applyView();
+  function poiIcon(poi) {
+    return L.divIcon({
+      className: 'poi-marker-wrap',
+      html: `<div class="poi-marker" data-poi="${poi.id}" style="--c:${colorOf(poi.category)}">
+        <span class="poi-dot">${poi.icon}</span>
+        <span class="poi-label">${esc(poi.short)}</span>
+      </div>`,
+      iconSize: [0, 0],
+      iconAnchor: [0, 0],
+    });
   }
 
-  function applyView() {
-    svg.setAttribute('viewBox', `${view.x} ${view.y} ${view.w} ${view.h}`);
+  function stopIcon(index, count) {
+    return L.divIcon({
+      className: 'stop-marker-wrap',
+      html: `<div class="stop-marker">${index}${count > 1 ? `<small>×${count}</small>` : ''}</div>`,
+      iconSize: [0, 0],
+      iconAnchor: [0, 0],
+    });
+  }
+
+  function gpsIcon() {
+    return L.divIcon({
+      className: 'gps-marker-wrap',
+      html: '<div class="gps-marker"><span class="gps-ring"></span><span class="gps-dot"></span></div>',
+      iconSize: [0, 0],
+      iconAnchor: [0, 0],
+    });
+  }
+
+  function fitCampus() {
+    if (map) map.fitBounds(CAMPUS_BOUNDS, { padding: [26, 26], maxZoom: 17 });
+  }
+
+  function initMap() {
+    if (!window.L) {
+      const host = $('map');
+      if (host) host.innerHTML = '<div class="map-error">地图库未加载；请确认 vendor/leaflet.js 存在</div>';
+      return;
+    }
+    map = L.map('map', {
+      zoomControl: false,
+      attributionControl: false,
+      minZoom: 14,
+      maxZoom: 19,
+      zoomSnap: 0.5,
+    });
+    streetLayer = L.tileLayer(TILE_URL, {
+      subdomains: ['1', '2', '3', '4'],
+      maxZoom: 19,
+      className: 'gaode-street',
+    });
+    streetLayer.addTo(map);
+    fitCampus();
+
+    map.on('click', () => {
+      const card = $('poiCard');
+      if (card) card.hidden = true;
+      state.selected = null;
+      document.querySelectorAll('.poi-marker').forEach((el) => el.classList.remove('active'));
+    });
+
+    for (const poi of POIS) {
+      if (poi.id === 'c11study' || poi.id === 'cafe') continue;
+      const marker = L.marker([poi.lat, poi.lng], {
+        icon: poiIcon(poi),
+        keyboard: false,
+        riseOnHover: true,
+      }).addTo(map);
+      marker.on('click', (event) => {
+        if (event.originalEvent) L.DomEvent.stopPropagation(event.originalEvent);
+        selectPoi(poi.id, false);
+      });
+      markerById.set(poi.id, marker);
+    }
+
+    L.control.scale({ imperial: false, position: 'bottomright', maxWidth: 80 }).addTo(map);
+    window.addEventListener('resize', () => {
+      if (map) map.invalidateSize();
+    });
+  }
+
+  // ---------- 步行道路线（OSM foot routing） ----------
+
+  const roadCache = new Map();
+
+  function gcj02ToWgs84(lat, lng) {
+    let wlat = lat;
+    let wlng = lng;
+    for (let i = 0; i < 7; i += 1) {
+      const gcj = R.wgs84ToGcj02(wlat, wlng);
+      wlat -= gcj.lat - lat;
+      wlng -= gcj.lng - lng;
+    }
+    return { lat: wlat, lng: wlng };
+  }
+
+  async function fetchRoadLeg(from, to) {
+    const key = `${from.lat.toFixed(6)},${from.lng.toFixed(6)}|${to.lat.toFixed(6)},${to.lng.toFixed(6)}`;
+    if (roadCache.has(key)) return roadCache.get(key);
+    const a = gcj02ToWgs84(from.lat, from.lng);
+    const b = gcj02ToWgs84(to.lat, to.lng);
+    const url =
+      `https://routing.openstreetmap.de/routed-foot/route/v1/foot/${a.lng},${a.lat};${b.lng},${b.lat}` +
+      '?overview=full&geometries=geojson&steps=false';
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 7000);
+    try {
+      const response = await fetch(url, { signal: controller.signal, cache: 'force-cache' });
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      const data = await response.json();
+      if (!data.routes || !data.routes[0] || !data.routes[0].geometry) throw new Error('NO_ROUTE');
+      const points = data.routes[0].geometry.coordinates.map(([lng, lat]) => {
+        const gcj = R.wgs84ToGcj02(lat, lng);
+        return [gcj.lat, gcj.lng];
+      });
+      roadCache.set(key, points);
+      return points;
+    } catch (error) {
+      roadCache.set(key, null);
+      return null;
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+
+  function drawRoute(latlngs, road) {
+    if (!routeGroup) return;
+    for (const layer of routeLayers) routeGroup.removeLayer(layer);
+    routeLayers = [];
+    if (latlngs.length < 2) return;
+    routeLayers.push(
+      L.polyline(latlngs, {
+        color: '#fffdf7',
+        weight: 10,
+        opacity: 0.9,
+        lineCap: 'round',
+        lineJoin: 'round',
+      }).addTo(routeGroup)
+    );
+    routeLayers.push(
+      L.polyline(latlngs, {
+        color: '#f26b21',
+        weight: 4.8,
+        opacity: 0.98,
+        lineCap: 'round',
+        lineJoin: 'round',
+      }).addTo(routeGroup)
+    );
+    const attribution = $('mapAttribution');
+    if (attribution && road) {
+      attribution.textContent = '底图 © 高德地图 · 路线 © OpenStreetMap contributors · 时长按校园步行估算';
+    }
+  }
+
+  function renderRoute(plan) {
+    if (!map) return;
+    if (routeGroup) map.removeLayer(routeGroup);
+    if (stopGroup) map.removeLayer(stopGroup);
+    if (gpsGroup) map.removeLayer(gpsGroup);
+    routeGroup = L.layerGroup().addTo(map);
+    stopGroup = L.layerGroup().addTo(map);
+    gpsGroup = L.layerGroup().addTo(map);
+    routeLayers = [];
+    routeSeq += 1;
+    const seq = routeSeq;
+
+    const points = (plan.route && plan.route.points) || [];
+    const latlngs = points.map((point) => [point.lat, point.lng]);
+    drawRoute(latlngs, false);
+
+    const stopPoints = [];
+    for (const stop of plan.stops || []) {
+      const poi = POI.get(stop.poiId);
+      if (!poi) continue;
+      const last = stopPoints[stopPoints.length - 1];
+      if (last && Math.abs(last.lat - poi.lat) < 1e-7 && Math.abs(last.lng - poi.lng) < 1e-7) continue;
+      stopPoints.push(poi);
+    }
+    if (stopPoints.length > 1) {
+      Promise.all(
+        stopPoints.slice(0, -1).map((from, index) => fetchRoadLeg(from, stopPoints[index + 1]))
+      ).then((legs) => {
+        if (seq !== routeSeq) return;
+        const merged = [];
+        let missed = 0;
+        for (let i = 0; i < legs.length; i += 1) {
+          const leg = legs[i];
+          const from = stopPoints[i];
+          const to = stopPoints[i + 1];
+          if (leg && leg.length > 1) {
+            for (const point of leg) {
+              const last = merged[merged.length - 1];
+              if (!last || last[0] !== point[0] || last[1] !== point[1]) merged.push(point);
+            }
+          } else {
+            missed += 1;
+            merged.push([from.lat, from.lng], [to.lat, to.lng]);
+          }
+        }
+        if (merged.length > 1) drawRoute(merged, missed < legs.length);
+      });
+    }
+
+    const grouped = new Map();
+    plan.stops.forEach((stop, index) => {
+      const poi = POI.get(stop.poiId);
+      if (!poi) return;
+      if (!grouped.has(poi.id)) grouped.set(poi.id, { poi, first: index + 1, count: 0 });
+      grouped.get(poi.id).count += 1;
+    });
+    for (const item of grouped.values()) {
+      L.marker([item.poi.lat, item.poi.lng], {
+        icon: stopIcon(item.first, item.count),
+        keyboard: false,
+        zIndexOffset: 800,
+      }).addTo(stopGroup);
+    }
+
+    if (plan.gps && plan.gps.in_campus) {
+      L.marker([plan.gps.lat, plan.gps.lng], {
+        icon: gpsIcon(),
+        keyboard: false,
+        zIndexOffset: 900,
+      }).addTo(gpsGroup);
+    }
   }
 
   // ---------- 规划 ----------
@@ -520,88 +581,6 @@
     $('statStudy').textContent = fmtShort(plan.summary.study_minutes);
     $('statSport').textContent = `${plan.summary.sport_minutes} 分钟`;
     $('statPlay').textContent = `${plan.summary.play_minutes} 分钟`;
-  }
-
-  // ---------- 渲染：路线 ----------
-
-  function pathFromPoints(points) {
-    return points.map((p, i) => `${i === 0 ? 'M' : 'L'} ${x(p.lng).toFixed(1)} ${y(p.lat).toFixed(1)}`).join(' ');
-  }
-
-  function renderRoute(plan) {
-    const routeLayer = $('routeLayer');
-    const badgeLayer = $('badgeLayer');
-    const gpsLayer = $('gpsLayer');
-    const points = (plan.route && plan.route.points) || [];
-    const arrows = [];
-    for (const block of plan.blocks) {
-      if (block.type !== 'walk' || !block.leg || !block.leg.points || block.leg.points.length < 2) continue;
-      const pts = block.leg.points;
-      const mid = Math.max(1, Math.floor(pts.length / 2));
-      const a = pts[mid - 1];
-      const b = pts[mid];
-      if (!a || !b) continue;
-      const ax = x(a.lng);
-      const ay = y(a.lat);
-      const bx = x(b.lng);
-      const by = y(b.lat);
-      const angle = (Math.atan2(by - ay, bx - ax) * 180) / Math.PI;
-      arrows.push(`<path class="route-arrow" d="M -3.6 -3.2 L 4.2 0 L -3.6 3.2 Z" transform="translate(${((ax + bx) / 2).toFixed(1)} ${((ay + by) / 2).toFixed(1)}) rotate(${angle.toFixed(1)})"/>`);
-    }
-    if (points.length > 1) {
-      const d = pathFromPoints(points);
-      routeLayer.innerHTML = `<path class="route-halo" d="${d}"/><path class="route-line" d="${d}"/><path class="route-dash" d="${d}"/>${arrows.join('')}`;
-    } else {
-      routeLayer.innerHTML = '';
-    }
-
-    const grouped = new Map();
-    plan.stops.forEach((stop, index) => {
-      const p = POI.get(stop.poiId);
-      if (!p) return;
-      if (!grouped.has(p.id)) grouped.set(p.id, { poi: p, first: index + 1, count: 0 });
-      grouped.get(p.id).count += 1;
-    });
-    const badgeOffset = {
-      library: [-12, -31],
-      cafe: [20, 4],
-      canteen1: [-16, -26],
-      canteen2: [14, -27],
-      c11: [0, -27],
-      c1: [0, -25],
-      field: [0, -12],
-      gym: [0, -25],
-      a1: [0, -33],
-      a2: [0, -33],
-      a3: [0, -33],
-      a4: [0, -33],
-      a5: [0, -33],
-    };
-    const badges = [];
-    for (const item of grouped.values()) {
-      const [px, py] = xy(item.poi);
-      const offset = badgeOffset[item.poi.id] || [0, -22];
-      badges.push(`<g class="stop-badge" transform="translate(${(px + offset[0]).toFixed(1)} ${(py + offset[1]).toFixed(1)})">
-        <circle r="7.2"/><text>${item.first}</text>
-        ${item.count > 1 ? `<text class="badge-count" x="9" y="-7">×${item.count}</text>` : ''}
-      </g>`);
-    }
-    badgeLayer.innerHTML = badges.join('');
-
-    if (plan.gps && plan.gps.in_campus) {
-      const gx = x(plan.gps.lng);
-      const gy = y(plan.gps.lat);
-      gpsLayer.innerHTML = `<g transform="translate(${gx.toFixed(1)} ${gy.toFixed(1)})">
-        <circle class="gps-pulse" r="13"/>
-        <circle class="gps-dot" r="6"/>
-      </g>`;
-    } else {
-      gpsLayer.innerHTML = '';
-    }
-
-    document.querySelectorAll('[data-poi]').forEach((el) => {
-      el.classList.toggle('active', state.selected === el.getAttribute('data-poi'));
-    });
   }
 
   // ---------- 地点卡片 ----------
@@ -1402,6 +1381,7 @@
         status.textContent = `导入失败：${result.message || result.error}`;
         return;
       }
+      saveStorage('huayuan.timetable', result.timetable);
       renderProfile();
       replan(true);
       const s = result.summary;
@@ -1415,6 +1395,11 @@
     state.timetable = null;
     state.timetableInfo = null;
     state.timetableSource = 'demo';
+    try {
+      localStorage.removeItem('huayuan.timetable');
+    } catch (error) {
+      // ignore
+    }
     renderProfile();
     replan(false);
     toast('已切回示例课表（虚构数据）');
@@ -1577,56 +1562,14 @@
       document.querySelectorAll('[data-poi]').forEach((el) => el.classList.remove('active'));
     });
 
-    svg.addEventListener('click', (e) => {
-      const target = e.target.closest('[data-poi]');
-      if (!target) return;
-      const poiId = target.getAttribute('data-poi');
-      if (poiId) selectPoi(poiId, false);
+    $('zoomIn').addEventListener('click', () => {
+      if (map) map.zoomIn();
     });
-
-    // 缩放
-    $('zoomIn').addEventListener('click', () => zoom(0.78));
-    $('zoomOut').addEventListener('click', () => zoom(1.28));
+    $('zoomOut').addEventListener('click', () => {
+      if (map) map.zoomOut();
+    });
     $('zoomReset').addEventListener('click', () => {
-      view.x = 0;
-      view.y = 0;
-      view.w = W;
-      view.h = H;
-      applyView();
-    });
-
-    svg.addEventListener(
-      'wheel',
-      (e) => {
-        e.preventDefault();
-        const factor = e.deltaY > 0 ? 1.12 : 0.89;
-        zoom(factor, e.clientX, e.clientY);
-      },
-      { passive: false }
-    );
-
-    // 拖拽平移
-    let drag = null;
-    svg.addEventListener('pointerdown', (e) => {
-      if (e.target.closest('.poi') || e.target.closest('.stop-badge')) return;
-      drag = { x: e.clientX, y: e.clientY, view: { ...view } };
-      svg.setPointerCapture(e.pointerId);
-      svg.style.cursor = 'grabbing';
-    });
-    svg.addEventListener('pointermove', (e) => {
-      if (!drag) return;
-      const rect = svg.getBoundingClientRect();
-      const dx = ((e.clientX - drag.x) / rect.width) * drag.view.w;
-      const dy = ((e.clientY - drag.y) / rect.height) * drag.view.h;
-      view.x = clamp(drag.view.x - dx, 0, W - drag.view.w);
-      view.y = clamp(drag.view.y - dy, 0, H - drag.view.h);
-      view.w = drag.view.w;
-      view.h = drag.view.h;
-      applyView();
-    });
-    svg.addEventListener('pointerup', () => {
-      drag = null;
-      svg.style.cursor = 'grab';
+      fitCampus();
     });
 
     window.addEventListener('keydown', (e) => {
@@ -1636,31 +1579,6 @@
         document.querySelectorAll('[data-poi]').forEach((el) => el.classList.remove('active'));
       }
     });
-  }
-
-  function clamp(value, min, max) {
-    return Math.min(max, Math.max(min, value));
-  }
-
-  function zoom(factor, clientX, clientY) {
-    const oldW = view.w;
-    const oldH = view.h;
-    const nextW = clamp(oldW * factor, 360, 1400);
-    const nextH = nextW * (oldH / oldW);
-    let cx = view.x + oldW / 2;
-    let cy = view.y + oldH / 2;
-    if (clientX != null) {
-      const rect = svg.getBoundingClientRect();
-      const rx = (clientX - rect.left) / rect.width;
-      const ry = (clientY - rect.top) / rect.height;
-      cx = view.x + rx * oldW;
-      cy = view.y + ry * oldH;
-    }
-    view.x = clamp(cx - (nextW * (cx - view.x)) / oldW, 0, W - nextW);
-    view.y = clamp(cy - (nextH * (cy - view.y)) / oldH, 0, H - nextH);
-    view.w = nextW;
-    view.h = nextH;
-    applyView();
   }
 
   // ---------- 启动 ----------
@@ -1685,6 +1603,21 @@
   }
   $('dateInput').value = state.date;
   $('todoDate').value = state.date;
+  if (TBL) {
+    try {
+      const savedTimetable = JSON.parse(localStorage.getItem('huayuan.timetable') || 'null');
+      if (savedTimetable) {
+        const info = TBL.summarizeTimetable(savedTimetable, { date: state.date });
+        if (info.ok) {
+          state.timetable = info.timetable;
+          state.timetableInfo = info;
+          state.timetableSource = 'imported';
+        }
+      }
+    } catch (error) {
+      // 旧缓存损坏时忽略，继续用示例课表
+    }
+  }
   const presetParam = params.get('preset');
   const presetFromUrl = PRESETS.find((item) => item.id === presetParam);
   if (presetFromUrl) {
@@ -1715,7 +1648,7 @@
   }
 
   try {
-    buildMap();
+    initMap();
     syncSliders();
     syncWeatherControls();
     document.querySelectorAll('#presets button').forEach((btn) => {
@@ -1732,7 +1665,6 @@
       setTimeout(checkDueReminders, 1200);
     }
     if (params.get('live') === '1') setTimeout(fetchLiveWeather, 300);
-    svg.style.cursor = 'grab';
   } catch (error) {
     const box = document.getElementById('jsError');
     if (box) {
