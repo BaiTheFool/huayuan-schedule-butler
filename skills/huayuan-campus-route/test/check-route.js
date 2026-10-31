@@ -393,6 +393,30 @@ check('未知教室会标待确认，并按 A3 保守估算', () => {
   assert.strictEqual(plan.blocks.find((b) => b.type === 'class').poi_id, 'a3');
 });
 
+check('体育课场地能映射到田径场，而不是当成 A3', () => {
+  const plan = R.planDay({
+    date: '2026-11-03',
+    timetable: {
+      campus: { key: 'university_town', label: '大学城校区' },
+      courses: [{ course: '身体素质', weekday: 2, start_time: '14:00', end_time: '15:35', classroom: '大学城校区生活区田径场' }],
+    },
+  });
+  assert.strictEqual(plan.blocks.find((b) => b.type === 'class').poi_id, 'field');
+});
+
+check('17:20 下课的晚餐会留出通勤，不产生重叠', () => {
+  const plan = R.planDay({
+    date: '2026-11-03',
+    timetable: {
+      campus: { key: 'university_town', label: '大学城校区' },
+      courses: [{ course: '晚课前的课', weekday: 2, start_time: '15:45', end_time: '17:20', classroom: 'A1308' }],
+    },
+  });
+  const dinner = plan.blocks.find((b) => b.type === 'meal' && b.title.includes('晚餐'));
+  assert.ok(dinner.start_min >= 17 * 60 + 25);
+  assert.strictEqual(plan.validation.ok, true);
+});
+
 check('Markdown 导出包含日期、时间轴、热水与依据', () => {
   const md = R.buildMarkdown(base);
   assert.ok(md.includes('2026-10-29'));

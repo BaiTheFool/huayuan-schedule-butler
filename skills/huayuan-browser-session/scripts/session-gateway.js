@@ -81,6 +81,9 @@ function chromeExecutable() {
     path.join(process.env.LOCALAPPDATA || '', 'Google', 'Chrome', 'Application', 'chrome.exe'),
     'C:/Program Files/Google/Chrome/Application/chrome.exe',
     'C:/Program Files (x86)/Google/Chrome/Application/chrome.exe',
+    // 本机可能只装了 Edge；作为 Chrome 缺失时的回退，不改变原有优先级
+    'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe',
+    'C:/Program Files/Microsoft/Edge/Application/msedge.exe',
   ];
   return candidates.find((candidate) => fs.existsSync(candidate)) || null;
 }

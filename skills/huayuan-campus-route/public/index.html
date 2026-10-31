@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>华园一日 · 大学城校园路线</title>
   <meta name="description" content="按课表、食堂、图书馆和宿舍热水时间，生成华南理工大学大学城校区的一日步行路线。" />
+  <link rel="stylesheet" href="vendor/leaflet.css" />
   <link rel="stylesheet" href="styles.css" />
   <script>
     window.addEventListener('error', function (event) {
@@ -199,8 +200,8 @@
       <section class="map-wrap" aria-label="校园路线地图">
         <div class="map-head">
           <div class="map-title">
-            <b>华工大学城 · 步行示意</b>
-            <span>按真实 POI 经纬度绘制，不替代导航</span>
+            <b>华工大学城 · 高德标准地图</b>
+            <span>底图 © 高德地图（联网加载）；校园点位与路线为规划示意</span>
           </div>
           <div class="map-head-right">
             <span class="weather-badge" id="weatherBadge">☁️ 多云 26°C</span>
@@ -215,7 +216,7 @@
         </div>
 
         <div class="map-canvas" id="mapCanvas">
-          <svg id="map" viewBox="0 0 1000 1000" role="img" aria-label="华南理工大学大学城校区路线示意图"></svg>
+          <div id="map" class="leaflet-map" role="application" aria-label="华南理工大学大学城校区高德标准地图"></div>
 
           <div class="weather-alert" id="weatherAlert" hidden></div>
 
@@ -241,8 +242,7 @@
           </div>
 
           <div class="map-foot">
-            <div class="scale"><span></span>100 m</div>
-            <div class="north">N ↑</div>
+            <div class="map-attribution" id="mapAttribution">底图 © 高德地图 · 校园点位为示意</div>
             <div class="gps-state" id="gpsState">未使用定位</div>
           </div>
         </div>
@@ -254,6 +254,7 @@
 
   <noscript>这个页面需要 JavaScript 才能生成路线。</noscript>
 
+  <script src="vendor/leaflet.js"></script>
   <script src="../data/campus-data.js"></script>
   <script src="../data/exam-catalog.js"></script>
   <script src="../scripts/route-engine.js"></script>
