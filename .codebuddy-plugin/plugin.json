@@ -1,6 +1,6 @@
 {
   "name": "huayuan-schedule-butler-v2",
-  "version": "0.13.8",
+  "version": "0.13.9",
   "description": "Unifies SCUT undergraduate course schedules, assignments, exams and notices into explainable, editable task cards and day/week plans, including a weather-aware University Town campus walking-route planner with major input, official timetable import, exam-prep tasks and manual todos.",
   "author": {
     "name": "华园日程管家项目组",
