@@ -1380,6 +1380,7 @@
         status.textContent = `导入失败：${result.message || result.error}`;
         return;
       }
+      saveStorage('huayuan.timetable', result.timetable);
       renderProfile();
       replan(true);
       const s = result.summary;
@@ -1393,6 +1394,11 @@
     state.timetable = null;
     state.timetableInfo = null;
     state.timetableSource = 'demo';
+    try {
+      localStorage.removeItem('huayuan.timetable');
+    } catch (error) {
+      // ignore
+    }
     renderProfile();
     replan(false);
     toast('已切回示例课表（虚构数据）');
@@ -1662,6 +1668,21 @@
   }
   $('dateInput').value = state.date;
   $('todoDate').value = state.date;
+  if (TBL) {
+    try {
+      const savedTimetable = JSON.parse(localStorage.getItem('huayuan.timetable') || 'null');
+      if (savedTimetable) {
+        const info = TBL.summarizeTimetable(savedTimetable, { date: state.date });
+        if (info.ok) {
+          state.timetable = info.timetable;
+          state.timetableInfo = info;
+          state.timetableSource = 'imported';
+        }
+      }
+    } catch (error) {
+      // 旧缓存损坏时忽略，继续用示例课表
+    }
+  }
   const presetParam = params.get('preset');
   const presetFromUrl = PRESETS.find((item) => item.id === presetParam);
   if (presetFromUrl) {
