@@ -1,4 +1,6 @@
-VERSION=0.14.11
+VERSION=0.15.0
+
+### 0.15.0 · 2026-10-31 · feat: campus route on AMap standard map with OSM walking paths; fix Edge login fallback
 
 # 华园日程管家 · 版本记录
 
