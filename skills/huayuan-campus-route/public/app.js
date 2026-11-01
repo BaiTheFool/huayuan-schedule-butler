@@ -1224,7 +1224,9 @@
   }
 
   function homeSelectValue() {
-    if (state.dormPoiId === 'offcampus') return 'offcampus';
+    if (state.dormPoiId === 'offcampus') {
+      return state.home.id === 'suishi' ? 'suishi' : 'offcampus';
+    }
     if (state.dormPoiId === 'custom_home') return state.home.id ? `dorm:${state.home.id}` : 'dorm:c11';
     return `dorm:${state.dormPoiId || 'c11'}`;
   }
@@ -1244,6 +1246,7 @@
     dorms.sort((a, b) => String(a.short || a.name).localeCompare(String(b.short || b.name), 'zh-Hans-CN', { numeric: true }));
     select.innerHTML =
       '<option value="offcampus">校外住处（可填地址）</option>' +
+      '<option value="suishi">穗石牌坊（东门外）</option>' +
       dorms
         .map((dorm) => `<option value="dorm:${esc(dorm.id)}">${esc(dorm.name || dorm.short)}</option>`)
         .join('');
@@ -1303,6 +1306,11 @@
       toast('先填一个校外地址');
       return;
     }
+    if (/穗石|牌坊/.test(raw)) {
+      setHomeCoords(23.0452, 113.4113, '穗石牌坊（东门外）');
+      $('homeHint').textContent = '已定位到穗石牌坊，走东门进校最近。';
+      return;
+    }
     state.home.address = raw;
     saveStorage('huayuan.home', state.home);
     const button = $('geocodeHomeBtn');
@@ -1359,7 +1367,16 @@
     });
     $('homeSelect').addEventListener('change', (e) => {
       const value = e.target.value;
-      if (value === 'offcampus') {
+      if (value === 'suishi') {
+        state.dormPoiId = 'offcampus';
+        state.home = {
+          id: 'suishi',
+          address: '穗石牌坊（东门外）',
+          lat: 23.0452,
+          lng: 113.4113,
+          offcampus: true,
+        };
+      } else if (value === 'offcampus') {
         state.dormPoiId = 'offcampus';
         if (!homeCoordsValid() || !state.home.offcampus) {
           state.home = { id: 'offcampus', address: '大学城南地铁站', lat: 23.04346, lng: 113.40111, offcampus: true };
