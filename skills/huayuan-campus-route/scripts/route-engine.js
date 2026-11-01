@@ -140,6 +140,8 @@
   const pathCache = new Map();
   const CUSTOM_HOME_ID = 'home_custom';
   let customHomeNearest = null;
+  const MEAL_CUSTOM_ID = 'meal_custom';
+  let customMealNearest = null;
 
   /** 把用户填写的校外住址临时接入步行图；每次重排更新，不污染固定 POI 数据。 */
   function installCustomHome(home) {
@@ -187,7 +189,48 @@
     return node;
   }
 
-  /** Dijkstra：节点少，直接用 O(n²)，不引依赖。 */
+  /** 把用户选择的校外用餐点临时接入步行图。 */
+  function installCustomMeal(place) {
+    if (!place || !Number.isFinite(Number(place.lat)) || !Number.isFinite(Number(place.lng))) return null;
+    const lat = Number(place.lat);
+    const lng = Number(place.lng);
+    if (lat < -90 || lat > 90 || lng < -180 || lng > 180) return null;
+    const node = {
+      id: MEAL_CUSTOM_ID,
+      name: place.name || place.address || '校外用餐地点',
+      short: String(place.name || place.address || '校外用餐').slice(0, 12),
+      category: 'meal',
+      icon: '🍽️',
+      lat,
+      lng,
+      coord_confidence: 'user',
+      hours: null,
+      offcampus: true,
+    };
+    POI_MAP.set(MEAL_CUSTOM_ID, node);
+    NODE_MAP.set(MEAL_CUSTOM_ID, node);
+    if (customMealNearest) {
+      const edges = GRAPH.get(customMealNearest.id) || [];
+      GRAPH.set(customMealNearest.id, edges.filter((edge) => edge.id !== MEAL_CUSTOM_ID));
+    }
+    let nearest = null;
+    for (const [id, candidate] of NODE_MAP) {
+      if (id === MEAL_CUSTOM_ID) continue;
+      const distance = haversine(node, candidate);
+      if (!nearest || distance < nearest.distance) nearest = { id, node: candidate, distance };
+    }
+    GRAPH.set(MEAL_CUSTOM_ID, []);
+    if (nearest) {
+      const distance = nearest.distance * 1.12;
+      GRAPH.get(MEAL_CUSTOM_ID).push({ id: nearest.id, distance });
+      GRAPH.get(nearest.id).push({ id: MEAL_CUSTOM_ID, distance });
+      customMealNearest = { id: nearest.id, node: nearest.node };
+    } else {
+      customMealNearest = null;
+    }
+    pathCache.clear();
+    return node;
+  }
   function shortestPath(fromId, toId) {
     if (fromId === toId) {
       const p = NODE_MAP.get(fromId);
@@ -787,6 +830,7 @@
     const classes = normalized.list;
 
     const customHome = installCustomHome(opts.home);
+    const customMeal = installCustomMeal(opts.mealPlace);
     const dormPoiId = customHome ? CUSTOM_HOME_ID : opts.dormPoiId && POI_MAP.has(opts.dormPoiId) ? opts.dormPoiId : 'c11';
     const isOffCampus = dormPoiId === 'offcampus' || (dormPoiId === CUSTOM_HOME_ID && customHome && customHome.offcampus);
     let startPoiId = dormPoiId;
@@ -836,6 +880,12 @@
 
     function mealChoice(meal, fromPoiId) {
       const pref = String(mealPrefs[meal] || 'auto');
+      if (pref === 'offcampus') {
+        const poi = POI_MAP.get(MEAL_CUSTOM_ID);
+        if (poi) return { poi, takeout: false, offcampus: true, preferred: true };
+        warnings.push('校外用餐地点没有定位，已先按最近饭堂安排');
+        return { poi: nearestPoi(['canteen1', 'canteen2'], fromPoiId), takeout: false, preferred: false };
+      }
       if (pref === 'takeout') {
         const placeId = mealPrefs.takeoutPlace === 'home' ? dormPoiId : takeoutPlaceId;
         return { poi: POI_MAP.get(placeId) || POI_MAP.get('c11'), takeout: true, preferred: true };
@@ -848,10 +898,12 @@
 
     function mealTitle(choice, label) {
       const place = choice.poi ? choice.poi.short : '饭堂';
+      if (choice.offcampus) return `${label} · 校外（${place}）`;
       return choice.takeout ? `${label} · 外卖（${place}）` : `${label} · ${place}`;
     }
 
     function mealReason(choice, fallback) {
+      if (choice.offcampus) return `按你的偏好，去校外${choice.poi ? choice.poi.name : '用餐地点'}用餐`;
       if (choice.takeout) return `按你的偏好，在${choice.poi ? choice.poi.short : '宿舍'}吃外卖`;
       if (choice.preferred) return `按你的偏好，去${choice.poi ? choice.poi.short : '饭堂'}`;
       return fallback;

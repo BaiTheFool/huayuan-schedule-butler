@@ -94,6 +94,7 @@
                   <option value="canteen1">一饭</option>
                   <option value="canteen2">二饭</option>
                   <option value="takeout">外卖</option>
+                  <option value="offcampus">校外地点</option>
                 </select>
               </div>
               <div class="pref-row">
@@ -103,6 +104,7 @@
                   <option value="canteen1">一饭</option>
                   <option value="canteen2">二饭</option>
                   <option value="takeout">外卖</option>
+                  <option value="offcampus">校外地点</option>
                 </select>
               </div>
               <div class="pref-row">
@@ -112,6 +114,7 @@
                   <option value="canteen1">一饭</option>
                   <option value="canteen2">二饭</option>
                   <option value="takeout">外卖</option>
+                  <option value="offcampus">校外地点</option>
                 </select>
               </div>
               <div class="pref-row">
@@ -124,6 +127,18 @@
                   <option value="canteen1">一饭</option>
                   <option value="canteen2">二饭</option>
                 </select>
+              </div>
+              <div class="home-fields" id="mealPlaceFields" hidden>
+                <div class="pref-row">
+                  <span>校外用餐地点</span>
+                  <input id="mealPlaceAddress" type="text" maxlength="80" placeholder="如：穗石牌坊 / 大学城南地铁站" />
+                </div>
+                <div class="home-actions">
+                  <button type="button" class="mini-btn" id="geocodeMealBtn">按地址定位</button>
+                  <button type="button" class="link-btn" id="pickMealOnMapBtn">在地图上选点</button>
+                  <span class="home-coord" id="mealPlaceCoord">未定位</span>
+                </div>
+                <p class="pref-hint" id="mealPlaceHint">三餐任选“校外地点”后，这里填堂食地点；路线会把它作为一顿饭的停靠点。</p>
               </div>
               <div class="pref-row">
                 <span>喜欢的运动</span>

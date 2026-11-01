@@ -485,6 +485,18 @@ check('校外住宿选外卖时默认在住处吃，不送回宿舍', () => {
   assert.strictEqual(dinner.poi_id, 'home_custom');
 });
 
+check('午餐可选校外具体地点并接入路线', () => {
+  const plan = R.planDay({
+    date: '2026-11-02',
+    mealPrefs: { lunch: 'offcampus' },
+    mealPlace: { lat: 23.0452, lng: 113.4113, address: '穗石牌坊（东门外）' },
+    timetable: { campus: { key: 'university_town', label: '大学城校区' }, courses: [] },
+  });
+  const lunch = plan.blocks.find((b) => b.type === 'meal' && b.title.includes('午餐'));
+  assert.ok(lunch.title.includes('校外'));
+  assert.strictEqual(lunch.poi_id, 'meal_custom');
+});
+
 check('Markdown 导出包含日期、时间轴、热水与依据', () => {
   const md = R.buildMarkdown(base);
   assert.ok(md.includes('2026-10-29'));
