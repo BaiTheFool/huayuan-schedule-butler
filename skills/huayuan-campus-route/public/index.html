@@ -33,6 +33,8 @@
           <span class="dot"></span>
           <input id="dateInput" type="date" value="" aria-label="选择日期" />
           <span id="topDate">周四</span>
+          <button type="button" class="link-btn date-jump" id="todayBtn">今天</button>
+          <button type="button" class="link-btn date-jump" id="tomorrowBtn">明天</button>
         </div>
         <button class="btn ghost" id="exportBtn" type="button">导出 Markdown</button>
         <button class="btn ghost" id="printBtn" type="button">打印</button>
@@ -178,6 +180,11 @@
                   <option value="120">120 分钟</option>
                 </select>
               </div>
+              <div class="pref-divider"></div>
+              <label class="pref-check">
+                <input type="checkbox" id="napEnabled" checked />
+                <span>午饭后午休 20 分钟</span>
+              </label>
               <div class="pref-divider"></div>
               <div class="pref-row">
                 <span>住宿 / 休息</span>

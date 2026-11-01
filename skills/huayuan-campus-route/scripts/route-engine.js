@@ -1305,7 +1305,7 @@
       }
 
       if (hour < 14.05) {
-        if (end - at >= 25) {
+        if (opts.nap !== false && end - at >= 25) {
           pushBlock('rest', lunch ? lunch.poiId : startPoiId, at, at + 20, '午饭后坐一会儿，给下午留缓冲');
           at += 25;
         }

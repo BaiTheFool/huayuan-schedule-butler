@@ -109,14 +109,15 @@
     visibleLocations: [],
     plan: null,
     selected: null,
-    dormPoiId: 'c11',
-    home: { id: 'c11', address: '', lat: null, lng: null, offcampus: false },
+    dormPoiId: '',
+    home: { id: '', address: '', lat: null, lng: null, offcampus: false },
     pickHomeOnMap: false,
     mealPlace: { address: '', lat: null, lng: null },
     pickMealOnMap: false,
     mealPrefs: { breakfast: 'auto', lunch: 'auto', dinner: 'auto', takeoutPlace: 'home' },
     sportPref: 'auto',
     sportType: 'auto',
+    nap: true,
     gym: { enabled: false, date: '', start: '19:00', minutes: 60 },
   };
 
@@ -565,7 +566,7 @@
       gps: state.gps,
       timetable: state.timetable || undefined,
       preferences: state.preferences || undefined,
-      dormPoiId: state.dormPoiId,
+      dormPoiId: state.dormPoiId || undefined,
       home: state.dormPoiId === 'offcampus' || state.dormPoiId === 'custom_home' ? state.home : undefined,
       mealPrefs: state.mealPrefs,
       mealPlace: ['breakfast', 'lunch', 'dinner'].some((meal) => state.mealPrefs[meal] === 'offcampus')
@@ -573,6 +574,7 @@
         : undefined,
       sportPref: state.sportPref,
       sportType: state.sportType,
+      nap: state.nap,
       gym: state.gym.enabled ? state.gym : undefined,
       weekNumber: state.timetableInfo ? state.timetableInfo.week_number : null,
       major: state.major || undefined,
@@ -583,6 +585,9 @@
       state.plan = null;
       toast(plan.message || '没有生成路线');
       return;
+    }
+    if (!state.dormPoiId) {
+      plan.warnings.unshift('尚未选择住宿，当前暂按 C11 计算；请在“住宿 / 休息”里选宿舍或校外住处');
     }
     if (!plan.validation.ok) {
       state.plan = null;
@@ -1307,8 +1312,8 @@
     if (state.dormPoiId === 'offcampus') {
       return state.home.id === 'suishi' ? 'suishi' : 'offcampus';
     }
-    if (state.dormPoiId === 'custom_home') return state.home.id ? `dorm:${state.home.id}` : 'dorm:c11';
-    return `dorm:${state.dormPoiId || 'c11'}`;
+    if (state.dormPoiId === 'custom_home') return state.home.id ? `dorm:${state.home.id}` : 'none';
+    return state.dormPoiId ? `dorm:${state.dormPoiId}` : 'none';
   }
 
   function populateHomeOptions() {
@@ -1325,6 +1330,7 @@
     }
     dorms.sort((a, b) => String(a.short || a.name).localeCompare(String(b.short || b.name), 'zh-Hans-CN', { numeric: true }));
     select.innerHTML =
+      '<option value="none">请选择住宿</option>' +
       '<option value="offcampus">校外住处（可填地址）</option>' +
       '<option value="suishi">穗石牌坊（东门外）</option>' +
       dorms
@@ -1553,7 +1559,11 @@
     });
     $('homeSelect').addEventListener('change', (e) => {
       const value = e.target.value;
-      if (value === 'suishi') {
+      if (value === 'none') {
+        state.dormPoiId = '';
+        state.home = { id: '', address: '', lat: null, lng: null, offcampus: false };
+        $('prefsHint').textContent = '还没有选住宿；请选择校内宿舍或校外住处后再生成路线。';
+      } else if (value === 'suishi') {
         state.dormPoiId = 'offcampus';
         state.home = {
           id: 'suishi',
@@ -1640,6 +1650,11 @@
       saveStorage('huayuan.gym', state.gym);
       replan(false);
     });
+    $('napEnabled').addEventListener('change', (e) => {
+      state.nap = e.target.checked;
+      saveStorage('huayuan.nap', state.nap);
+      replan(false);
+    });
   }
 
   function syncPreferencesUI() {
@@ -1659,6 +1674,7 @@
     $('gymDate').disabled = !state.gym.enabled;
     $('gymStart').disabled = !state.gym.enabled;
     $('gymMinutes').disabled = !state.gym.enabled;
+    $('napEnabled').checked = state.nap !== false;
     $('prefsHint').textContent =
       state.dormPoiId === 'offcampus'
         ? '填地址后点“按地址定位”，或点“在地图上选点”；路线按住处坐标重算。'
@@ -1875,6 +1891,20 @@
       replan(false);
     });
 
+    function jumpToDate(offsetDays) {
+      const base = new Date(`${state.date}T12:00:00`);
+      base.setDate(base.getDate() + offsetDays);
+      state.date = `${base.getFullYear()}-${String(base.getMonth() + 1).padStart(2, '0')}-${String(base.getDate()).padStart(2, '0')}`;
+      $('dateInput').value = state.date;
+      $('todoDate').value = state.date;
+      if (state.gym.enabled) state.gym.date = state.date;
+      refreshWeekForDate();
+      syncPreferencesUI();
+      replan(false);
+    }
+    $('todayBtn').addEventListener('click', () => jumpToDate(0));
+    $('tomorrowBtn').addEventListener('click', () => jumpToDate(1));
+
     $('saveMajorBtn').addEventListener('click', saveMajor);
     $('majorInput').addEventListener('keydown', (e) => {
       if (e.key === 'Enter') {
@@ -2088,6 +2118,8 @@
     if (savedGym && typeof savedGym === 'object') {
       state.gym = { ...state.gym, ...savedGym };
     }
+    const savedNap = localStorage.getItem('huayuan.nap');
+    if (savedNap !== null) state.nap = savedNap === 'true';
     state.reminders = localStorage.getItem('huayuan.reminders') === 'true';
   } catch (error) {
     // 隐私模式下 localStorage 可能不可用
