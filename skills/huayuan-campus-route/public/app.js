@@ -399,6 +399,28 @@
       Promise.all(
         stopPoints.slice(0, -1).map((from, index) => {
           const to = stopPoints[index + 1];
+          const nearSuishi = (place) =>
+            place &&
+            Math.abs(Number(place.lat) - 23.0452) < 0.0012 &&
+            Math.abs(Number(place.lng) - 113.4113) < 0.0018;
+          if (nearSuishi(from) || nearSuishi(to)) {
+            const gate = POI.get('eastgate');
+            if (gate) {
+              if (nearSuishi(to)) {
+                return fetchRoadLeg(from, gate).then((tail) => {
+                  const points = tail && tail.length ? tail.slice() : [[from.lat, from.lng]];
+                  points.push(...SUISHI_APPROACH.slice().reverse());
+                  return points;
+                });
+              }
+              return fetchRoadLeg(gate, to).then((tail) => {
+                const points = SUISHI_APPROACH.slice();
+                if (tail && tail.length) points.push(...tail.slice(1));
+                else points.push([to.lat, to.lng]);
+                return points;
+              });
+            }
+          }
           const mealAtSuishi = Object.values(state.mealPlaces || {}).some((place) => /穗石|牌坊/.test(String(place && place.address || '')));
           if ((/^meal_/.test(from.id) || /^meal_/.test(to.id)) && mealAtSuishi) {
             const gate = POI.get('eastgate');
