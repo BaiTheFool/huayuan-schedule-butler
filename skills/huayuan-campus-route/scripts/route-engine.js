@@ -157,6 +157,7 @@
       lng,
       coord_confidence: 'user',
       hours: null,
+      offcampus: home.offcampus !== false,
     };
     POI_MAP.set(CUSTOM_HOME_ID, node);
     NODE_MAP.set(CUSTOM_HOME_ID, node);
@@ -787,7 +788,7 @@
 
     const customHome = installCustomHome(opts.home);
     const dormPoiId = customHome ? CUSTOM_HOME_ID : opts.dormPoiId && POI_MAP.has(opts.dormPoiId) ? opts.dormPoiId : 'c11';
-    const isOffCampus = dormPoiId === 'offcampus' || dormPoiId === CUSTOM_HOME_ID;
+    const isOffCampus = dormPoiId === 'offcampus' || (dormPoiId === CUSTOM_HOME_ID && customHome && customHome.offcampus);
     let startPoiId = dormPoiId;
     if (gps && gps.in_campus && gps.nearest_poi) startPoiId = gps.nearest_poi;
     if (gps && !gps.in_campus) {

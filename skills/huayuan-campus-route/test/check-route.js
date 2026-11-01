@@ -463,6 +463,16 @@ check('自定义校外地址会重算起终点路线', () => {
   assert.ok(plan.route.points.length > 2);
 });
 
+check('校内自定义宿舍仍按宿舍热水和门禁安排', () => {
+  const plan = R.planDay({
+    date: '2026-11-02',
+    home: { lat: 23.0521, lng: 113.4017, address: 'E1 学生宿舍', offcampus: false },
+    timetable: { campus: { key: 'university_town', label: '大学城校区' }, courses: [] },
+  });
+  assert.strictEqual(plan.blocks.find((b) => b.type === 'wake').poi_id, 'home_custom');
+  assert.ok(plan.blocks.find((b) => b.type === 'shower').title.includes('宿舍'));
+});
+
 check('Markdown 导出包含日期、时间轴、热水与依据', () => {
   const md = R.buildMarkdown(base);
   assert.ok(md.includes('2026-10-29'));

@@ -110,7 +110,7 @@
     plan: null,
     selected: null,
     dormPoiId: 'c11',
-    home: { address: '', lat: null, lng: null },
+    home: { id: 'c11', address: '', lat: null, lng: null, offcampus: false },
     pickHomeOnMap: false,
     mealPrefs: { breakfast: 'auto', lunch: 'auto', dinner: 'auto', takeoutPlace: 'c11' },
     sportPref: 'auto',
@@ -398,7 +398,7 @@
       }).addTo(gpsGroup);
     }
 
-    if (state.dormPoiId === 'offcampus' && homeCoordsValid()) {
+    if ((state.dormPoiId === 'offcampus' || state.dormPoiId === 'custom_home') && homeCoordsValid()) {
       L.marker([Number(state.home.lat), Number(state.home.lng)], {
         icon: homeIcon(),
         keyboard: false,
@@ -489,7 +489,7 @@
       timetable: state.timetable || undefined,
       preferences: state.preferences || undefined,
       dormPoiId: state.dormPoiId,
-      home: state.dormPoiId === 'offcampus' ? state.home : undefined,
+      home: state.dormPoiId === 'offcampus' || state.dormPoiId === 'custom_home' ? state.home : undefined,
       mealPrefs: state.mealPrefs,
       sportPref: state.sportPref,
       sportType: state.sportType,
@@ -1223,6 +1223,33 @@
     });
   }
 
+  function homeSelectValue() {
+    if (state.dormPoiId === 'offcampus') return 'offcampus';
+    if (state.dormPoiId === 'custom_home') return state.home.id ? `dorm:${state.home.id}` : 'dorm:c11';
+    return `dorm:${state.dormPoiId || 'c11'}`;
+  }
+
+  function populateHomeOptions() {
+    const select = $('homeSelect');
+    if (!select || select.dataset.populated === '1') return;
+    const dorms = [];
+    const seen = new Set();
+    for (const location of LOCATIONS) {
+      if (!['dorm', '宿舍'].includes(location.group)) continue;
+      if (location.id === 'offcampus') continue;
+      if (!location.id || seen.has(location.id)) continue;
+      seen.add(location.id);
+      dorms.push(location);
+    }
+    dorms.sort((a, b) => String(a.short || a.name).localeCompare(String(b.short || b.name), 'zh-Hans-CN', { numeric: true }));
+    select.innerHTML =
+      '<option value="offcampus">校外住处（可填地址）</option>' +
+      dorms
+        .map((dorm) => `<option value="dorm:${esc(dorm.id)}">${esc(dorm.name || dorm.short)}</option>`)
+        .join('');
+    select.dataset.populated = '1';
+  }
+
   function homeCoordsValid() {
     if (state.home.lat == null || state.home.lng == null || state.home.lat === '' || state.home.lng === '') return false;
     const lat = Number(state.home.lat);
@@ -1232,15 +1259,16 @@
 
   function syncHomeFields() {
     const offcampus = state.dormPoiId === 'offcampus';
+    const customHome = state.dormPoiId === 'custom_home';
     $('homeFields').hidden = !offcampus;
     $('homeAddress').value = state.home.address || '';
-    $('homeCoord').textContent = offcampus && homeCoordsValid()
+    $('homeCoord').textContent = (offcampus || customHome) && homeCoordsValid()
       ? `${Number(state.home.lat).toFixed(5)}, ${Number(state.home.lng).toFixed(5)}`
       : '未定位';
-    if (offcampus && homeCoordsValid()) {
+    if ((offcampus || customHome) && homeCoordsValid()) {
       POI.set('home_custom', {
         id: 'home_custom',
-        name: state.home.address || '校外住处',
+        name: state.home.address || '住处',
         short: '住处',
         category: 'dorm',
         icon: '🏠',
@@ -1254,6 +1282,7 @@
 
   function setHomeCoords(lat, lng, address) {
     state.home = {
+      ...state.home,
       address: address || state.home.address || '地图选点',
       lat: Number(lat),
       lng: Number(lng),
@@ -1329,17 +1358,33 @@
       replan(false);
     });
     $('homeSelect').addEventListener('change', (e) => {
-      state.dormPoiId = e.target.value === 'offcampus' ? 'offcampus' : 'c11';
-      if (state.dormPoiId === 'offcampus' && !homeCoordsValid()) {
-        state.home = { address: '大学城南地铁站', lat: 23.04346, lng: 113.40111 };
-        saveStorage('huayuan.home', state.home);
+      const value = e.target.value;
+      if (value === 'offcampus') {
+        state.dormPoiId = 'offcampus';
+        if (!homeCoordsValid() || !state.home.offcampus) {
+          state.home = { id: 'offcampus', address: '大学城南地铁站', lat: 23.04346, lng: 113.40111, offcampus: true };
+        }
+      } else {
+        const id = value.replace(/^dorm:/, '');
+        const location = LOCATIONS.find((item) => item.id === id);
+        if (location) {
+          state.home = {
+            id,
+            address: location.name,
+            lat: Number(location.lat),
+            lng: Number(location.lng),
+            offcampus: false,
+          };
+          state.dormPoiId = POI.has(id) ? id : 'custom_home';
+        }
       }
       $('prefsHint').textContent =
         state.dormPoiId === 'offcampus'
           ? '填地址后点“按地址定位”，或点“在地图上选点”；路线按住处坐标重算。'
-          : '默认住 C11；校外住宿时填写地址或在地图上选点。';
+          : '已选校内宿舍；起床、洗漱、睡觉会按这个宿舍安排。';
       syncHomeFields();
       saveStorage('huayuan.dormPoiId', state.dormPoiId);
+      saveStorage('huayuan.home', state.home);
       replan(false);
     });
     $('homeAddress').addEventListener('change', (e) => {
@@ -1396,7 +1441,7 @@
     $('takeoutPlace').value = state.mealPrefs.takeoutPlace;
     $('sportPref').value = state.sportPref || 'auto';
     $('sportType').value = state.sportType || 'auto';
-    $('homeSelect').value = state.dormPoiId;
+    $('homeSelect').value = homeSelectValue();
     syncHomeFields();
     $('gymEnabled').checked = Boolean(state.gym.enabled);
     $('gymDate').value = state.gym.date || state.date;
@@ -1805,13 +1850,15 @@
       state.mealPrefs = { ...state.mealPrefs, ...savedMealPrefs };
     }
     const savedDorm = localStorage.getItem('huayuan.dormPoiId');
-    if (savedDorm === 'offcampus' || savedDorm === 'c11') state.dormPoiId = savedDorm;
+    if (['offcampus', 'c11', 'custom_home'].includes(savedDorm)) state.dormPoiId = savedDorm;
     const savedHome = JSON.parse(localStorage.getItem('huayuan.home') || 'null');
     if (savedHome && typeof savedHome === 'object' && Number.isFinite(Number(savedHome.lat)) && Number.isFinite(Number(savedHome.lng))) {
       state.home = {
+        id: String(savedHome.id || 'offcampus').slice(0, 40),
         address: String(savedHome.address || '').slice(0, 80),
         lat: Number(savedHome.lat),
         lng: Number(savedHome.lng),
+        offcampus: savedHome.offcampus !== false,
       };
     }
     const savedSportPref = localStorage.getItem('huayuan.sportPref');
@@ -1838,7 +1885,7 @@
   if (params.get('home') === 'offcampus') {
     state.dormPoiId = 'offcampus';
     if (!homeCoordsValid()) {
-      state.home = { address: '大学城南地铁站', lat: 23.04346, lng: 113.40111 };
+      state.home = { id: 'offcampus', address: '大学城南地铁站', lat: 23.04346, lng: 113.40111, offcampus: true };
     }
   }
   if (TBL) {
@@ -1895,6 +1942,7 @@
     });
     bind();
     bindPreferences();
+    populateHomeOptions();
     syncPreferencesUI();
     replan(false);
     refreshDashboardContext();
