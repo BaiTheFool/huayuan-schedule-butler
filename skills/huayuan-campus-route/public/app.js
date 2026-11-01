@@ -263,6 +263,9 @@
     [23.0475, 113.4088],
     [23.0484, 113.4079],
   ];
+  const GYM_ENTRY = [23.04815, 113.40375];
+  const GYM_PLAZA = [23.04755, 113.40455];
+  const GYM_CANTEEN = [23.04795, 113.40335];
 
   function gcj02ToWgs84(lat, lng) {
     let wlat = lat;
@@ -368,6 +371,15 @@
       Promise.all(
         stopPoints.slice(0, -1).map((from, index) => {
           const to = stopPoints[index + 1];
+          if (from.id === 'gym' || to.id === 'gym') {
+            const way = ['library', 'cafe', 'a1', 'a2', 'a3'].includes(from.id) || ['library', 'cafe', 'a1', 'a2', 'a3'].includes(to.id)
+              ? GYM_PLAZA
+              : GYM_CANTEEN;
+            if (to.id === 'gym') {
+              return Promise.resolve([[from.lat, from.lng], way, GYM_ENTRY]);
+            }
+            return Promise.resolve([GYM_ENTRY, way, [to.lat, to.lng]]);
+          }
           if (to.id === 'home_custom' && state.home.id === 'suishi') {
             const gate = POI.get('eastgate');
             if (gate) {
@@ -1942,6 +1954,12 @@
   $('dateInput').value = state.date;
   $('todoDate').value = state.date;
   if (!state.gym.date) state.gym.date = state.date;
+  if (params.get('gym') === '1') {
+    state.gym.enabled = true;
+    state.gym.date = state.date;
+    state.gym.start = state.gym.start || '19:00';
+    state.gym.minutes = state.gym.minutes || 60;
+  }
   if (params.get('home') === 'offcampus') {
     state.dormPoiId = 'offcampus';
     if (!homeCoordsValid()) {
