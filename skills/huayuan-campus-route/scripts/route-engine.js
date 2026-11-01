@@ -137,6 +137,16 @@
     GRAPH.get(b).push({ id: a, distance: d });
   }
 
+  const CAMPUS_OUTSIDE_IDS = new Set(['offcampus', 'suishi', 'j_offcampus', 'j_suishi', 'eastgate']);
+  const CAMPUS_GRAPH = new Map();
+  for (const [id, edges] of GRAPH) {
+    if (CAMPUS_OUTSIDE_IDS.has(id)) continue;
+    CAMPUS_GRAPH.set(
+      id,
+      edges.filter((edge) => !CAMPUS_OUTSIDE_IDS.has(edge.id))
+    );
+  }
+
   const pathCache = new Map();
   const CUSTOM_HOME_ID = 'home_custom';
   let customHomeNearest = null;
@@ -286,12 +296,19 @@
       const p = NODE_MAP.get(fromId);
       return { nodes: [fromId], points: p ? [{ lat: p.lat, lng: p.lng }] : [], distance: 0 };
     }
-    const key = `${fromId}->${toId}`;
+    const isCampusId = (id) =>
+      !CAMPUS_OUTSIDE_IDS.has(id) &&
+      !String(id).startsWith('event_') &&
+      !String(id).startsWith('meal_') &&
+      id !== 'home_custom';
+    const useCampusGraph = isCampusId(fromId) && isCampusId(toId);
+    const graph = useCampusGraph ? CAMPUS_GRAPH : GRAPH;
+    const key = `${useCampusGraph ? 'campus' : 'full'}:${fromId}->${toId}`;
     if (pathCache.has(key)) return pathCache.get(key);
     const dist = new Map();
     const prev = new Map();
     const visited = new Set();
-    for (const id of GRAPH.keys()) dist.set(id, Infinity);
+    for (const id of graph.keys()) dist.set(id, Infinity);
     dist.set(fromId, 0);
     while (true) {
       let current = null;
@@ -305,7 +322,7 @@
       if (!current || best === Infinity) break;
       if (current === toId) break;
       visited.add(current);
-      for (const edge of GRAPH.get(current) || []) {
+      for (const edge of graph.get(current) || []) {
         const next = best + edge.distance;
         if (next < (dist.get(edge.id) ?? Infinity)) {
           dist.set(edge.id, next);
