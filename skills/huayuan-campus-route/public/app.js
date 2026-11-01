@@ -112,7 +112,8 @@
     dormPoiId: '',
     home: { id: '', address: '', lat: null, lng: null, offcampus: false },
     pickHomeOnMap: false,
-    mealPlace: { address: '', lat: null, lng: null },
+    mealPlaces: { breakfast: { address: '', lat: null, lng: null }, lunch: { address: '', lat: null, lng: null }, dinner: { address: '', lat: null, lng: null } },
+    mealPlaceEditing: 'lunch',
     pickMealOnMap: false,
     mealPrefs: { breakfast: 'auto', lunch: 'auto', dinner: 'auto', takeoutPlace: 'home' },
     sportPref: 'auto',
@@ -227,7 +228,7 @@
       if (state.pickMealOnMap) {
         state.pickMealOnMap = false;
         map.getContainer().style.cursor = '';
-        setMealPlaceCoords(event.latlng.lat, event.latlng.lng, state.mealPlace.address || '地图选点');
+        setMealPlaceCoords(event.latlng.lat, event.latlng.lng, (state.mealPlaces[state.mealPlaceEditing] || {}).address || '地图选点');
         return;
       }
       if (state.pickHomeOnMap) {
@@ -385,8 +386,8 @@
       Promise.all(
         stopPoints.slice(0, -1).map((from, index) => {
           const to = stopPoints[index + 1];
-          const mealAtSuishi = /穗石|牌坊/.test(String(state.mealPlace && state.mealPlace.address || ''));
-          if ((from.id === 'meal_custom' || to.id === 'meal_custom') && mealAtSuishi) {
+          const mealAtSuishi = Object.values(state.mealPlaces || {}).some((place) => /穗石|牌坊/.test(String(place && place.address || '')));
+          if ((/^meal_/.test(from.id) || /^meal_/.test(to.id)) && mealAtSuishi) {
             const gate = POI.get('eastgate');
             if (gate) {
               if (to.id === 'meal_custom') {
@@ -574,8 +575,8 @@
       dormPoiId: state.dormPoiId || undefined,
       home: state.dormPoiId === 'offcampus' || state.dormPoiId === 'custom_home' ? state.home : undefined,
       mealPrefs: state.mealPrefs,
-      mealPlace: ['breakfast', 'lunch', 'dinner'].some((meal) => state.mealPrefs[meal] === 'offcampus')
-        ? state.mealPlace
+      mealPlaces: ['breakfast', 'lunch', 'dinner'].some((meal) => state.mealPrefs[meal] === 'offcampus')
+        ? state.mealPlaces
         : undefined,
       sportPref: state.sportPref,
       sportType: state.sportType,
@@ -1351,57 +1352,69 @@
     return Number.isFinite(lat) && Number.isFinite(lng) && Math.abs(lat) <= 90 && Math.abs(lng) <= 180;
   }
 
-  function mealPlaceValid() {
-    if (state.mealPlace.lat == null || state.mealPlace.lng == null) return false;
-    const lat = Number(state.mealPlace.lat);
-    const lng = Number(state.mealPlace.lng);
+  function mealPlaceValid(meal) {
+    const place = state.mealPlaces[meal] || {};
+    if (place.lat == null || place.lng == null) return false;
+    const lat = Number(place.lat);
+    const lng = Number(place.lng);
     return Number.isFinite(lat) && Number.isFinite(lng) && Math.abs(lat) <= 90 && Math.abs(lng) <= 180;
   }
 
   function syncMealPlaceFields() {
-    const used = ['breakfast', 'lunch', 'dinner'].some((meal) => state.mealPrefs[meal] === 'offcampus');
-    $('mealPlaceFields').hidden = !used;
-    $('mealPlaceAddress').value = state.mealPlace.address || '';
-    $('mealPlaceCoord').textContent = used && mealPlaceValid()
-      ? `${Number(state.mealPlace.lat).toFixed(5)}, ${Number(state.mealPlace.lng).toFixed(5)}`
+    const used = ['breakfast', 'lunch', 'dinner'].filter((meal) => state.mealPrefs[meal] === 'offcampus');
+    if (!used.includes(state.mealPlaceEditing)) state.mealPlaceEditing = used[0] || 'lunch';
+    const meal = state.mealPlaceEditing;
+    const place = state.mealPlaces[meal] || {};
+    $('mealPlaceFields').hidden = used.length === 0;
+    $('mealPlaceMeal').value = meal;
+    $('mealPlaceAddress').value = place.address || '';
+    $('mealPlaceCoord').textContent = used.length && mealPlaceValid(meal)
+      ? `${Number(place.lat).toFixed(5)}, ${Number(place.lng).toFixed(5)}`
       : '未定位';
-    if (used && mealPlaceValid()) {
-      POI.set('meal_custom', {
-        id: 'meal_custom',
-        name: state.mealPlace.address || '校外用餐地点',
-        short: '校外用餐',
-        category: 'meal',
-        icon: '🍽️',
-        lat: Number(state.mealPlace.lat),
-        lng: Number(state.mealPlace.lng),
-      });
-    } else {
-      POI.delete('meal_custom');
+    for (const item of ['breakfast', 'lunch', 'dinner']) {
+      const id = `meal_${item}`;
+      if (used.includes(item) && mealPlaceValid(item)) {
+        const current = state.mealPlaces[item];
+        POI.set(id, {
+          id,
+          name: current.address || '校外用餐地点',
+          short: String(current.address || '校外用餐').slice(0, 12),
+          category: 'meal',
+          icon: '🍽️',
+          lat: Number(current.lat),
+          lng: Number(current.lng),
+        });
+      } else {
+        POI.delete(id);
+      }
     }
   }
 
-  function setMealPlaceCoords(lat, lng, address) {
-    state.mealPlace = {
-      address: address || state.mealPlace.address || '地图选点',
+  function setMealPlaceCoords(lat, lng, address, meal) {
+    const target = meal || state.mealPlaceEditing;
+    state.mealPlaces[target] = {
+      ...(state.mealPlaces[target] || {}),
+      address: address || (state.mealPlaces[target] && state.mealPlaces[target].address) || '地图选点',
       lat: Number(lat),
       lng: Number(lng),
     };
-    saveStorage('huayuan.mealPlace', state.mealPlace);
+    saveStorage('huayuan.mealPlaces', state.mealPlaces);
     syncMealPlaceFields();
     replan(false);
-    toast(`校外用餐地点已设为 ${state.mealPlace.address}`);
+    toast(`${target === 'breakfast' ? '早餐' : target === 'dinner' ? '晚餐' : '午餐'}校外地点已设为 ${state.mealPlaces[target].address}`);
   }
 
   async function geocodeMealPlace() {
+    const meal = state.mealPlaceEditing;
     const raw = String($('mealPlaceAddress').value || '').trim();
     if (!raw) {
       toast('先填一个校外用餐地点');
       return;
     }
-    state.mealPlace.address = raw;
-    saveStorage('huayuan.mealPlace', state.mealPlace);
+    state.mealPlaces[meal] = { ...(state.mealPlaces[meal] || {}), address: raw };
+    saveStorage('huayuan.mealPlaces', state.mealPlaces);
     if (/穗石|牌坊/.test(raw)) {
-      setMealPlaceCoords(23.0452, 113.4113, '穗石牌坊（东门外）');
+      setMealPlaceCoords(23.0452, 113.4113, '穗石牌坊（东门外）', meal);
       $('mealPlaceHint').textContent = '已定位到穗石牌坊，按东门进校最近。';
       return;
     }
@@ -1421,7 +1434,7 @@
       const [lng, lat] = feature.geometry.coordinates;
       const gcj = R.wgs84ToGcj02(Number(lat), Number(lng));
       const props = feature.properties || {};
-      setMealPlaceCoords(gcj.lat, gcj.lng, raw);
+      setMealPlaceCoords(gcj.lat, gcj.lng, raw, meal);
       $('mealPlaceHint').textContent = `已定位到 ${props.name || props.street || raw}；地址按你填写的保留，可在地图上微调。`;
     } catch (error) {
       toast('用餐地点没定位到，请换个说法或在地图上选点');
@@ -1518,9 +1531,12 @@
     for (const [meal, id] of Object.entries(mealIds)) {
       $(id).addEventListener('change', (e) => {
         state.mealPrefs[meal] = e.target.value;
-        if (e.target.value === 'offcampus' && !mealPlaceValid()) {
-          state.mealPlace = { address: '穗石牌坊（东门外）', lat: 23.0452, lng: 113.4113 };
-          saveStorage('huayuan.mealPlace', state.mealPlace);
+        if (e.target.value === 'offcampus') {
+          state.mealPlaceEditing = meal;
+          if (!mealPlaceValid(meal)) {
+            state.mealPlaces[meal] = { address: '穗石牌坊（东门外）', lat: 23.0452, lng: 113.4113 };
+            saveStorage('huayuan.mealPlaces', state.mealPlaces);
+          }
         }
         saveStorage('huayuan.mealPrefs', state.mealPrefs);
         syncMealPlaceFields();
@@ -1532,9 +1548,17 @@
       saveStorage('huayuan.mealPrefs', state.mealPrefs);
       replan(false);
     });
+    $('mealPlaceMeal').addEventListener('change', (e) => {
+      state.mealPlaceEditing = e.target.value;
+      syncMealPlaceFields();
+    });
     $('mealPlaceAddress').addEventListener('change', (e) => {
-      state.mealPlace.address = String(e.target.value || '').trim().slice(0, 80);
-      saveStorage('huayuan.mealPlace', state.mealPlace);
+      const meal = state.mealPlaceEditing;
+      state.mealPlaces[meal] = {
+        ...(state.mealPlaces[meal] || {}),
+        address: String(e.target.value || '').trim().slice(0, 80),
+      };
+      saveStorage('huayuan.mealPlaces', state.mealPlaces);
     });
     $('mealPlaceAddress').addEventListener('keydown', (e) => {
       if (e.key === 'Enter') {
@@ -2105,13 +2129,27 @@
         offcampus: savedHome.offcampus !== false,
       };
     }
-    const savedMealPlace = JSON.parse(localStorage.getItem('huayuan.mealPlace') || 'null');
-    if (savedMealPlace && typeof savedMealPlace === 'object' && Number.isFinite(Number(savedMealPlace.lat)) && Number.isFinite(Number(savedMealPlace.lng))) {
-      state.mealPlace = {
-        address: String(savedMealPlace.address || '').slice(0, 80),
-        lat: Number(savedMealPlace.lat),
-        lng: Number(savedMealPlace.lng),
-      };
+    const savedMealPlaces = JSON.parse(localStorage.getItem('huayuan.mealPlaces') || 'null');
+    if (savedMealPlaces && typeof savedMealPlaces === 'object') {
+      for (const meal of ['breakfast', 'lunch', 'dinner']) {
+        const place = savedMealPlaces[meal];
+        if (place && Number.isFinite(Number(place.lat)) && Number.isFinite(Number(place.lng))) {
+          state.mealPlaces[meal] = {
+            address: String(place.address || '').slice(0, 80),
+            lat: Number(place.lat),
+            lng: Number(place.lng),
+          };
+        }
+      }
+    } else {
+      const savedMealPlace = JSON.parse(localStorage.getItem('huayuan.mealPlace') || 'null');
+      if (savedMealPlace && Number.isFinite(Number(savedMealPlace.lat)) && Number.isFinite(Number(savedMealPlace.lng))) {
+        state.mealPlaces.lunch = {
+          address: String(savedMealPlace.address || '').slice(0, 80),
+          lat: Number(savedMealPlace.lat),
+          lng: Number(savedMealPlace.lng),
+        };
+      }
     }
     const savedSportPref = localStorage.getItem('huayuan.sportPref');
     if (['auto', 'field_life', 'field', 'gym'].includes(savedSportPref)) state.sportPref = savedSportPref;

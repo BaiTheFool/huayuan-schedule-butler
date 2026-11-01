@@ -140,8 +140,12 @@
   const pathCache = new Map();
   const CUSTOM_HOME_ID = 'home_custom';
   let customHomeNearest = null;
-  const MEAL_CUSTOM_ID = 'meal_custom';
-  let customMealNearest = null;
+  const MEAL_CUSTOM_IDS = {
+    breakfast: 'meal_breakfast',
+    lunch: 'meal_lunch',
+    dinner: 'meal_dinner',
+  };
+  const customMealNearest = new Map();
 
   /** 把用户填写的校外住址临时接入步行图；每次重排更新，不污染固定 POI 数据。 */
   function installCustomHome(home) {
@@ -189,14 +193,16 @@
     return node;
   }
 
-  /** 把用户选择的校外用餐点临时接入步行图。 */
-  function installCustomMeal(place) {
+  /** 把用户选择的校外用餐点临时接入步行图；早/午/晚各自一个节点。 */
+  function installCustomMeal(meal, place) {
+    const id = MEAL_CUSTOM_IDS[meal];
+    if (!id) return null;
     if (!place || !Number.isFinite(Number(place.lat)) || !Number.isFinite(Number(place.lng))) return null;
     const lat = Number(place.lat);
     const lng = Number(place.lng);
     if (lat < -90 || lat > 90 || lng < -180 || lng > 180) return null;
     const node = {
-      id: MEAL_CUSTOM_ID,
+      id,
       name: place.name || place.address || '校外用餐地点',
       short: String(place.name || place.address || '校外用餐').slice(0, 12),
       category: 'meal',
@@ -207,26 +213,27 @@
       hours: null,
       offcampus: true,
     };
-    POI_MAP.set(MEAL_CUSTOM_ID, node);
-    NODE_MAP.set(MEAL_CUSTOM_ID, node);
-    if (customMealNearest) {
-      const edges = GRAPH.get(customMealNearest.id) || [];
-      GRAPH.set(customMealNearest.id, edges.filter((edge) => edge.id !== MEAL_CUSTOM_ID));
+    POI_MAP.set(id, node);
+    NODE_MAP.set(id, node);
+    const previous = customMealNearest.get(id);
+    if (previous) {
+      const edges = GRAPH.get(previous.id) || [];
+      GRAPH.set(previous.id, edges.filter((edge) => edge.id !== id));
     }
     let nearest = null;
-    for (const [id, candidate] of NODE_MAP) {
-      if (id === MEAL_CUSTOM_ID) continue;
+    for (const [candidateId, candidate] of NODE_MAP) {
+      if (candidateId === id) continue;
       const distance = haversine(node, candidate);
-      if (!nearest || distance < nearest.distance) nearest = { id, node: candidate, distance };
+      if (!nearest || distance < nearest.distance) nearest = { id: candidateId, node: candidate, distance };
     }
-    GRAPH.set(MEAL_CUSTOM_ID, []);
+    GRAPH.set(id, []);
     if (nearest) {
       const distance = nearest.distance * 1.12;
-      GRAPH.get(MEAL_CUSTOM_ID).push({ id: nearest.id, distance });
-      GRAPH.get(nearest.id).push({ id: MEAL_CUSTOM_ID, distance });
-      customMealNearest = { id: nearest.id, node: nearest.node };
+      GRAPH.get(id).push({ id: nearest.id, distance });
+      GRAPH.get(nearest.id).push({ id, distance });
+      customMealNearest.set(id, { id: nearest.id, node: nearest.node });
     } else {
-      customMealNearest = null;
+      customMealNearest.delete(id);
     }
     pathCache.clear();
     return node;
@@ -830,7 +837,8 @@
     const classes = normalized.list;
 
     const customHome = installCustomHome(opts.home);
-    const customMeal = installCustomMeal(opts.mealPlace);
+    const mealPlaces = opts.mealPlaces || (opts.mealPlace ? { lunch: opts.mealPlace } : {});
+    for (const [meal, place] of Object.entries(mealPlaces)) installCustomMeal(meal, place);
     const dormPoiId = customHome ? CUSTOM_HOME_ID : opts.dormPoiId && POI_MAP.has(opts.dormPoiId) ? opts.dormPoiId : 'c11';
     const isOffCampus = dormPoiId === 'offcampus' || (dormPoiId === CUSTOM_HOME_ID && customHome && customHome.offcampus);
     let startPoiId = dormPoiId;
@@ -881,7 +889,7 @@
     function mealChoice(meal, fromPoiId) {
       const pref = String(mealPrefs[meal] || 'auto');
       if (pref === 'offcampus') {
-        const poi = POI_MAP.get(MEAL_CUSTOM_ID);
+        const poi = POI_MAP.get(MEAL_CUSTOM_IDS[meal]);
         if (poi) return { poi, takeout: false, offcampus: true, preferred: true };
         warnings.push('校外用餐地点没有定位，已先按最近饭堂安排');
         return { poi: nearestPoi(['canteen1', 'canteen2'], fromPoiId), takeout: false, preferred: false };

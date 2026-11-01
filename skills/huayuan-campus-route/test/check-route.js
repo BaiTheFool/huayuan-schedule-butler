@@ -494,7 +494,7 @@ check('午餐可选校外具体地点并接入路线', () => {
   });
   const lunch = plan.blocks.find((b) => b.type === 'meal' && b.title.includes('午餐'));
   assert.ok(lunch.title.includes('校外'));
-  assert.strictEqual(lunch.poi_id, 'meal_custom');
+  assert.strictEqual(lunch.poi_id, 'meal_lunch');
 });
 
 check('Markdown 导出包含日期、时间轴、热水与依据', () => {
