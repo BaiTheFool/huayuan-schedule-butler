@@ -452,6 +452,17 @@ check('跑步偏好会安排到田径场而不是体育馆', () => {
   assert.ok(['field', 'field_life'].includes(sport.poi_id));
 });
 
+check('自定义校外地址会重算起终点路线', () => {
+  const plan = R.planDay({
+    date: '2026-11-02',
+    home: { lat: 23.0432, lng: 113.4011, address: '校外测试住处' },
+    timetable: { campus: { key: 'university_town', label: '大学城校区' }, courses: [] },
+  });
+  assert.strictEqual(plan.blocks.find((b) => b.type === 'wake').poi_id, 'home_custom');
+  assert.strictEqual(plan.blocks.find((b) => b.type === 'sleep').poi_id, 'home_custom');
+  assert.ok(plan.route.points.length > 2);
+});
+
 check('Markdown 导出包含日期、时间轴、热水与依据', () => {
   const md = R.buildMarkdown(base);
   assert.ok(md.includes('2026-10-29'));

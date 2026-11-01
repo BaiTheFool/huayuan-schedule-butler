@@ -167,10 +167,22 @@
                 <span>住宿 / 休息</span>
                 <select id="homeSelect" aria-label="住宿地点">
                   <option value="c11">校内 C11 宿舍</option>
-                  <option value="offcampus">校外住处（大学城南）</option>
+                  <option value="offcampus">校外住处（可填地址）</option>
                 </select>
               </div>
-              <p class="pref-hint" id="prefsHint">校外住处是示例点，路线为近似连接；可在页面上查看后按实际住处调整。</p>
+              <div class="home-fields" id="homeFields" hidden>
+                <div class="pref-row">
+                  <span>校外地址</span>
+                  <input id="homeAddress" type="text" maxlength="80" placeholder="如：大学城南地铁站 / 穗石村" />
+                </div>
+                <div class="home-actions">
+                  <button type="button" class="mini-btn" id="geocodeHomeBtn">按地址定位</button>
+                  <button type="button" class="link-btn" id="pickHomeOnMapBtn">在地图上选点</button>
+                  <span class="home-coord" id="homeCoord">未定位</span>
+                </div>
+                <p class="pref-hint" id="homeHint">地址会先尝试用 OpenStreetMap 搜索；找不到时点“在地图上选点”，路线按坐标重算。</p>
+              </div>
+              <p class="pref-hint" id="prefsHint">默认住 C11；校外住宿时填写地址或在地图上选点。</p>
             </div>
           </details>
 

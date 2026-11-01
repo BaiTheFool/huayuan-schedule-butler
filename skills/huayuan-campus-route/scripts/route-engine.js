@@ -138,6 +138,53 @@
   }
 
   const pathCache = new Map();
+  const CUSTOM_HOME_ID = 'home_custom';
+  let customHomeNearest = null;
+
+  /** 把用户填写的校外住址临时接入步行图；每次重排更新，不污染固定 POI 数据。 */
+  function installCustomHome(home) {
+    if (!home || !Number.isFinite(Number(home.lat)) || !Number.isFinite(Number(home.lng))) return null;
+    const lat = Number(home.lat);
+    const lng = Number(home.lng);
+    if (lat < -90 || lat > 90 || lng < -180 || lng > 180) return null;
+    const node = {
+      id: CUSTOM_HOME_ID,
+      name: home.name || home.address || '校外住处',
+      short: '住处',
+      category: 'dorm',
+      icon: '🏠',
+      lat,
+      lng,
+      coord_confidence: 'user',
+      hours: null,
+    };
+    POI_MAP.set(CUSTOM_HOME_ID, node);
+    NODE_MAP.set(CUSTOM_HOME_ID, node);
+    if (customHomeNearest) {
+      const edges = GRAPH.get(customHomeNearest.id) || [];
+      GRAPH.set(
+        customHomeNearest.id,
+        edges.filter((edge) => edge.id !== CUSTOM_HOME_ID)
+      );
+    }
+    let nearest = null;
+    for (const [id, candidate] of NODE_MAP) {
+      if (id === CUSTOM_HOME_ID) continue;
+      const distance = haversine(node, candidate);
+      if (!nearest || distance < nearest.distance) nearest = { id, node: candidate, distance };
+    }
+    GRAPH.set(CUSTOM_HOME_ID, []);
+    if (nearest) {
+      const distance = nearest.distance * 1.12;
+      GRAPH.get(CUSTOM_HOME_ID).push({ id: nearest.id, distance });
+      GRAPH.get(nearest.id).push({ id: CUSTOM_HOME_ID, distance });
+      customHomeNearest = { id: nearest.id, node: nearest.node };
+    } else {
+      customHomeNearest = null;
+    }
+    pathCache.clear();
+    return node;
+  }
 
   /** Dijkstra：节点少，直接用 O(n²)，不引依赖。 */
   function shortestPath(fromId, toId) {
@@ -738,8 +785,9 @@
     warnings.push(...normalized.warnings);
     const classes = normalized.list;
 
-    const dormPoiId = opts.dormPoiId && POI_MAP.has(opts.dormPoiId) ? opts.dormPoiId : 'c11';
-    const isOffCampus = dormPoiId === 'offcampus';
+    const customHome = installCustomHome(opts.home);
+    const dormPoiId = customHome ? CUSTOM_HOME_ID : opts.dormPoiId && POI_MAP.has(opts.dormPoiId) ? opts.dormPoiId : 'c11';
+    const isOffCampus = dormPoiId === 'offcampus' || dormPoiId === CUSTOM_HOME_ID;
     let startPoiId = dormPoiId;
     if (gps && gps.in_campus && gps.nearest_poi) startPoiId = gps.nearest_poi;
     if (gps && !gps.in_campus) {
@@ -1085,7 +1133,7 @@
         const fromHome = pathFor(startPoiId, id, { ...travelOpts, at: start });
         const dinner = nearestPoi(['canteen1', 'canteen2'], id);
         const after = dinner ? pathFor(id, dinner.id, { ...travelOpts, at: end }).minutes : 0;
-        const score = (toVenue.uncertain ? 999 : toVenue.minutes) + after * 0.35 + (fromHome.uncertain ? 0 : fromHome.minutes) * 0.35;
+        const score = (toVenue.uncertain ? 999 : toVenue.minutes) * 0.35 + after * 0.2 + (fromHome.uncertain ? 0 : fromHome.minutes) * 0.75;
         if (!best || score < best.score) best = { id, score };
       }
       return best ? best.id : null;

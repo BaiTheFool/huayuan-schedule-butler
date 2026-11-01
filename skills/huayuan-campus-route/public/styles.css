@@ -570,6 +570,42 @@ input[type="range"]::-moz-range-thumb {
   line-height: 1.45;
 }
 
+.home-fields {
+  display: grid;
+  gap: 6px;
+  padding: 7px;
+  border: 1px dashed var(--line);
+  border-radius: 9px;
+  background: rgba(255, 253, 247, 0.5);
+}
+
+.home-fields[hidden] { display: none; }
+
+.home-fields .pref-row input {
+  width: 62%;
+  height: 27px;
+  padding: 0 8px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(255, 253, 247, 0.9);
+  color: var(--ink);
+  font-family: var(--font);
+  font-size: 10.5px;
+}
+
+.home-actions {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  flex-wrap: wrap;
+}
+
+.home-coord {
+  color: var(--ink-faint);
+  font-size: 9px;
+  margin-left: auto;
+}
+
 .location-picker {
   position: relative;
   margin-top: 10px;
