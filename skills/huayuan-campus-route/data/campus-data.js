@@ -457,12 +457,12 @@
       id: code.toLowerCase(),
       name: `${code} 学生宿舍`,
       short: code,
-      aliases: [`${code}栋`, '2025年新宿舍', '生活区'],
+      aliases: [`${code}栋`, '2025年新宿舍', 'E区宿舍', '生活区'],
       group: '宿舍',
-      lat: 23.05210 + index * 0.00012,
-      lng: 113.40170 + index * 0.00014,
+      lat: 23.05355 + index * 0.00012,
+      lng: 113.40775 + index * 0.00015,
       coord: 'gcj02',
-      source: '校园地图资料汇编（2025年10月投入使用，具体位置待现场确认）',
+      source: '校园地图资料汇编（2025年10月投入使用；按北门东侧 E 区示意范围取约值）',
       coord_confidence: 'low',
     })),
     { id: 'numeric-dorms', name: '数字编号宿舍（1–200栋）', short: '数字宿舍', aliases: ['1栋', '100栋', '200栋', '生活区数字楼'], group: '宿舍', lat: 23.0491, lng: 113.4008, coord: 'gcj02', source: '校园地图资料汇编（生活区）', coord_confidence: 'low' },
@@ -543,6 +543,7 @@
     { id: 'j_library', name: '图书馆西侧', lat: 23.04675, lng: 113.40455, kind: 'junction' },
     { id: 'j_east', name: '东侧环路', lat: 23.0482, lng: 113.4065, kind: 'junction' },
     { id: 'j_ne', name: '东北路口', lat: 23.0509, lng: 113.40645, kind: 'junction' },
+    { id: 'j_e', name: 'E 区宿舍路口', lat: 23.0534, lng: 113.4079, kind: 'junction' },
   ];
 
   const WALK_EDGES = [
@@ -579,6 +580,8 @@
     ['j_a4', 'j_a5'],
     ['j_a5', 'a5'],
     ['j_a5', 'j_canteen2'],
+    ['j_ne', 'j_e'],
+    ['j_a5', 'j_e'],
     ['j_a5', 'j_ne'],
     ['j_canteen2', 'canteen2'],
     ['j_canteen2', 'hospital'],
