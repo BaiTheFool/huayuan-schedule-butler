@@ -431,6 +431,27 @@ check('校外住宿会改变起床、洗漱和睡觉地点', () => {
   assert.strictEqual(plan.blocks.find((b) => b.type === 'sleep').poi_id, 'offcampus');
 });
 
+check('羽毛球偏好会安排到体育馆', () => {
+  const plan = R.planDay({
+    date: '2026-11-02',
+    preset: 'sport',
+    sportType: 'badminton',
+    timetable: { campus: { key: 'university_town', label: '大学城校区' }, courses: [] },
+  });
+  assert.strictEqual(plan.blocks.find((b) => b.type === 'sport').poi_id, 'gym');
+});
+
+check('跑步偏好会安排到田径场而不是体育馆', () => {
+  const plan = R.planDay({
+    date: '2026-11-02',
+    preset: 'sport',
+    sportType: 'run',
+    timetable: { campus: { key: 'university_town', label: '大学城校区' }, courses: [] },
+  });
+  const sport = plan.blocks.find((b) => b.type === 'sport');
+  assert.ok(['field', 'field_life'].includes(sport.poi_id));
+});
+
 check('Markdown 导出包含日期、时间轴、热水与依据', () => {
   const md = R.buildMarkdown(base);
   assert.ok(md.includes('2026-10-29'));

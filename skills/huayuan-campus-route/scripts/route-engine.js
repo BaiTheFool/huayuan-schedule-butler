@@ -688,6 +688,18 @@
     const gymEnabled = Boolean(gymPref.enabled) && (!gymPref.date || gymPref.date === parts.iso);
     const gymStart = parseTime(gymPref.start || '18:00');
     const gymMinutes = Math.min(120, Math.max(30, Number(gymPref.minutes) || 60));
+    const sportType = opts.sportType || 'auto';
+    const SPORT_TYPE_LABELS = {
+      run: '跑步',
+      football: '足球',
+      longjump: '跳远',
+      pullup: '引体向上',
+      badminton: '羽毛球',
+      basketball: '篮球',
+      fitness: '健身',
+      walk: '散步',
+    };
+    const sportTypeLabel = SPORT_TYPE_LABELS[sportType] || '';
     if (parts.is_weekend && opts.preferences && opts.preferences.weekend) {
       const weekend = opts.preferences.weekend;
       const weekendWake = parseTime(weekend.wake);
@@ -1040,26 +1052,33 @@
     }
 
     function pickSportVenue(start, end, fromPoiId) {
+      const gymOnly = sportType === 'badminton' || sportType === 'fitness';
+      const fieldType = ['run', 'football', 'longjump', 'pullup', 'basketball', 'walk'].includes(sportType);
       const pref = opts.sportPref && opts.sportPref !== 'auto' ? opts.sportPref : null;
       if (pref && ['field_life', 'field', 'gym'].includes(pref) && venueOpen(pref, start, end)) {
+        const compatible = gymOnly ? pref === 'gym' : fieldType ? pref !== 'gym' : true;
         const outdoorAllowed = !weather.sport_indoor || (weather.is_hot && !weather.is_wet && start >= 19 * 60 + 30);
-        if (pref === 'gym' || outdoorAllowed) return pref;
+        if (compatible && (pref === 'gym' || outdoorAllowed)) return pref;
       }
       let order;
-      if (weather.sport_indoor) {
+      if (gymOnly) {
+        order = ['gym'];
+      } else if (fieldType) {
+        order = ['field_life', 'field', 'gym'];
+      } else if (weather.sport_indoor) {
         // 高温天日落后允许回田径场；其余坏天气只去室内
         order = weather.is_hot && !weather.is_wet && start >= 19 * 60 + 30
           ? ['field_life', 'field', 'gym']
           : ['gym'];
       } else {
-        // 默认运动优先去更近的田径场；健身馆只在用户明确勾选时单独排
         order = ['field_life', 'field', 'gym'];
       }
+      if (pref && order.includes(pref)) order = [pref, ...order.filter((id) => id !== pref)];
       const from = fromPoiId || startPoiId;
       let best = null;
       for (const id of order) {
         if (!venueOpen(id, start, end)) continue;
-        if (!weather.sport_indoor && id === 'gym' && (venueOpen('field_life', start, end) || venueOpen('field', start, end))) {
+        if (!gymOnly && !weather.sport_indoor && id === 'gym' && (venueOpen('field_life', start, end) || venueOpen('field', start, end))) {
           continue;
         }
         const toVenue = pathFor(from, id, { ...travelOpts, at: start });
@@ -1149,7 +1168,7 @@
         return null;
       }
       const weatherNote = weather.is_wet ? '，雨天改室内' : weather.is_hot ? '，高温改室内/避晒' : weather.is_polluted ? '，污染天改室内' : '';
-      const block = pushBlock('sport', venue, windowStart, windowStart + want, `${label}；运动权重 ${Math.round(weights.sport * 100)}%，留 ${want} 分钟${weatherNote}`);
+      const block = pushBlock('sport', venue, windowStart, windowStart + want, `${label}${sportTypeLabel ? ` · ${sportTypeLabel}` : ''}；运动权重 ${Math.round(weights.sport * 100)}%，留 ${want} 分钟${weatherNote}`);
       if (block) budget.sport -= want;
       return block;
     }

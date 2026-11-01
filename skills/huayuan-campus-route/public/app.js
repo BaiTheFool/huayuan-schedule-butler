@@ -112,6 +112,7 @@
     dormPoiId: 'c11',
     mealPrefs: { breakfast: 'auto', lunch: 'auto', dinner: 'auto', takeoutPlace: 'c11' },
     sportPref: 'auto',
+    sportType: 'auto',
     gym: { enabled: false, date: '', start: '19:00', minutes: 60 },
   };
 
@@ -464,6 +465,7 @@
       dormPoiId: state.dormPoiId,
       mealPrefs: state.mealPrefs,
       sportPref: state.sportPref,
+      sportType: state.sportType,
       gym: state.gym.enabled ? state.gym : undefined,
       weekNumber: state.timetableInfo ? state.timetableInfo.week_number : null,
       major: state.major || undefined,
@@ -1213,6 +1215,11 @@
       saveStorage('huayuan.sportPref', state.sportPref);
       replan(false);
     });
+    $('sportType').addEventListener('change', (e) => {
+      state.sportType = e.target.value || 'auto';
+      saveStorage('huayuan.sportType', state.sportType);
+      replan(false);
+    });
     $('homeSelect').addEventListener('change', (e) => {
       state.dormPoiId = e.target.value === 'offcampus' ? 'offcampus' : 'c11';
       $('prefsHint').textContent =
@@ -1255,6 +1262,7 @@
     $('mealDinner').value = state.mealPrefs.dinner;
     $('takeoutPlace').value = state.mealPrefs.takeoutPlace;
     $('sportPref').value = state.sportPref || 'auto';
+    $('sportType').value = state.sportType || 'auto';
     $('homeSelect').value = state.dormPoiId;
     $('gymEnabled').checked = Boolean(state.gym.enabled);
     $('gymDate').value = state.gym.date || state.date;
@@ -1666,6 +1674,10 @@
     if (savedDorm === 'offcampus' || savedDorm === 'c11') state.dormPoiId = savedDorm;
     const savedSportPref = localStorage.getItem('huayuan.sportPref');
     if (['auto', 'field_life', 'field', 'gym'].includes(savedSportPref)) state.sportPref = savedSportPref;
+    const savedSportType = localStorage.getItem('huayuan.sportType');
+    if (['auto', 'run', 'football', 'longjump', 'pullup', 'badminton', 'basketball', 'fitness', 'walk'].includes(savedSportType)) {
+      state.sportType = savedSportType;
+    }
     const savedGym = JSON.parse(localStorage.getItem('huayuan.gym') || 'null');
     if (savedGym && typeof savedGym === 'object') {
       state.gym = { ...state.gym, ...savedGym };
