@@ -682,6 +682,12 @@
     const preset = PRESETS.find((item) => item.id === opts.preset) || PRESETS[1];
     const weights = normalizeWeights(opts.weights || preset.weights);
     const prefs = normalizePrefs(opts.preferences);
+    const mealPrefs = opts.mealPrefs || {};
+    const takeoutPlaceId = POI_MAP.has(mealPrefs.takeoutPlace) ? mealPrefs.takeoutPlace : 'c11';
+    const gymPref = opts.gym || {};
+    const gymEnabled = Boolean(gymPref.enabled) && (!gymPref.date || gymPref.date === parts.iso);
+    const gymStart = parseTime(gymPref.start || '18:00');
+    const gymMinutes = Math.min(120, Math.max(30, Number(gymPref.minutes) || 60));
     if (parts.is_weekend && opts.preferences && opts.preferences.weekend) {
       const weekend = opts.preferences.weekend;
       const weekendWake = parseTime(weekend.wake);
@@ -721,6 +727,7 @@
     const classes = normalized.list;
 
     const dormPoiId = opts.dormPoiId && POI_MAP.has(opts.dormPoiId) ? opts.dormPoiId : 'c11';
+    const isOffCampus = dormPoiId === 'offcampus';
     let startPoiId = dormPoiId;
     if (gps && gps.in_campus && gps.nearest_poi) startPoiId = gps.nearest_poi;
     if (gps && !gps.in_campus) {
@@ -765,23 +772,48 @@
 
     // 早餐：离第一节课最近的那个饭堂
     blocks.push(...classes);
+
+    function mealChoice(meal, fromPoiId) {
+      const pref = String(mealPrefs[meal] || 'auto');
+      if (pref === 'takeout') {
+        return { poi: POI_MAP.get(takeoutPlaceId) || POI_MAP.get('c11'), takeout: true, preferred: true };
+      }
+      if (pref === 'canteen1' || pref === 'canteen2') {
+        return { poi: POI_MAP.get(pref), takeout: false, preferred: true };
+      }
+      return { poi: nearestPoi(['canteen1', 'canteen2'], fromPoiId), takeout: false, preferred: false };
+    }
+
+    function mealTitle(choice, label) {
+      const place = choice.poi ? choice.poi.short : '饭堂';
+      return choice.takeout ? `${label} · 外卖（${place}）` : `${label} · ${place}`;
+    }
+
+    function mealReason(choice, fallback) {
+      if (choice.takeout) return `按你的偏好，在${choice.poi ? choice.poi.short : '宿舍'}吃外卖`;
+      if (choice.preferred) return `按你的偏好，去${choice.poi ? choice.poi.short : '饭堂'}`;
+      return fallback;
+    }
+
     let breakfast = null;
     const firstClass = classes[0] || null;
     const morningLimit = firstClass ? Math.min(firstClass.start - 25, 9 * 60) : 10 * 60;
-    const breakfastStart = findSlot(occupiedFrom(blocks), wake + 35, morningLimit, 30);    if (breakfastStart !== null) {
-      const venue = nearestPoi(['canteen1', 'canteen2'], firstClass ? firstClass.poiId : startPoiId);
+    const breakfastStart = findSlot(occupiedFrom(blocks), wake + 35, morningLimit, 30);
+    if (breakfastStart !== null) {
+      const choice = mealChoice('breakfast', firstClass ? firstClass.poiId : startPoiId);
+      const venue = choice.poi;
       breakfast = {
         id: 'breakfast',
         type: 'meal',
         meal: 'breakfast',
-        title: `早餐 · ${venue ? venue.short : '饭堂'}`,
+        title: mealTitle(choice, '早餐'),
         subtitle: venue ? venue.name : null,
         poiId: venue ? venue.id : 'canteen1',
         start: breakfastStart,
         end: breakfastStart + 30,
         locked: false,
-        source: '[偏好]',
-        reason: firstClass ? `第一节课在 ${POI_MAP.get(firstClass.poiId).short}，顺路吃早餐` : '今天没有早课，吃完再安排',
+        source: choice.preferred ? '[用户偏好]' : '[偏好]',
+        reason: mealReason(choice, firstClass ? `第一节课在 ${POI_MAP.get(firstClass.poiId).short}，顺路吃早餐` : '今天没有早课，吃完再安排'),
       };
       blocks.push(breakfast);
     } else {
@@ -790,7 +822,8 @@
 
     // 午餐：先给上一节课到饭堂留出真实通勤时间，避免饭后与步行块重叠。
     const lunchAnchor = lastClassEndingBefore(classes, 13 * 60 + 20);
-    const lunchVenue = nearestPoi(['canteen1', 'canteen2'], lunchAnchor ? lunchAnchor.poiId : startPoiId);
+    const lunchChoice = mealChoice('lunch', lunchAnchor ? lunchAnchor.poiId : startPoiId);
+    const lunchVenue = lunchChoice.poi;
     const lunchTravel = lunchAnchor && lunchVenue
       ? pathFor(lunchAnchor.poiId, lunchVenue.id, { ...travelOpts, at: lunchAnchor.end }).minutes + 3
       : 12;
@@ -804,14 +837,14 @@
         id: 'lunch',
         type: 'meal',
         meal: 'lunch',
-        title: `午餐 · ${venue ? venue.short : '饭堂'}`,
+        title: mealTitle(lunchChoice, '午餐'),
         subtitle: venue ? venue.name : null,
         poiId: venue ? venue.id : 'canteen1',
         start: lunchStart,
         end: lunchStart + 40,
         locked: true,
-        source: '[偏好]',
-        reason: `上午最后一节在 ${POI_MAP.get(morning.poiId).short}，就近去${venue ? venue.short : '饭堂'}`,
+        source: lunchChoice.preferred ? '[用户偏好]' : '[偏好]',
+        reason: mealReason(lunchChoice, `上午最后一节在 ${POI_MAP.get(morning.poiId).short}，就近去${venue ? venue.short : '饭堂'}`),
       };
       blocks.push(lunch);
     } else {
@@ -823,7 +856,8 @@
     const dinnerTo = eveningClass ? Math.min(19 * 60 + 10, eveningClass.start - 20) : 19 * 60 + 10;
     const dinnerAnchor = lastClassEndingBefore(classes, dinnerTo);
     const dinnerAnchorPoi = dinnerAnchor ? dinnerAnchor.poiId : startPoiId;
-    const dinnerVenue = nearestPoi(['canteen1', 'canteen2'], dinnerAnchorPoi);
+    const dinnerChoice = mealChoice('dinner', dinnerAnchorPoi);
+    const dinnerVenue = dinnerChoice.poi;
     const dinnerTravel = dinnerAnchor && dinnerVenue
       ? pathFor(dinnerAnchorPoi, dinnerVenue.id, { ...travelOpts, at: dinnerAnchor.end }).minutes + 3
       : 8;
@@ -836,18 +870,46 @@
         id: 'dinner',
         type: 'meal',
         meal: 'dinner',
-        title: `晚餐 · ${venue ? venue.short : '饭堂'}`,
+        title: mealTitle(dinnerChoice, '晚餐'),
         subtitle: venue ? venue.name : null,
         poiId: venue ? venue.id : 'canteen2',
         start: dinnerStart,
         end: dinnerStart + 40,
         locked: false,
-        source: '[偏好]',
-        reason: eveningClass ? `晚课在 ${POI_MAP.get(eveningClass.poiId).short}，先吃饭再过去` : '按作息固定晚餐，给晚上留出完整空档',
+        source: dinnerChoice.preferred ? '[用户偏好]' : '[偏好]',
+        reason: mealReason(dinnerChoice, eveningClass ? `晚课在 ${POI_MAP.get(eveningClass.poiId).short}，先吃饭再过去` : '按作息固定晚餐，给晚上留出完整空档'),
       };
       blocks.push(dinner);
     } else {
       warnings.push('晚餐没有找到 40 分钟空档，晚课前可能来不及吃饭');
+    }
+
+    // 健身馆：用户指定日期/时间/时长，作为固定运动块；与课程或三餐冲突时只提醒不硬塞
+    let gymBlock = null;
+    if (gymEnabled && gymStart !== null) {
+      const gymEnd = gymStart + gymMinutes;
+      const collision = blocks.find((b) => b.start < gymEnd && b.end > gymStart);
+      if (gymStart < wake || gymEnd > prefs.sleep) {
+        warnings.push(`健身馆 ${clock(gymStart)}–${clock(gymEnd)} 超出作息，未排入`);
+      } else if (collision) {
+        warnings.push(`健身馆 ${clock(gymStart)}–${clock(gymEnd)} 与「${collision.title}」冲突，未排入`);
+      } else if (!venueOpen('gym', gymStart, gymEnd)) {
+        warnings.push(`健身馆 ${clock(gymStart)}–${clock(gymEnd)} 不在开放时间内，未排入`);
+      } else {
+        gymBlock = {
+          id: 'gym',
+          type: 'sport',
+          title: '健身馆',
+          subtitle: POI_MAP.get('gym').name,
+          poiId: 'gym',
+          start: gymStart,
+          end: gymEnd,
+          locked: true,
+          source: '[用户]',
+          reason: `你指定 ${clock(gymStart)} 去健身馆，${gymMinutes} 分钟`,
+        };
+        blocks.push(gymBlock);
+      }
     }
 
     // 洗澡：必须落在热水时段与门禁之前
@@ -859,21 +921,21 @@
     }
     showerStart = Math.min(showerStart, 22 * 60 + 40);
     const curfew = parts.is_weekend ? parseTime(CURFEW.weekend) : parseTime(CURFEW.weekday);
-    if (showerStart + 20 > curfew - 5) {
+    if (!isOffCampus && showerStart + 20 > curfew - 5) {
       warnings.push(`洗澡结束会接近门禁 ${clock(curfew)}，请把晚课后的安排再压缩`);
     }
     const showerPoi = POI_MAP.get(dormPoiId);
     const shower = {
       id: 'shower',
       type: 'shower',
-      title: '回宿舍洗澡',
+      title: isOffCampus ? '回住处洗漱' : '回宿舍洗澡',
       subtitle: showerPoi.name,
       poiId: dormPoiId,
       start: showerStart,
       end: showerStart + 20,
       locked: true,
       source: '[开放时间]',
-      reason: `热水 ${HOT_WATER.label}，门禁 ${CURFEW.label}`,
+      reason: isOffCampus ? '校外住宿，按你的作息回住处洗漱' : `热水 ${HOT_WATER.label}，门禁 ${CURFEW.label}`,
     };
     blocks.push(shower);
 
@@ -907,7 +969,7 @@
     }
 
     // 固定块 = 课程 + 三餐 + 洗澡
-    const fixed = blocks.filter((b) => b.type === 'class' || b.type === 'meal' || b.type === 'shower');
+    const fixed = blocks.filter((b) => b.type === 'class' || b.type === 'meal' || b.type === 'shower' || (b.type === 'sport' && b.locked));
     const flexWindows = [];
     const dayEnd = showerStart;
     const boundaries = fixed
@@ -931,6 +993,7 @@
     budget.study = Math.min(budget.study, prefs.study_limit);
     budget.sport = Math.min(budget.sport, 100);
     budget.play = Math.min(budget.play, 120);
+    if (gymBlock) budget.sport = 0;
 
     const flexible = [];
     let studyScheduled = 0;
@@ -968,18 +1031,45 @@
       return null;
     }
 
-    function pickSportVenue(start, end) {
+    function poiBefore(at) {
+      const all = blocks
+        .concat(flexible)
+        .filter((b) => b.poiId && b.end <= at + 5)
+        .sort((a, b) => b.end - a.end);
+      return all.length ? all[0].poiId : startPoiId;
+    }
+
+    function pickSportVenue(start, end, fromPoiId) {
+      const pref = opts.sportPref && opts.sportPref !== 'auto' ? opts.sportPref : null;
+      if (pref && ['field_life', 'field', 'gym'].includes(pref) && venueOpen(pref, start, end)) {
+        const outdoorAllowed = !weather.sport_indoor || (weather.is_hot && !weather.is_wet && start >= 19 * 60 + 30);
+        if (pref === 'gym' || outdoorAllowed) return pref;
+      }
       let order;
       if (weather.sport_indoor) {
         // 高温天日落后允许回田径场；其余坏天气只去室内
-        order = weather.is_hot && !weather.is_wet && start >= 19 * 60 + 30 ? ['field', 'gym'] : ['gym'];
+        order = weather.is_hot && !weather.is_wet && start >= 19 * 60 + 30
+          ? ['field_life', 'field', 'gym']
+          : ['gym'];
       } else {
-        order = ['field', 'gym'];
+        // 默认运动优先去更近的田径场；健身馆只在用户明确勾选时单独排
+        order = ['field_life', 'field', 'gym'];
       }
+      const from = fromPoiId || startPoiId;
+      let best = null;
       for (const id of order) {
-        if (venueOpen(id, start, end)) return id;
+        if (!venueOpen(id, start, end)) continue;
+        if (!weather.sport_indoor && id === 'gym' && (venueOpen('field_life', start, end) || venueOpen('field', start, end))) {
+          continue;
+        }
+        const toVenue = pathFor(from, id, { ...travelOpts, at: start });
+        const fromHome = pathFor(startPoiId, id, { ...travelOpts, at: start });
+        const dinner = nearestPoi(['canteen1', 'canteen2'], id);
+        const after = dinner ? pathFor(id, dinner.id, { ...travelOpts, at: end }).minutes : 0;
+        const score = (toVenue.uncertain ? 999 : toVenue.minutes) + after * 0.35 + (fromHome.uncertain ? 0 : fromHome.minutes) * 0.35;
+        if (!best || score < best.score) best = { id, score };
       }
-      return null;
+      return best ? best.id : null;
     }
 
     function pickPlayVenue(start, end) {
@@ -1053,7 +1143,7 @@
       if (budget.sport < 25) return null;
       const want = Math.min(budget.sport, 70, limit - windowStart, Math.round(30 + 45 * weights.sport));
       if (want < 25) return null;
-      const venue = pickSportVenue(windowStart, windowStart + want);
+      const venue = pickSportVenue(windowStart, windowStart + want, poiBefore(windowStart));
       if (!venue) {
         warnings.push(`${label}因天气或体育馆闭馆取消，未硬排露天运动`);
         return null;

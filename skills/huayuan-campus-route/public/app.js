@@ -109,6 +109,10 @@
     visibleLocations: [],
     plan: null,
     selected: null,
+    dormPoiId: 'c11',
+    mealPrefs: { breakfast: 'auto', lunch: 'auto', dinner: 'auto', takeoutPlace: 'c11' },
+    sportPref: 'auto',
+    gym: { enabled: false, date: '', start: '19:00', minutes: 60 },
   };
 
   const $ = (id) => document.getElementById(id);
@@ -457,6 +461,10 @@
       gps: state.gps,
       timetable: state.timetable || undefined,
       preferences: state.preferences || undefined,
+      dormPoiId: state.dormPoiId,
+      mealPrefs: state.mealPrefs,
+      sportPref: state.sportPref,
+      gym: state.gym.enabled ? state.gym : undefined,
       weekNumber: state.timetableInfo ? state.timetableInfo.week_number : null,
       major: state.major || undefined,
       tasks: tasksForRoute(),
@@ -1186,6 +1194,81 @@
     });
   }
 
+  function bindPreferences() {
+    const mealIds = { breakfast: 'mealBreakfast', lunch: 'mealLunch', dinner: 'mealDinner' };
+    for (const [meal, id] of Object.entries(mealIds)) {
+      $(id).addEventListener('change', (e) => {
+        state.mealPrefs[meal] = e.target.value;
+        saveStorage('huayuan.mealPrefs', state.mealPrefs);
+        replan(false);
+      });
+    }
+    $('takeoutPlace').addEventListener('change', (e) => {
+      state.mealPrefs.takeoutPlace = e.target.value;
+      saveStorage('huayuan.mealPrefs', state.mealPrefs);
+      replan(false);
+    });
+    $('sportPref').addEventListener('change', (e) => {
+      state.sportPref = e.target.value || 'auto';
+      saveStorage('huayuan.sportPref', state.sportPref);
+      replan(false);
+    });
+    $('homeSelect').addEventListener('change', (e) => {
+      state.dormPoiId = e.target.value === 'offcampus' ? 'offcampus' : 'c11';
+      $('prefsHint').textContent =
+        state.dormPoiId === 'offcampus'
+          ? '校外住处是大学城南示例点，路线为近似连接；起床/睡觉/洗漱都会按这里安排。'
+          : '默认住 C11；校外住宿时选择上面的示例点，路线按近似连接计算。';
+      saveStorage('huayuan.dormPoiId', state.dormPoiId);
+      replan(false);
+    });
+    $('gymEnabled').addEventListener('change', (e) => {
+      state.gym.enabled = e.target.checked;
+      if (state.gym.enabled && !state.gym.date) state.gym.date = state.date;
+      $('gymDate').value = state.gym.date || state.date;
+      $('gymDate').disabled = !state.gym.enabled;
+      $('gymStart').disabled = !state.gym.enabled;
+      $('gymMinutes').disabled = !state.gym.enabled;
+      saveStorage('huayuan.gym', state.gym);
+      replan(false);
+    });
+    $('gymDate').addEventListener('change', (e) => {
+      state.gym.date = e.target.value || state.date;
+      saveStorage('huayuan.gym', state.gym);
+      replan(false);
+    });
+    $('gymStart').addEventListener('change', (e) => {
+      state.gym.start = e.target.value || '19:00';
+      saveStorage('huayuan.gym', state.gym);
+      replan(false);
+    });
+    $('gymMinutes').addEventListener('change', (e) => {
+      state.gym.minutes = Number(e.target.value) || 60;
+      saveStorage('huayuan.gym', state.gym);
+      replan(false);
+    });
+  }
+
+  function syncPreferencesUI() {
+    $('mealBreakfast').value = state.mealPrefs.breakfast;
+    $('mealLunch').value = state.mealPrefs.lunch;
+    $('mealDinner').value = state.mealPrefs.dinner;
+    $('takeoutPlace').value = state.mealPrefs.takeoutPlace;
+    $('sportPref').value = state.sportPref || 'auto';
+    $('homeSelect').value = state.dormPoiId;
+    $('gymEnabled').checked = Boolean(state.gym.enabled);
+    $('gymDate').value = state.gym.date || state.date;
+    $('gymStart').value = state.gym.start || '19:00';
+    $('gymMinutes').value = String(state.gym.minutes || 60);
+    $('gymDate').disabled = !state.gym.enabled;
+    $('gymStart').disabled = !state.gym.enabled;
+    $('gymMinutes').disabled = !state.gym.enabled;
+    $('prefsHint').textContent =
+      state.dormPoiId === 'offcampus'
+        ? '校外住处是大学城南示例点，路线为近似连接；起床/睡觉/洗漱都会按这里安排。'
+        : '默认住 C11；校外住宿时选择上面的示例点，路线按近似连接计算。';
+  }
+
   function saveMajor() {
     const value = String($('majorInput').value || '').trim().slice(0, 40);
     state.major = value;
@@ -1385,8 +1468,13 @@
 
   function bind() {
     $('dateInput').addEventListener('change', (e) => {
+      const previousDate = state.date;
       state.date = e.target.value || state.date;
       if (!$('todoDate').value) $('todoDate').value = state.date;
+      if (state.gym.enabled && (!state.gym.date || state.gym.date === previousDate)) {
+        state.gym.date = state.date;
+        $('gymDate').value = state.date;
+      }
       refreshWeekForDate();
       replan(false);
     });
@@ -1513,7 +1601,7 @@
       $('clearGpsBtn').hidden = true;
       $('locationSearch').value = '';
       $('locationSelected').className = 'location-selected';
-      $('locationSelected').textContent = '未选择楼栋 · 可搜索 82 个校园地点；也可使用设备定位';
+      $('locationSelected').textContent = `未选择楼栋 · 可搜索 ${LOCATIONS.length} 个校园地点；也可使用设备定位`;
       replan(false);
     });
 
@@ -1570,6 +1658,18 @@
     if (Array.isArray(savedTasks)) state.manualTasks = savedTasks;
     const savedDone = JSON.parse(localStorage.getItem('huayuan.doneTaskIds') || '[]');
     if (Array.isArray(savedDone)) state.doneTaskIds = savedDone;
+    const savedMealPrefs = JSON.parse(localStorage.getItem('huayuan.mealPrefs') || 'null');
+    if (savedMealPrefs && typeof savedMealPrefs === 'object') {
+      state.mealPrefs = { ...state.mealPrefs, ...savedMealPrefs };
+    }
+    const savedDorm = localStorage.getItem('huayuan.dormPoiId');
+    if (savedDorm === 'offcampus' || savedDorm === 'c11') state.dormPoiId = savedDorm;
+    const savedSportPref = localStorage.getItem('huayuan.sportPref');
+    if (['auto', 'field_life', 'field', 'gym'].includes(savedSportPref)) state.sportPref = savedSportPref;
+    const savedGym = JSON.parse(localStorage.getItem('huayuan.gym') || 'null');
+    if (savedGym && typeof savedGym === 'object') {
+      state.gym = { ...state.gym, ...savedGym };
+    }
     state.reminders = localStorage.getItem('huayuan.reminders') === 'true';
   } catch (error) {
     // 隐私模式下 localStorage 可能不可用
@@ -1580,6 +1680,7 @@
   }
   $('dateInput').value = state.date;
   $('todoDate').value = state.date;
+  if (!state.gym.date) state.gym.date = state.date;
   if (TBL) {
     try {
       const savedTimetable = JSON.parse(localStorage.getItem('huayuan.timetable') || 'null');
@@ -1628,10 +1729,13 @@
     initMap();
     syncSliders();
     syncWeatherControls();
+    if (params.get('prefs') === '1') $('prefsCard').open = true;
     document.querySelectorAll('#presets button').forEach((btn) => {
       btn.classList.toggle('active', btn.dataset.preset === state.preset);
     });
     bind();
+    bindPreferences();
+    syncPreferencesUI();
     replan(false);
     refreshDashboardContext();
     setInterval(refreshDashboardContext, 30000);

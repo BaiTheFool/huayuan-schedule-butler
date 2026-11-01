@@ -81,8 +81,84 @@
               <button type="button" class="mini-btn" id="useLocationBtn">设为起点</button>
             </div>
             <div class="location-results" id="locationResults" role="listbox" hidden></div>
-            <div class="location-selected" id="locationSelected">未选择楼栋 · 可搜索 82 个校园地点；也可使用设备定位</div>
+            <div class="location-selected" id="locationSelected">未选择楼栋 · 可搜索 84 个校园地点；也可使用设备定位</div>
           </div>
+
+          <details class="prefs-card" id="prefsCard">
+            <summary>三餐 · 健身 · 住宿偏好</summary>
+            <div class="prefs-body">
+              <div class="pref-row">
+                <span>早餐</span>
+                <select id="mealBreakfast" aria-label="早餐偏好">
+                  <option value="auto">自动就近</option>
+                  <option value="canteen1">一饭</option>
+                  <option value="canteen2">二饭</option>
+                  <option value="takeout">外卖</option>
+                </select>
+              </div>
+              <div class="pref-row">
+                <span>午餐</span>
+                <select id="mealLunch" aria-label="午餐偏好">
+                  <option value="auto">自动就近</option>
+                  <option value="canteen1">一饭</option>
+                  <option value="canteen2">二饭</option>
+                  <option value="takeout">外卖</option>
+                </select>
+              </div>
+              <div class="pref-row">
+                <span>晚餐</span>
+                <select id="mealDinner" aria-label="晚餐偏好">
+                  <option value="auto">自动就近</option>
+                  <option value="canteen1">一饭</option>
+                  <option value="canteen2">二饭</option>
+                  <option value="takeout">外卖</option>
+                </select>
+              </div>
+              <div class="pref-row">
+                <span>外卖地点</span>
+                <select id="takeoutPlace" aria-label="外卖用餐地点">
+                  <option value="c11">C11 宿舍</option>
+                  <option value="c11study">C11 尚学空间</option>
+                  <option value="library">图书馆</option>
+                  <option value="canteen1">一饭</option>
+                  <option value="canteen2">二饭</option>
+                </select>
+              </div>
+              <div class="pref-row">
+                <span>运动场地</span>
+                <select id="sportPref" aria-label="运动场地偏好">
+                  <option value="auto">自动选最近</option>
+                  <option value="field_life">生活区田径场</option>
+                  <option value="field">南侧田径场</option>
+                  <option value="gym">体育馆</option>
+                </select>
+              </div>
+              <div class="pref-divider"></div>
+              <label class="pref-check">
+                <input type="checkbox" id="gymEnabled" />
+                <span>去健身馆（体育馆内）</span>
+              </label>
+              <div class="gym-fields">
+                <input type="date" id="gymDate" aria-label="健身日期" />
+                <input type="time" id="gymStart" value="19:00" step="300" aria-label="健身开始时间" />
+                <select id="gymMinutes" aria-label="健身时长">
+                  <option value="45">45 分钟</option>
+                  <option value="60" selected>60 分钟</option>
+                  <option value="90">90 分钟</option>
+                  <option value="120">120 分钟</option>
+                </select>
+              </div>
+              <div class="pref-divider"></div>
+              <div class="pref-row">
+                <span>住宿 / 休息</span>
+                <select id="homeSelect" aria-label="住宿地点">
+                  <option value="c11">校内 C11 宿舍</option>
+                  <option value="offcampus">校外住处（大学城南）</option>
+                </select>
+              </div>
+              <p class="pref-hint" id="prefsHint">校外住处是示例点，路线为近似连接；可在页面上查看后按实际住处调整。</p>
+            </div>
+          </details>
 
           <div class="field">
             <span class="label">今天的人格</span>

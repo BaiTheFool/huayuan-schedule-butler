@@ -385,6 +385,52 @@ check('17:20 下课的晚餐会留出通勤，不产生重叠', () => {
   assert.strictEqual(plan.validation.ok, true);
 });
 
+check('运动场地偏好会选生活区田径场', () => {
+  const plan = R.planDay({
+    date: '2026-11-02',
+    preset: 'sport',
+    sportPref: 'field_life',
+    timetable: { campus: { key: 'university_town', label: '大学城校区' }, courses: [] },
+  });
+  assert.ok(plan.blocks.some((b) => b.type === 'sport' && b.poi_id === 'field_life'));
+});
+
+check('午餐可指定二饭，晚餐可选外卖并在宿舍吃', () => {
+  const plan = R.planDay({
+    date: '2026-11-02',
+    mealPrefs: { lunch: 'canteen2', dinner: 'takeout', takeoutPlace: 'c11' },
+    timetable: { campus: { key: 'university_town', label: '大学城校区' }, courses: [] },
+  });
+  const lunch = plan.blocks.find((b) => b.type === 'meal' && b.title.includes('午餐'));
+  const dinner = plan.blocks.find((b) => b.type === 'meal' && b.title.includes('晚餐'));
+  assert.strictEqual(lunch.poi_id, 'canteen2');
+  assert.ok(dinner.title.includes('外卖'));
+  assert.strictEqual(dinner.poi_id, 'c11');
+});
+
+check('勾选健身馆后会插入固定运动块，且不再重复排运动', () => {
+  const plan = R.planDay({
+    date: '2026-11-02',
+    gym: { enabled: true, date: '2026-11-02', start: '19:00', minutes: 60 },
+    timetable: { campus: { key: 'university_town', label: '大学城校区' }, courses: [] },
+  });
+  const gym = plan.blocks.find((b) => b.type === 'sport' && b.title === '健身馆');
+  assert.ok(gym);
+  assert.strictEqual(gym.start, '19:00');
+  assert.strictEqual(plan.blocks.filter((b) => b.type === 'sport').length, 1);
+});
+
+check('校外住宿会改变起床、洗漱和睡觉地点', () => {
+  const plan = R.planDay({
+    date: '2026-11-02',
+    dormPoiId: 'offcampus',
+    timetable: { campus: { key: 'university_town', label: '大学城校区' }, courses: [] },
+  });
+  assert.strictEqual(plan.blocks.find((b) => b.type === 'wake').poi_id, 'offcampus');
+  assert.ok(plan.blocks.find((b) => b.type === 'shower').title.includes('住处'));
+  assert.strictEqual(plan.blocks.find((b) => b.type === 'sleep').poi_id, 'offcampus');
+});
+
 check('Markdown 导出包含日期、时间轴、热水与依据', () => {
   const md = R.buildMarkdown(base);
   assert.ok(md.includes('2026-10-29'));
