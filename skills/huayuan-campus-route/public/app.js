@@ -276,73 +276,9 @@
     });
   }
 
-  // ---------- 步行道路线（OSM foot routing） ----------
+  // ---------- 校园步行图路线 ----------
 
-  const roadCache = new Map();
-  const SUISHI_APPROACH = [
-    [23.0452, 113.4113],
-    [23.04555, 113.41085],
-    [23.0459, 113.4104],
-    [23.04635, 113.40995],
-    [23.0468, 113.40955],
-    [23.04725, 113.40915],
-    [23.04765, 113.40875],
-    [23.0480, 113.4084],
-    [23.04825, 113.40815],
-    [23.0484, 113.4079],
-  ];
-  const GYM_ENTRY = [23.04815, 113.40375];
-  const GYM_PLAZA = [23.04755, 113.40455];
-  const GYM_CANTEEN = [23.04795, 113.40335];
-
-  function gcj02ToWgs84(lat, lng) {
-    let wlat = lat;
-    let wlng = lng;
-    for (let i = 0; i < 7; i += 1) {
-      const gcj = R.wgs84ToGcj02(wlat, wlng);
-      wlat -= gcj.lat - lat;
-      wlng -= gcj.lng - lng;
-    }
-    return { lat: wlat, lng: wlng };
-  }
-
-  async function fetchRoadLeg(from, to, via) {
-    const viaKey = via ? `${via.lat.toFixed(6)},${via.lng.toFixed(6)}` : '';
-    const key = `${from.lat.toFixed(6)},${from.lng.toFixed(6)}|${viaKey}|${to.lat.toFixed(6)},${to.lng.toFixed(6)}`;
-    if (roadCache.has(key)) return roadCache.get(key);
-    const a = gcj02ToWgs84(from.lat, from.lng);
-    const b = gcj02ToWgs84(to.lat, to.lng);
-    const coords = [`${a.lng},${a.lat}`];
-    if (via) {
-      const v = gcj02ToWgs84(via.lat, via.lng);
-      coords.push(`${v.lng},${v.lat}`);
-    }
-    coords.push(`${b.lng},${b.lat}`);
-    const url =
-      `https://routing.openstreetmap.de/routed-foot/route/v1/foot/${coords.join(';')}` +
-      '?overview=full&geometries=geojson&steps=false';
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 7000);
-    try {
-      const response = await fetch(url, { signal: controller.signal, cache: 'force-cache' });
-      if (!response.ok) throw new Error(`HTTP ${response.status}`);
-      const data = await response.json();
-      if (!data.routes || !data.routes[0] || !data.routes[0].geometry) throw new Error('NO_ROUTE');
-      const points = data.routes[0].geometry.coordinates.map(([lng, lat]) => {
-        const gcj = R.wgs84ToGcj02(lat, lng);
-        return [gcj.lat, gcj.lng];
-      });
-      roadCache.set(key, points);
-      return points;
-    } catch (error) {
-      roadCache.set(key, null);
-      return null;
-    } finally {
-      clearTimeout(timer);
-    }
-  }
-
-  function drawRoute(latlngs, road) {
+  function drawRoute(latlngs) {
     if (!routeGroup) return;
     for (const layer of routeLayers) routeGroup.removeLayer(layer);
     routeLayers = [];
@@ -365,10 +301,6 @@
         lineJoin: 'round',
       }).addTo(routeGroup)
     );
-    const attribution = $('mapAttribution');
-    if (attribution && road) {
-      attribution.textContent = '底图 © 高德地图 · 路线 © OpenStreetMap contributors · 时长按校园步行估算';
-    }
   }
 
   function renderRoute(plan) {
@@ -385,7 +317,7 @@
 
     const points = (plan.route && plan.route.points) || [];
     const latlngs = points.map((point) => [point.lat, point.lng]);
-    drawRoute(latlngs, false);
+    drawRoute(latlngs);
 
     const stopPoints = [];
     for (const stop of plan.stops || []) {
@@ -395,105 +327,6 @@
       if (last && Math.abs(last.lat - poi.lat) < 1e-7 && Math.abs(last.lng - poi.lng) < 1e-7) continue;
       stopPoints.push(poi);
     }
-    if (stopPoints.length > 1) {
-      Promise.all(
-        stopPoints.slice(0, -1).map((from, index) => {
-          const to = stopPoints[index + 1];
-          const nearSuishi = (place) =>
-            place &&
-            Math.abs(Number(place.lat) - 23.0452) < 0.0012 &&
-            Math.abs(Number(place.lng) - 113.4113) < 0.0018;
-          if (nearSuishi(from) || nearSuishi(to)) {
-            const gate = POI.get('eastgate');
-            if (gate) {
-              if (nearSuishi(to)) {
-                return fetchRoadLeg(from, gate).then((tail) => {
-                  const points = tail && tail.length ? tail.slice() : [[from.lat, from.lng]];
-                  points.push(...SUISHI_APPROACH.slice().reverse());
-                  return points;
-                });
-              }
-              return fetchRoadLeg(gate, to).then((tail) => {
-                const points = SUISHI_APPROACH.slice();
-                if (tail && tail.length) points.push(...tail.slice(1));
-                else points.push([to.lat, to.lng]);
-                return points;
-              });
-            }
-          }
-          const mealAtSuishi = Object.values(state.mealPlaces || {}).some((place) => /穗石|牌坊/.test(String(place && place.address || '')));
-          if ((/^meal_/.test(from.id) || /^meal_/.test(to.id)) && mealAtSuishi) {
-            const gate = POI.get('eastgate');
-            if (gate) {
-              if (to.id === 'meal_custom') {
-                return fetchRoadLeg(from, gate).then((tail) => {
-                  const points = tail && tail.length ? tail.slice() : [[from.lat, from.lng]];
-                  points.push(...SUISHI_APPROACH.slice().reverse());
-                  return points;
-                });
-              }
-              return fetchRoadLeg(gate, to).then((tail) => {
-                const points = SUISHI_APPROACH.slice();
-                if (tail && tail.length) points.push(...tail.slice(1));
-                else points.push([to.lat, to.lng]);
-                return points;
-              });
-            }
-          }
-          if (from.id === 'gym' || to.id === 'gym') {
-            const way = ['library', 'cafe', 'a1', 'a2', 'a3'].includes(from.id) || ['library', 'cafe', 'a1', 'a2', 'a3'].includes(to.id)
-              ? GYM_PLAZA
-              : GYM_CANTEEN;
-            if (to.id === 'gym') {
-              return Promise.resolve([[from.lat, from.lng], way, GYM_ENTRY]);
-            }
-            return Promise.resolve([GYM_ENTRY, way, [to.lat, to.lng]]);
-          }
-          if (to.id === 'home_custom' && state.home.id === 'suishi') {
-            const gate = POI.get('eastgate');
-            if (gate) {
-              return fetchRoadLeg(from, gate).then((tail) => {
-                const points = tail && tail.length ? tail.slice() : [[from.lat, from.lng]];
-                points.push(...SUISHI_APPROACH.slice().reverse());
-                return points;
-              });
-            }
-          }
-          if (from.id === 'home_custom' && state.home.id === 'suishi') {
-            const gate = POI.get('eastgate');
-            if (gate) {
-              return fetchRoadLeg(gate, to).then((tail) => {
-                const points = SUISHI_APPROACH.slice();
-                if (tail && tail.length) points.push(...tail.slice(1));
-                else points.push([to.lat, to.lng]);
-                return points;
-              });
-            }
-          }
-          return fetchRoadLeg(from, to);
-        })
-      ).then((legs) => {
-        if (seq !== routeSeq) return;
-        const merged = [];
-        let missed = 0;
-        for (let i = 0; i < legs.length; i += 1) {
-          const leg = legs[i];
-          const from = stopPoints[i];
-          const to = stopPoints[i + 1];
-          if (leg && leg.length > 1) {
-            for (const point of leg) {
-              const last = merged[merged.length - 1];
-              if (!last || last[0] !== point[0] || last[1] !== point[1]) merged.push(point);
-            }
-          } else {
-            missed += 1;
-            merged.push([from.lat, from.lng], [to.lat, to.lng]);
-          }
-        }
-        if (merged.length > 1) drawRoute(merged, missed < legs.length);
-      });
-    }
-
     const grouped = new Map();
     plan.stops.forEach((stop, index) => {
       const poi = POI.get(stop.poiId);
