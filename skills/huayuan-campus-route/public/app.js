@@ -256,6 +256,13 @@
   // ---------- 步行道路线（OSM foot routing） ----------
 
   const roadCache = new Map();
+  const SUISHI_APPROACH = [
+    [23.0452, 113.4113],
+    [23.0459, 113.4106],
+    [23.0467, 113.4097],
+    [23.0475, 113.4088],
+    [23.0484, 113.4079],
+  ];
 
   function gcj02ToWgs84(lat, lng) {
     let wlat = lat;
@@ -268,13 +275,20 @@
     return { lat: wlat, lng: wlng };
   }
 
-  async function fetchRoadLeg(from, to) {
-    const key = `${from.lat.toFixed(6)},${from.lng.toFixed(6)}|${to.lat.toFixed(6)},${to.lng.toFixed(6)}`;
+  async function fetchRoadLeg(from, to, via) {
+    const viaKey = via ? `${via.lat.toFixed(6)},${via.lng.toFixed(6)}` : '';
+    const key = `${from.lat.toFixed(6)},${from.lng.toFixed(6)}|${viaKey}|${to.lat.toFixed(6)},${to.lng.toFixed(6)}`;
     if (roadCache.has(key)) return roadCache.get(key);
     const a = gcj02ToWgs84(from.lat, from.lng);
     const b = gcj02ToWgs84(to.lat, to.lng);
+    const coords = [`${a.lng},${a.lat}`];
+    if (via) {
+      const v = gcj02ToWgs84(via.lat, via.lng);
+      coords.push(`${v.lng},${v.lat}`);
+    }
+    coords.push(`${b.lng},${b.lat}`);
     const url =
-      `https://routing.openstreetmap.de/routed-foot/route/v1/foot/${a.lng},${a.lat};${b.lng},${b.lat}` +
+      `https://routing.openstreetmap.de/routed-foot/route/v1/foot/${coords.join(';')}` +
       '?overview=full&geometries=geojson&steps=false';
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), 7000);
@@ -352,7 +366,21 @@
     }
     if (stopPoints.length > 1) {
       Promise.all(
-        stopPoints.slice(0, -1).map((from, index) => fetchRoadLeg(from, stopPoints[index + 1]))
+        stopPoints.slice(0, -1).map((from, index) => {
+          const to = stopPoints[index + 1];
+          if (from.id === 'home_custom' && state.home.id === 'suishi') {
+            const gate = POI.get('eastgate');
+            if (gate) {
+              return fetchRoadLeg(gate, to).then((tail) => {
+                const points = SUISHI_APPROACH.slice();
+                if (tail && tail.length) points.push(...tail.slice(1));
+                else points.push([to.lat, to.lng]);
+                return points;
+              });
+            }
+          }
+          return fetchRoadLeg(from, to);
+        })
       ).then((legs) => {
         if (seq !== routeSeq) return;
         const merged = [];
@@ -1904,6 +1932,9 @@
     if (!homeCoordsValid()) {
       state.home = { id: 'offcampus', address: '大学城南地铁站', lat: 23.04346, lng: 113.40111, offcampus: true };
     }
+  } else if (params.get('home') === 'suishi') {
+    state.dormPoiId = 'offcampus';
+    state.home = { id: 'suishi', address: '穗石牌坊（东门外）', lat: 23.0452, lng: 113.4113, offcampus: true };
   }
   if (TBL) {
     try {
