@@ -837,7 +837,8 @@
     function mealChoice(meal, fromPoiId) {
       const pref = String(mealPrefs[meal] || 'auto');
       if (pref === 'takeout') {
-        return { poi: POI_MAP.get(takeoutPlaceId) || POI_MAP.get('c11'), takeout: true, preferred: true };
+        const placeId = mealPrefs.takeoutPlace === 'home' ? dormPoiId : takeoutPlaceId;
+        return { poi: POI_MAP.get(placeId) || POI_MAP.get('c11'), takeout: true, preferred: true };
       }
       if (pref === 'canteen1' || pref === 'canteen2') {
         return { poi: POI_MAP.get(pref), takeout: false, preferred: true };

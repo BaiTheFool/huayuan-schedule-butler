@@ -473,6 +473,18 @@ check('校内自定义宿舍仍按宿舍热水和门禁安排', () => {
   assert.ok(plan.blocks.find((b) => b.type === 'shower').title.includes('宿舍'));
 });
 
+check('校外住宿选外卖时默认在住处吃，不送回宿舍', () => {
+  const plan = R.planDay({
+    date: '2026-11-02',
+    home: { lat: 23.0452, lng: 113.4113, address: '穗石牌坊', offcampus: true },
+    mealPrefs: { dinner: 'takeout', takeoutPlace: 'home' },
+    timetable: { campus: { key: 'university_town', label: '大学城校区' }, courses: [] },
+  });
+  const dinner = plan.blocks.find((b) => b.type === 'meal' && b.title.includes('晚餐'));
+  assert.ok(dinner.title.includes('外卖'));
+  assert.strictEqual(dinner.poi_id, 'home_custom');
+});
+
 check('Markdown 导出包含日期、时间轴、热水与依据', () => {
   const md = R.buildMarkdown(base);
   assert.ok(md.includes('2026-10-29'));

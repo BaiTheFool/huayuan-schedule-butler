@@ -112,7 +112,7 @@
     dormPoiId: 'c11',
     home: { id: 'c11', address: '', lat: null, lng: null, offcampus: false },
     pickHomeOnMap: false,
-    mealPrefs: { breakfast: 'auto', lunch: 'auto', dinner: 'auto', takeoutPlace: 'c11' },
+    mealPrefs: { breakfast: 'auto', lunch: 'auto', dinner: 'auto', takeoutPlace: 'home' },
     sportPref: 'auto',
     sportType: 'auto',
     gym: { enabled: false, date: '', start: '19:00', minutes: 60 },
@@ -368,6 +368,16 @@
       Promise.all(
         stopPoints.slice(0, -1).map((from, index) => {
           const to = stopPoints[index + 1];
+          if (to.id === 'home_custom' && state.home.id === 'suishi') {
+            const gate = POI.get('eastgate');
+            if (gate) {
+              return fetchRoadLeg(from, gate).then((tail) => {
+                const points = tail && tail.length ? tail.slice() : [[from.lat, from.lng]];
+                points.push(...SUISHI_APPROACH.slice().reverse());
+                return points;
+              });
+            }
+          }
           if (from.id === 'home_custom' && state.home.id === 'suishi') {
             const gate = POI.get('eastgate');
             if (gate) {
@@ -1427,6 +1437,11 @@
         state.dormPoiId === 'offcampus'
           ? '填地址后点“按地址定位”，或点“在地图上选点”；路线按住处坐标重算。'
           : '已选校内宿舍；起床、洗漱、睡觉会按这个宿舍安排。';
+      if (state.dormPoiId === 'offcampus' && ['c11', 'c11study'].includes(state.mealPrefs.takeoutPlace)) {
+        state.mealPrefs.takeoutPlace = 'home';
+        $('takeoutPlace').value = 'home';
+        saveStorage('huayuan.mealPrefs', state.mealPrefs);
+      }
       syncHomeFields();
       saveStorage('huayuan.dormPoiId', state.dormPoiId);
       saveStorage('huayuan.home', state.home);
