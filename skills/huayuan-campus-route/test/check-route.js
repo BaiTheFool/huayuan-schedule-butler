@@ -497,6 +497,19 @@ check('午餐可选校外具体地点并接入路线', () => {
   assert.strictEqual(lunch.poi_id, 'meal_lunch');
 });
 
+check('固定时段待办会插入时间轴并在指定地点', () => {
+  const plan = R.planDay({
+    date: '2026-11-02',
+    fixedEvents: [{ title: '小组会议', start: '09:00', end: '10:00', location: '图书馆', lat: 23.046927, lng: 113.405395 }],
+    timetable: { campus: { key: 'university_town', label: '大学城校区' }, courses: [] },
+  });
+  const task = plan.blocks.find((b) => b.type === 'task');
+  assert.ok(task);
+  assert.strictEqual(task.title, '小组会议');
+  assert.strictEqual(task.start, '09:00');
+  assert.strictEqual(task.poi_id, 'event_0');
+});
+
 check('Markdown 导出包含日期、时间轴、热水与依据', () => {
   const md = R.buildMarkdown(base);
   assert.ok(md.includes('2026-10-29'));

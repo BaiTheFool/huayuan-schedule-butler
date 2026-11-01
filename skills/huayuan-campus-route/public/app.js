@@ -115,6 +115,8 @@
     mealPlaces: { breakfast: { address: '', lat: null, lng: null }, lunch: { address: '', lat: null, lng: null }, dinner: { address: '', lat: null, lng: null } },
     mealPlaceEditing: 'lunch',
     pickMealOnMap: false,
+    todoPlace: { address: '', lat: null, lng: null },
+    pickTodoOnMap: false,
     mealPrefs: { breakfast: 'auto', lunch: 'auto', dinner: 'auto', takeoutPlace: 'home' },
     sportPref: 'auto',
     sportType: 'auto',
@@ -225,6 +227,17 @@
     fitCampus();
 
     map.on('click', (event) => {
+      if (state.pickTodoOnMap) {
+        state.pickTodoOnMap = false;
+        map.getContainer().style.cursor = '';
+        state.todoPlace = {
+          address: $('todoLocation').value.trim() || '地图选点',
+          lat: event.latlng.lat,
+          lng: event.latlng.lng,
+        };
+        $('todoCoord').textContent = `${event.latlng.lat.toFixed(5)}, ${event.latlng.lng.toFixed(5)}`;
+        return;
+      }
       if (state.pickMealOnMap) {
         state.pickMealOnMap = false;
         map.getContainer().style.cursor = '';
@@ -560,8 +573,39 @@
     });
   }
 
+  function fixedEventsForDate() {
+    const weekday = new Date(`${state.date}T12:00:00`).getDay() || 7;
+    return state.manualTasks
+      .filter((task) => task.start && task.end && Number.isFinite(Number(task.lat)) && Number.isFinite(Number(task.lng)))
+      .filter((task) => {
+        if (task.repeat === 'daily') return true;
+        if (task.repeat === 'weekly') return Number(task.weekday) === weekday;
+        return String(task.date || '') === state.date;
+      })
+      .map((task) => ({
+        title: task.title,
+        start: task.start,
+        end: task.end,
+        location: task.location || '',
+        lat: Number(task.lat),
+        lng: Number(task.lng),
+      }));
+  }
+
   function replan(showToast) {
     refreshTasks();
+    const fixedEvents = fixedEventsForDate();
+    fixedEvents.forEach((event, index) => {
+      POI.set(`event_${index}`, {
+        id: `event_${index}`,
+        name: event.location || event.title,
+        short: String(event.location || '待办').slice(0, 12),
+        category: 'task',
+        icon: '📌',
+        lat: event.lat,
+        lng: event.lng,
+      });
+    });
     const plan = R.planDay({
       date: state.date,
       preset: state.preset,
@@ -585,6 +629,7 @@
       weekNumber: state.timetableInfo ? state.timetableInfo.week_number : null,
       major: state.major || undefined,
       tasks: tasksForRoute(),
+      fixedEvents,
     });
 
     if (!plan.ok) {
@@ -1116,11 +1161,15 @@
             const control = task.external
               ? '<span class="task-lock" title="请回到左侧对话区标记完成">只读</span>'
               : `<input type="checkbox" data-task-check ${task.done ? 'checked' : ''} aria-label="完成 ${esc(task.title)}" />`;
+            const repeatText = task.repeat === 'weekly' ? `每周${['一', '二', '三', '四', '五', '六', '日'][Number(task.weekday) - 1] || ''}` : task.repeat === 'daily' ? '每天' : '一次';
+            const schedule = task.start
+              ? `${task.start}–${task.end} · ${task.location || '自选地点'} · ${repeatText}`
+              : `预计 ${task.estimated_minutes} 分钟`;
             return `<div class="task-item ${task.done ? 'done' : ''}" data-task-id="${esc(task.id)}">
               ${control}
               <div>
                 <div class="task-title">${esc(task.title)}</div>
-                <div class="task-meta">[${esc(source)}] ${esc(due)} · 预计 ${task.estimated_minutes} 分钟${task.course ? ` · ${esc(task.course)}` : ''}</div>
+                <div class="task-meta">[${esc(source)}] ${esc(due)} · ${esc(schedule)}${task.course ? ` · ${esc(task.course)}` : ''}</div>
               </div>
               <div class="task-side">
                 <span class="task-due ${st.key}">${esc(st.label)}</span>
@@ -1181,13 +1230,35 @@
       return;
     }
     const date = $('todoDate').value || state.date;
-    const minutes = Math.max(10, Math.min(480, Number($('todoMinutes').value) || 60));
+    const start = $('todoStart').value || '09:00';
+    const end = $('todoEnd').value || '10:00';
+    const repeat = $('todoRepeat').value || 'once';
+    const weekday = repeat === 'weekly' ? Number($('todoWeekday').value) || 1 : null;
+    if (end <= start) {
+      toast('结束时间要晚于开始时间');
+      return;
+    }
+    if (!state.todoPlace || !Number.isFinite(Number(state.todoPlace.lat)) || !Number.isFinite(Number(state.todoPlace.lng))) {
+      toast('先点“地图选点”给待办定位');
+      return;
+    }
+    const startMin = Number(start.slice(0, 2)) * 60 + Number(start.slice(3, 5));
+    const endMin = Number(end.slice(0, 2)) * 60 + Number(end.slice(3, 5));
+    const minutes = Math.max(10, endMin - startMin);
     const priority = $('todoPriority').value || 'P2';
     state.manualTasks.push({
       id: `manual-${Date.now()}`,
       title: title.slice(0, 100),
-      due: `${date}T23:59`,
+      due: `${date}T${end}`,
       due_date: date,
+      start,
+      end,
+      repeat,
+      weekday,
+      date,
+      location: state.todoPlace.address || $('todoLocation').value.trim() || '自选地点',
+      lat: Number(state.todoPlace.lat),
+      lng: Number(state.todoPlace.lng),
       priority,
       estimated_minutes: minutes,
       source: 'manual',
@@ -1195,6 +1266,9 @@
     });
     saveStorage('huayuan.manualTasks', state.manualTasks);
     $('todoTitle').value = '';
+    $('todoLocation').value = '';
+    $('todoCoord').textContent = '未定位';
+    state.todoPlace = { address: '', lat: null, lng: null };
     openTaskSection();
     replan(true);
     toast(`已加入待办：${title}`);
@@ -1959,6 +2033,18 @@
     $('demoExamsBtn').addEventListener('click', loadDemoExams);
     $('clearExamsBtn').addEventListener('click', clearExams);
     $('remindBtn').addEventListener('click', enableReminders);
+    $('pickTodoOnMapBtn').addEventListener('click', () => {
+      if (!map) {
+        toast('地图还没准备好');
+        return;
+      }
+      state.pickTodoOnMap = true;
+      map.getContainer().style.cursor = 'crosshair';
+      toast('在地图上点一下待办地点');
+    });
+    $('todoRepeat').addEventListener('change', (e) => {
+      $('todoWeekday').hidden = e.target.value !== 'weekly';
+    });
     $('addTodoBtn').addEventListener('click', addManualTask);
     $('todoTitle').addEventListener('keydown', (e) => {
       if (e.key === 'Enter') {

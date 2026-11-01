@@ -238,6 +238,49 @@
     pathCache.clear();
     return node;
   }
+  const customEventNearest = new Map();
+
+  /** 把待办的固定地点临时接入步行图。 */
+  function installCustomEvent(event, index) {
+    if (!event || !Number.isFinite(Number(event.lat)) || !Number.isFinite(Number(event.lng))) return null;
+    const id = `event_${index}`;
+    const node = {
+      id,
+      name: event.location || event.title || '待办地点',
+      short: String(event.location || '待办').slice(0, 12),
+      category: 'task',
+      icon: '📌',
+      lat: Number(event.lat),
+      lng: Number(event.lng),
+      coord_confidence: 'user',
+      hours: null,
+    };
+    POI_MAP.set(id, node);
+    NODE_MAP.set(id, node);
+    const previous = customEventNearest.get(id);
+    if (previous) {
+      const edges = GRAPH.get(previous.id) || [];
+      GRAPH.set(previous.id, edges.filter((edge) => edge.id !== id));
+    }
+    let nearest = null;
+    for (const [candidateId, candidate] of NODE_MAP) {
+      if (candidateId === id) continue;
+      const distance = haversine(node, candidate);
+      if (!nearest || distance < nearest.distance) nearest = { id: candidateId, node: candidate, distance };
+    }
+    GRAPH.set(id, []);
+    if (nearest) {
+      const distance = nearest.distance * 1.12;
+      GRAPH.get(id).push({ id: nearest.id, distance });
+      GRAPH.get(nearest.id).push({ id, distance });
+      customEventNearest.set(id, { id: nearest.id, node: nearest.node });
+    } else {
+      customEventNearest.delete(id);
+    }
+    pathCache.clear();
+    return node;
+  }
+
   function shortestPath(fromId, toId) {
     if (fromId === toId) {
       const p = NODE_MAP.get(fromId);
@@ -886,6 +929,41 @@
     // 早餐：离第一节课最近的那个饭堂
     blocks.push(...classes);
 
+    // 用户固定时段待办：先占住时间，三餐和自习会绕开；冲突则只提醒
+    const eventBlocks = [];
+    (Array.isArray(opts.fixedEvents) ? opts.fixedEvents : []).forEach((event, index) => {
+      const start = parseTime(event.start);
+      const end = parseTime(event.end);
+      if (start === null || end === null || end <= start) return;
+      if (!Number.isFinite(Number(event.lat)) || !Number.isFinite(Number(event.lng))) {
+        warnings.push(`待办「${event.title || '未命名'}」没有定位，未排入`);
+        return;
+      }
+      if (start < wake || end > prefs.sleep) {
+        warnings.push(`待办「${event.title || '未命名'}」超出作息，未排入`);
+        return;
+      }
+      const collision = classes.find((item) => item.start < end && item.end > start);
+      if (collision) {
+        warnings.push(`待办「${event.title || '未命名'}」与「${collision.title}」冲突，未排入`);
+        return;
+      }
+      installCustomEvent(event, index);
+      eventBlocks.push({
+        id: `event-${index}`,
+        type: 'task',
+        title: event.title || '待办',
+        subtitle: event.location || '自选地点',
+        poiId: `event_${index}`,
+        start,
+        end,
+        locked: true,
+        source: '[待办]',
+        reason: `你指定 ${clock(start)}–${clock(end)} 在${event.location || '自选地点'}完成`,
+      });
+    });
+    blocks.push(...eventBlocks);
+
     function mealChoice(meal, fromPoiId) {
       const pref = String(mealPrefs[meal] || 'auto');
       if (pref === 'offcampus') {
@@ -1091,7 +1169,7 @@
     }
 
     // 固定块 = 课程 + 三餐 + 洗澡
-    const fixed = blocks.filter((b) => b.type === 'class' || b.type === 'meal' || b.type === 'shower' || (b.type === 'sport' && b.locked));
+    const fixed = blocks.filter((b) => b.type === 'class' || b.type === 'meal' || b.type === 'shower' || b.type === 'task' || (b.type === 'sport' && b.locked));
     const flexWindows = [];
     const dayEnd = showerStart;
     const boundaries = fixed

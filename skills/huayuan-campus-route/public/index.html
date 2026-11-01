@@ -298,16 +298,36 @@
             <div class="exam-list" id="examList"></div>
 
             <div class="todo-form">
-              <input id="todoTitle" type="text" maxlength="100" placeholder="手动加待办：交实验报告" aria-label="待办标题" />
+              <input id="todoTitle" type="text" maxlength="100" placeholder="手动加待办：交实验报告 / 小组会议" aria-label="待办标题" />
               <div class="todo-row">
-                <input id="todoDate" type="date" aria-label="截止日期" />
-                <input id="todoMinutes" type="number" min="10" max="480" step="10" value="60" aria-label="预计分钟" />
+                <input id="todoDate" type="date" aria-label="日期" />
+                <input id="todoStart" type="time" value="09:00" aria-label="开始时间" />
+                <input id="todoEnd" type="time" value="10:00" aria-label="结束时间" />
+                <select id="todoRepeat" aria-label="重复方式">
+                  <option value="once">一次</option>
+                  <option value="weekly">每周几</option>
+                  <option value="daily">每天</option>
+                </select>
+                <select id="todoWeekday" aria-label="星期几" hidden>
+                  <option value="1">周一</option>
+                  <option value="2">周二</option>
+                  <option value="3">周三</option>
+                  <option value="4">周四</option>
+                  <option value="5">周五</option>
+                  <option value="6">周六</option>
+                  <option value="7">周日</option>
+                </select>
                 <select id="todoPriority" aria-label="优先级">
                   <option value="P1">P1</option>
                   <option value="P2" selected>P2</option>
                   <option value="P0">P0</option>
                   <option value="P3">P3</option>
                 </select>
+              </div>
+              <div class="todo-row">
+                <input id="todoLocation" type="text" maxlength="80" placeholder="在哪里：图书馆 / 一饭 / 自选地点" aria-label="待办地点" />
+                <button type="button" class="link-btn" id="pickTodoOnMapBtn">地图选点</button>
+                <span class="home-coord" id="todoCoord">未定位</span>
                 <button type="button" class="mini-btn" id="addTodoBtn">添加</button>
               </div>
             </div>
