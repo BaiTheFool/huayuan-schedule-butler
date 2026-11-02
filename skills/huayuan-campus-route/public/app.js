@@ -393,7 +393,7 @@
       `https://routing.openstreetmap.de/routed-foot/route/v1/foot/${coords.join(';')}` +
       '?overview=full&geometries=geojson&steps=false';
     const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 7000);
+    const timer = setTimeout(() => controller.abort(), 20000);
     try {
       const response = await fetch(url, { signal: controller.signal, cache: 'force-cache' });
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
@@ -424,7 +424,7 @@
     const forceC10 = isUpperCDorm(from.id) || isUpperCDorm(to.id);
     const direct = forceC10 ? null : await fetchRoadLeg(from, to);
     if (direct && direct.length > 1) return direct;
-    const c10 = POI.get('c10');
+    const c10 = POI.get('c10') || LOCATIONS.find((item) => item.id === 'c10');
     if (!c10) return direct;
     if (isCDorm(from.id) && to.id !== 'c10') {
       const tail = await fetchRoadLeg(c10, to);
@@ -547,7 +547,12 @@
       if (!poi) continue;
       const last = stopPoints[stopPoints.length - 1];
       if (last && Math.abs(last.lat - poi.lat) < 1e-7 && Math.abs(last.lng - poi.lng) < 1e-7) continue;
-      stopPoints.push({ ...poi, type: stop.type });
+      let routePoi = poi;
+      if (/^c(8|9|1[0-7])$/.test(String(stop.poiId)) && stop.poiId !== 'c10') {
+        const c10 = POI.get('c10') || LOCATIONS.find((item) => item.id === 'c10');
+        if (c10) routePoi = c10;
+      }
+      stopPoints.push({ ...routePoi, id: routePoi.id, type: stop.type });
     }
     if (stopPoints.length > 1) {
       const seq = routeSeq;
