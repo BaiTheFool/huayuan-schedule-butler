@@ -636,6 +636,7 @@
     { id: 'j_lake_e', name: '琴湖东岸路口', lat: 23.0472, lng: 113.4071, kind: 'junction' },
     { id: 'j_east', name: '东侧环路', lat: 23.0482, lng: 113.4065, kind: 'junction' },
     { id: 'j_ne', name: '东北路口', lat: 23.0509, lng: 113.40645, kind: 'junction' },
+    { id: 'j_north1', name: '北一门内侧', lat: 23.0525, lng: 113.4036, kind: 'junction' },
     { id: 'j_e', name: 'E 区宿舍路口', lat: 23.0534, lng: 113.4079, kind: 'junction' },
   ];
 
@@ -691,7 +692,8 @@
     ['westgate', 'j_c1_gate'],
     ['northgate', 'j_ne'],
     ['west1gate', 'j_c11'],
-    ['north1gate', 'j_ne'],
+    ['north1gate', 'j_north1'],
+    ['j_north1', 'j_canteen2'],
   ];
 
   const PRESETS = [
