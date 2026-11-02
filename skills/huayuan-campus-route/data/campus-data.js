@@ -481,10 +481,10 @@
       short: '穗石牌坊',
       category: 'gate',
       icon: '⛩️',
-      lat: 23.0452,
-      lng: 113.4113,
-      coord_confidence: 'low',
-      coord_source: '按东门与穗石村入口相对位置估算；现场以牌坊为准',
+      lat: 23.05146,
+      lng: 113.41378,
+      coord_confidence: 'high',
+      coord_source: '用户提供 WGS84 坐标：113.41378, 23.05146',
       hours: null,
       hours_label: '校外道路，无校园门禁',
       hours_source: '用户可自选校外入口',
@@ -654,7 +654,7 @@
     { id: 'j_east', name: '东侧环路', lat: 23.0482, lng: 113.4065, kind: 'junction' },
     { id: 'j_ne', name: '东北路口', lat: 23.0509, lng: 113.40645, kind: 'junction' },
     { id: 'j_e', name: 'E 区宿舍路口', lat: 23.0534, lng: 113.4079, kind: 'junction' },
-    { id: 'j_suishi', name: '穗石牌坊路口', lat: 23.04535, lng: 113.41095, kind: 'junction' },
+    { id: 'j_suishi', name: '穗石牌坊路口', lat: 23.0513, lng: 113.4135, kind: 'junction' },
   ];
 
   const WALK_EDGES = [
@@ -699,7 +699,6 @@
     ['j_canteen2', 'j_c11'],
     ['j_c11', 'c11'],
     ['j_c11', 'c11study'],
-    ['j_east', 'j_ne'],
     ['j_lake_s', 'j_lake_e'],
     ['j_lake_e', 'j_east'],
     ['j_lake_s', 'lake'],

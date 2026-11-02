@@ -280,16 +280,12 @@
 
   const roadCache = new Map();
   const SUISHI_APPROACH = [
-    [23.0452, 113.4113],
-    [23.04555, 113.41085],
-    [23.0459, 113.4104],
-    [23.04635, 113.40995],
-    [23.0468, 113.40955],
-    [23.04725, 113.40915],
-    [23.04765, 113.40875],
-    [23.0480, 113.4084],
-    [23.04825, 113.40815],
-    [23.0484, 113.4079],
+    [23.05146, 113.41378],
+    [23.0510, 113.4129],
+    [23.0504, 113.4120],
+    [23.0498, 113.4110],
+    [23.0493, 113.4100],
+    [23.0487, 113.40868],
   ];
   const GYM_ENTRY = [23.04815, 113.40375];
   const GYM_PLAZA = [23.04755, 113.40455];
@@ -395,83 +391,6 @@
       if (last && Math.abs(last.lat - poi.lat) < 1e-7 && Math.abs(last.lng - poi.lng) < 1e-7) continue;
       stopPoints.push(poi);
     }
-    if (stopPoints.length > 1) {
-      Promise.all(
-        stopPoints.slice(0, -1).map((from, index) => {
-          const to = stopPoints[index + 1];
-          const mealAtSuishi = Object.values(state.mealPlaces || {}).some((place) => /穗石|牌坊/.test(String(place && place.address || '')));
-          if ((/^meal_/.test(from.id) || /^meal_/.test(to.id)) && mealAtSuishi) {
-            const gate = POI.get('eastgate');
-            if (gate) {
-              if (to.id === 'meal_custom') {
-                return fetchRoadLeg(from, gate).then((tail) => {
-                  const points = tail && tail.length ? tail.slice() : [[from.lat, from.lng]];
-                  points.push(...SUISHI_APPROACH.slice().reverse());
-                  return points;
-                });
-              }
-              return fetchRoadLeg(gate, to).then((tail) => {
-                const points = SUISHI_APPROACH.slice();
-                if (tail && tail.length) points.push(...tail.slice(1));
-                else points.push([to.lat, to.lng]);
-                return points;
-              });
-            }
-          }
-          if (from.id === 'gym' || to.id === 'gym') {
-            const way = ['library', 'cafe', 'a1', 'a2', 'a3'].includes(from.id) || ['library', 'cafe', 'a1', 'a2', 'a3'].includes(to.id)
-              ? GYM_PLAZA
-              : GYM_CANTEEN;
-            if (to.id === 'gym') {
-              return Promise.resolve([[from.lat, from.lng], way, GYM_ENTRY]);
-            }
-            return Promise.resolve([GYM_ENTRY, way, [to.lat, to.lng]]);
-          }
-          if (to.id === 'home_custom' && state.home.id === 'suishi') {
-            const gate = POI.get('eastgate');
-            if (gate) {
-              return fetchRoadLeg(from, gate).then((tail) => {
-                const points = tail && tail.length ? tail.slice() : [[from.lat, from.lng]];
-                points.push(...SUISHI_APPROACH.slice().reverse());
-                return points;
-              });
-            }
-          }
-          if (from.id === 'home_custom' && state.home.id === 'suishi') {
-            const gate = POI.get('eastgate');
-            if (gate) {
-              return fetchRoadLeg(gate, to).then((tail) => {
-                const points = SUISHI_APPROACH.slice();
-                if (tail && tail.length) points.push(...tail.slice(1));
-                else points.push([to.lat, to.lng]);
-                return points;
-              });
-            }
-          }
-          return fetchRoadLeg(from, to);
-        })
-      ).then((legs) => {
-        if (seq !== routeSeq) return;
-        const merged = [];
-        let missed = 0;
-        for (let i = 0; i < legs.length; i += 1) {
-          const leg = legs[i];
-          const from = stopPoints[i];
-          const to = stopPoints[i + 1];
-          if (leg && leg.length > 1) {
-            for (const point of leg) {
-              const last = merged[merged.length - 1];
-              if (!last || last[0] !== point[0] || last[1] !== point[1]) merged.push(point);
-            }
-          } else {
-            missed += 1;
-            merged.push([from.lat, from.lng], [to.lat, to.lng]);
-          }
-        }
-        if (merged.length > 1) drawRoute(merged, missed < legs.length);
-      });
-    }
-
     const grouped = new Map();
     plan.stops.forEach((stop, index) => {
       const poi = POI.get(stop.poiId);
@@ -1488,7 +1407,7 @@
     state.mealPlaces[meal] = { ...(state.mealPlaces[meal] || {}), address: raw };
     saveStorage('huayuan.mealPlaces', state.mealPlaces);
     if (/穗石|牌坊/.test(raw)) {
-      setMealPlaceCoords(23.0452, 113.4113, '穗石牌坊（东门外）', meal);
+      setMealPlaceCoords(23.05146, 113.41378, '穗石牌坊（东门外）', meal);
       $('mealPlaceHint').textContent = '已定位到穗石牌坊，按东门进校最近。';
       return;
     }
@@ -1566,7 +1485,7 @@
       return;
     }
     if (/穗石|牌坊/.test(raw)) {
-      setHomeCoords(23.0452, 113.4113, '穗石牌坊（东门外）');
+      setHomeCoords(23.05146, 113.41378, '穗石牌坊（东门外）');
       $('homeHint').textContent = '已定位到穗石牌坊，走东门进校最近。';
       return;
     }
@@ -1608,7 +1527,7 @@
         if (e.target.value === 'offcampus') {
           state.mealPlaceEditing = meal;
           if (!mealPlaceValid(meal)) {
-            state.mealPlaces[meal] = { address: '穗石牌坊（东门外）', lat: 23.0452, lng: 113.4113 };
+            state.mealPlaces[meal] = { address: '穗石牌坊（东门外）', lat: 23.05146, lng: 113.41378 };
             saveStorage('huayuan.mealPlaces', state.mealPlaces);
           }
         }
@@ -1671,8 +1590,8 @@
         state.home = {
           id: 'suishi',
           address: '穗石牌坊（东门外）',
-          lat: 23.0452,
-          lng: 113.4113,
+          lat: 23.05146,
+          lng: 113.41378,
           offcampus: true,
         };
       } else if (value === 'offcampus') {
@@ -2273,7 +2192,7 @@
     }
   } else if (params.get('home') === 'suishi') {
     state.dormPoiId = 'offcampus';
-    state.home = { id: 'suishi', address: '穗石牌坊（东门外）', lat: 23.0452, lng: 113.4113, offcampus: true };
+    state.home = { id: 'suishi', address: '穗石牌坊（东门外）', lat: 23.05146, lng: 113.41378, offcampus: true };
   }
   if (TBL) {
     try {

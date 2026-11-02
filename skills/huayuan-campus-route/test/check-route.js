@@ -476,7 +476,7 @@ check('校内自定义宿舍仍按宿舍热水和门禁安排', () => {
 check('校外住宿选外卖时默认在住处吃，不送回宿舍', () => {
   const plan = R.planDay({
     date: '2026-11-02',
-    home: { lat: 23.0452, lng: 113.4113, address: '穗石牌坊', offcampus: true },
+    home: { lat: 23.05146, lng: 113.41378, address: '穗石牌坊', offcampus: true },
     mealPrefs: { dinner: 'takeout', takeoutPlace: 'home' },
     timetable: { campus: { key: 'university_town', label: '大学城校区' }, courses: [] },
   });
@@ -489,7 +489,7 @@ check('午餐可选校外具体地点并接入路线', () => {
   const plan = R.planDay({
     date: '2026-11-02',
     mealPrefs: { lunch: 'offcampus' },
-    mealPlace: { lat: 23.0452, lng: 113.4113, address: '穗石牌坊（东门外）' },
+    mealPlace: { lat: 23.05146, lng: 113.41378, address: '穗石牌坊（东门外）' },
     timetable: { campus: { key: 'university_town', label: '大学城校区' }, courses: [] },
   });
   const lunch = plan.blocks.find((b) => b.type === 'meal' && b.title.includes('午餐'));
