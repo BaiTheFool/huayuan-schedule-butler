@@ -470,7 +470,6 @@
 
     const points = (plan.route && plan.route.points) || [];
     const latlngs = points.map((point) => [point.lat, point.lng]);
-    drawRoute(latlngs, false);
 
     const stopPoints = [];
     for (const stop of plan.stops || []) {
@@ -497,7 +496,7 @@
                 return {
                   from,
                   to,
-                  leg: path.points.map((point) => [point.lat, point.lng]),
+                  leg: [],
                 };
               });
             }
@@ -505,7 +504,7 @@
               return {
                 from,
                 to,
-                leg: path.points.map((point) => [point.lat, point.lng]),
+                leg: [],
               };
             }
           }
@@ -531,7 +530,6 @@
             }
           } else {
             missed += 1;
-            merged.push([from.lat, from.lng], [to.lat, to.lng]);
           }
         }
         if (merged.length > 1) drawRoute(merged, missed < results.length);
