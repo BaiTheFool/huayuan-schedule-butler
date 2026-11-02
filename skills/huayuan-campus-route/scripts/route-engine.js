@@ -869,6 +869,7 @@
     const parts = dateParts(opts.date || new Date());
     const preset = PRESETS.find((item) => item.id === opts.preset) || PRESETS[1];
     const weights = normalizeWeights(opts.weights || preset.weights);
+    const minWalk = opts.minWalk === true || preset.id === 'walk';
     const prefs = normalizePrefs(opts.preferences);
     const mealPrefs = opts.mealPrefs || {};
     const takeoutPlaceId = POI_MAP.has(mealPrefs.takeoutPlace) ? mealPrefs.takeoutPlace : 'c11';
@@ -1321,7 +1322,9 @@
         const fromHome = pathFor(startPoiId, id, { ...travelOpts, at: start });
         const dinner = nearestPoi(['canteen1', 'canteen2'], id);
         const after = dinner ? pathFor(id, dinner.id, { ...travelOpts, at: end }).minutes : 0;
-        const score = (toVenue.uncertain ? 999 : toVenue.minutes) * 0.35 + after * 0.2 + (fromHome.uncertain ? 0 : fromHome.minutes) * 0.75;
+        const score = minWalk
+          ? (toVenue.uncertain ? 999 : toVenue.minutes) * 1.4 + after * 0.4
+          : (toVenue.uncertain ? 999 : toVenue.minutes) * 0.35 + after * 0.2 + (fromHome.uncertain ? 0 : fromHome.minutes) * 0.75;
         if (!best || score < best.score) best = { id, score };
       }
       return best ? best.id : null;

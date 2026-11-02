@@ -240,6 +240,13 @@ check('卷王画像的自习时间多于玩咖，运动画像的运动时间多�
   assert.ok(play.summary.play_minutes > grind.summary.play_minutes, '玩咖放松没有更多');
 });
 
+check('少走路预设存在并生成完整路线', () => {
+  const walk = R.planDay({ date: '2026-10-29', preset: 'walk' });
+  assert.strictEqual(walk.meta.preset_name, '少走路');
+  assert.ok(walk.summary.walk_minutes > 0);
+  assert.ok(walk.route.points.length > 1);
+});
+
 check('周六没有课，仍会排自习、运动和放松', () => {
   const weekend = R.planDay({ date: '2026-10-31', preset: 'balanced' });
   assert.strictEqual(weekend.blocks.filter((b) => b.type === 'class').length, 0);
