@@ -411,7 +411,9 @@
       Promise.all(
         stopPoints.slice(0, -1).map((from, index) => {
           const to = stopPoints[index + 1];
-          return fetchRoadLeg(from, to).then((leg) => {
+          const routeFrom = from.id === 'gym' ? { lat: GYM_PLAZA[0], lng: GYM_PLAZA[1] } : from;
+          const routeTo = to.id === 'gym' ? { lat: GYM_PLAZA[0], lng: GYM_PLAZA[1] } : to;
+          return fetchRoadLeg(routeFrom, routeTo).then((leg) => {
             if (leg && leg.length) {
               if (to.id === 'gym') leg.push(...GYM_APPROACH);
               if (from.id === 'gym') leg.unshift(...GYM_APPROACH.slice().reverse());
