@@ -6,7 +6,7 @@
   <title>华园一日 · 大学城校园路线</title>
   <meta name="description" content="按课表、食堂、图书馆和宿舍热水时间，生成华南理工大学大学城校区的一日步行路线。" />
   <link rel="stylesheet" href="vendor/leaflet.css" />
-  <link rel="stylesheet" href="styles.css?v=20261103n" />
+  <link rel="stylesheet" href="styles.css?v=20261103o" />
   <script>
     window.addEventListener('error', function (event) {
       var box = document.getElementById('jsError');
@@ -162,6 +162,19 @@
                   <option value="basketball">篮球（生活区球场）</option>
                   <option value="fitness">健身（体育馆）</option>
                   <option value="walk">散步</option>
+                </select>
+              </div>
+              <div class="pref-row">
+                <span>自习地点</span>
+                <select id="studyPref" aria-label="自习地点偏好">
+                  <option value="auto">自动（图书馆优先）</option>
+                  <option value="library">图书馆</option>
+                  <option value="a1">A1 教学楼</option>
+                  <option value="a2">A2 教学楼</option>
+                  <option value="a3">A3 教学楼</option>
+                  <option value="a4">A4 教学楼</option>
+                  <option value="a5">A5 教学楼</option>
+                  <option value="home">自己的住处</option>
                 </select>
               </div>
               <div class="pref-row">
@@ -410,11 +423,11 @@
   <noscript>这个页面需要 JavaScript 才能生成路线。</noscript>
 
   <script src="vendor/leaflet.js"></script>
-  <script src="../data/campus-data.js?v=20261103n"></script>
+  <script src="../data/campus-data.js?v=20261103o"></script>
   <script src="../data/exam-catalog.js"></script>
-  <script src="../scripts/route-engine.js?v=20261103n"></script>
+  <script src="../scripts/route-engine.js?v=20261103o"></script>
   <script src="../scripts/timetable-import.js"></script>
   <script src="../scripts/task-planner.js"></script>
-  <script src="app.js?v=20261103n"></script>
+  <script src="app.js?v=20261103o"></script>
 </body>
 </html>

@@ -1274,6 +1274,11 @@
     }
 
     function pickStudyVenue(start, end) {
+      const pref = String(opts.studyPref || 'auto');
+      const homeId = startPoiId;
+      if (pref === 'home' && homeId && venueOpen(homeId, start, end)) return homeId;
+      if (['a1', 'a2', 'a3', 'a4', 'a5'].includes(pref) && venueOpen(pref, start, end)) return pref;
+      if (pref === 'library' && venueOpen('library', start, end)) return 'library';
       for (const id of ['library', 'c11study']) {
         if (venueOpen(id, start, end)) return id;
       }

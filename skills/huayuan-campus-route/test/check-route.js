@@ -240,6 +240,17 @@ check('卷王画像的自习时间多于玩咖，运动画像的运动时间多�
   assert.ok(play.summary.play_minutes > grind.summary.play_minutes, '玩咖放松没有更多');
 });
 
+check('自习地点可以指定 A2 或住处', () => {
+  const a2 = R.planDay({ date: '2026-10-29', studyPref: 'a2' });
+  const a2Study = a2.blocks.find((b) => b.type === 'study');
+  assert.ok(a2Study);
+  assert.strictEqual(a2Study.poi_id, 'a2');
+  const home = R.planDay({ date: '2026-10-29', studyPref: 'home' });
+  const homeStudy = home.blocks.find((b) => b.type === 'study');
+  assert.ok(homeStudy);
+  assert.strictEqual(homeStudy.poi_id, 'c11');
+});
+
 check('少走路预设存在并生成完整路线', () => {
   const walk = R.planDay({ date: '2026-10-29', preset: 'walk' });
   assert.strictEqual(walk.meta.preset_name, '少走路');

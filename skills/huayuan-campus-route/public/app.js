@@ -123,6 +123,7 @@
     tracePoints: [],
     customRoute: null,
     mealPrefs: { breakfast: 'auto', lunch: 'auto', dinner: 'auto', takeoutPlace: 'home' },
+    studyPref: 'auto',
     sportPref: 'auto',
     sportType: 'auto',
     nap: true,
@@ -688,6 +689,7 @@
       mealPlaces: ['breakfast', 'lunch', 'dinner'].some((meal) => state.mealPrefs[meal] === 'offcampus')
         ? state.mealPlaces
         : undefined,
+      studyPref: state.studyPref,
       sportPref: state.sportPref,
       sportType: state.sportType,
       nap: state.nap,
@@ -1699,6 +1701,11 @@
       map.getContainer().style.cursor = 'crosshair';
       toast('在地图上点一下校外用餐地点');
     });
+    $('studyPref').addEventListener('change', (e) => {
+      state.studyPref = e.target.value || 'auto';
+      saveStorage('huayuan.studyPref', state.studyPref);
+      replan(false);
+    });
     $('sportPref').addEventListener('change', (e) => {
       state.sportPref = e.target.value || 'auto';
       saveStorage('huayuan.sportPref', state.sportPref);
@@ -1805,6 +1812,7 @@
     $('mealLunch').value = state.mealPrefs.lunch;
     $('mealDinner').value = state.mealPrefs.dinner;
     $('takeoutPlace').value = state.mealPrefs.takeoutPlace;
+    $('studyPref').value = state.studyPref || 'auto';
     $('sportPref').value = state.sportPref || 'auto';
     $('sportType').value = state.sportType || 'auto';
     $('homeSelect').value = homeSelectValue();
@@ -2330,6 +2338,8 @@
         };
       }
     }
+    const savedStudyPref = localStorage.getItem('huayuan.studyPref');
+    if (['auto', 'library', 'a1', 'a2', 'a3', 'a4', 'a5', 'home'].includes(savedStudyPref)) state.studyPref = savedStudyPref;
     const savedSportPref = localStorage.getItem('huayuan.sportPref');
     if (['auto', 'field_life', 'field', 'gym'].includes(savedSportPref)) state.sportPref = savedSportPref;
     const savedSportType = localStorage.getItem('huayuan.sportType');
