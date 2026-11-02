@@ -251,6 +251,13 @@ check('自习地点可以指定 A2 或住处', () => {
   assert.strictEqual(homeStudy.poi_id, 'c11');
 });
 
+check('C8-C17 宿舍先经 C11 再进校园', () => {
+  const plan = R.planDay({ date: '2026-11-02', dormPoiId: 'c12' });
+  assert.strictEqual(plan.stops[0].poiId, 'c12');
+  const c11 = plan.route.points.find((point) => Math.abs(point.lat - 23.05093) < 1e-6 && Math.abs(point.lng - 113.40064) < 1e-6);
+  assert.ok(c11, 'expected route through C11');
+});
+
 check('少走路预设存在并生成完整路线', () => {
   const walk = R.planDay({ date: '2026-10-29', preset: 'walk' });
   assert.strictEqual(walk.meta.preset_name, '少走路');

@@ -589,6 +589,25 @@
     coord_confidence: item.coord_confidence || 'medium',
   }));
 
+  const EXTRA_DORM_POIS = EXTRA_LOCATION_RECORDS
+    .filter((item) => item.group === '宿舍' && /^c(2|3|4|5|6|7|8|9|1[0-7])$/.test(item.id))
+    .map((item) => ({
+      id: item.id,
+      name: item.name,
+      short: item.short,
+      category: 'dorm',
+      icon: '🏠',
+      lat: item.lat,
+      lng: item.lng,
+      coord_confidence: 'low',
+      coord_source: '校园地图资料汇编（C 区宿舍近似位置）',
+      hours: null,
+      hours_label: '宿舍门禁以现场为准',
+      tags: ['宿舍', 'C 区'],
+      desc: `${item.name}，C 区宿舍；路线可经 C11 进出。`,
+    }));
+  POIS.push(...EXTRA_DORM_POIS);
+
   const LOCATION_ALIAS_OVERRIDES = {
     library: ['T3', 'T3图书馆', '华工图书馆'],
     c1: ['C1栋', 'C1宿舍楼', '西区宿舍'],
@@ -695,6 +714,8 @@
     ['north1gate', 'j_north1'],
     ['j_north1', 'j_canteen2'],
   ];
+
+  for (const dorm of EXTRA_DORM_POIS) WALK_EDGES.push([dorm.id, 'c11']);
 
   const PRESETS = [
     {
