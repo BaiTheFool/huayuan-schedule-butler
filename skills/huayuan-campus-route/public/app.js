@@ -412,6 +412,30 @@
     }
   }
 
+  function isCDorm(id) {
+    return /^c([1-9]|1[0-7])$/.test(String(id || ''));
+  }
+
+  async function fetchRoadLegWithDormFallback(from, to) {
+    const direct = await fetchRoadLeg(from, to);
+    if (direct && direct.length > 1) return direct;
+    const c10 = POI.get('c10');
+    if (!c10) return direct;
+    if (isCDorm(from.id) && to.id !== 'c10') {
+      const tail = await fetchRoadLeg(c10, to);
+      if (tail && tail.length > 1) {
+        return [[from.lat, from.lng], [c10.lat, c10.lng], ...tail.slice(1)];
+      }
+    }
+    if (isCDorm(to.id) && from.id !== 'c10') {
+      const head = await fetchRoadLeg(from, c10);
+      if (head && head.length > 1) {
+        return [...head, [to.lat, to.lng]];
+      }
+    }
+    return direct;
+  }
+
   function drawRoute(latlngs, road) {
     if (!routeGroup) return;
     for (const layer of routeLayers) routeGroup.removeLayer(layer);
@@ -509,7 +533,7 @@
           }
           const routeFrom = from.id === 'gym' ? { lat: GYM_PLAZA[0], lng: GYM_PLAZA[1] } : from;
           const routeTo = to.id === 'gym' ? { lat: GYM_PLAZA[0], lng: GYM_PLAZA[1] } : to;
-          return fetchRoadLeg(routeFrom, routeTo).then((leg) => {
+          return fetchRoadLegWithDormFallback(routeFrom, routeTo).then((leg) => {
             if (leg && leg.length) {
               if (to.id === 'gym') leg.push(...GYM_APPROACH);
               if (from.id === 'gym') leg.unshift(...GYM_APPROACH.slice().reverse());
