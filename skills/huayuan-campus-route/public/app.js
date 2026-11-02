@@ -406,6 +406,32 @@
       if (last && Math.abs(last.lat - poi.lat) < 1e-7 && Math.abs(last.lng - poi.lng) < 1e-7) continue;
       stopPoints.push(poi);
     }
+    if (stopPoints.length > 1) {
+      const seq = routeSeq;
+      Promise.all(
+        stopPoints.slice(0, -1).map((from, index) => {
+          const to = stopPoints[index + 1];
+          return fetchRoadLeg(from, to).then((leg) => ({ from, to, leg }));
+        })
+      ).then((results) => {
+        if (seq !== routeSeq) return;
+        const merged = [];
+        let missed = 0;
+        for (const { from, to, leg } of results) {
+          if (leg && leg.length > 1) {
+            for (const point of leg) {
+              const last = merged[merged.length - 1];
+              if (!last || last[0] !== point[0] || last[1] !== point[1]) merged.push(point);
+            }
+          } else {
+            missed += 1;
+            merged.push([from.lat, from.lng], [to.lat, to.lng]);
+          }
+        }
+        if (merged.length > 1) drawRoute(merged, missed < results.length);
+      });
+    }
+
     const grouped = new Map();
     plan.stops.forEach((stop, index) => {
       const poi = POI.get(stop.poiId);
