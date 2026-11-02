@@ -480,7 +480,7 @@ check('校外住处会选总路程最短的校门', () => {
     home: { id: 'north-test', address: '北门附近', lat: 23.0545, lng: 113.402, offcampus: true },
     timetable: { campus: { key: 'university_town', label: '大学城校区' }, courses: [] },
   });
-  const gatePoint = plan.route.points.find((point) => Math.abs(point.lat - 23.05332) < 1e-6 && Math.abs(point.lng - 113.40309) < 1e-6);
+  const gatePoint = plan.route.points.find((point) => Math.abs(point.lat - 23.05323) < 1e-6 && Math.abs(point.lng - 113.40319) < 1e-6);
   assert.ok(gatePoint, 'expected route through north-1 gate');
 });
 

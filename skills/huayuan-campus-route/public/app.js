@@ -470,7 +470,6 @@
     const points = (plan.route && plan.route.points) || [];
     const latlngs = points.map((point) => [point.lat, point.lng]);
     drawRoute(latlngs, false);
-    if (state.customRoute && state.customRoute.length > 1) drawRoute(state.customRoute, false);
 
     const stopPoints = [];
     for (const stop of plan.stops || []) {
@@ -480,7 +479,7 @@
       if (last && Math.abs(last.lat - poi.lat) < 1e-7 && Math.abs(last.lng - poi.lng) < 1e-7) continue;
       stopPoints.push(poi);
     }
-    if (!state.customRoute && stopPoints.length > 1) {
+    if (stopPoints.length > 1) {
       const seq = routeSeq;
       Promise.all(
         stopPoints.slice(0, -1).map((from, index) => {
@@ -648,15 +647,6 @@
         lng: event.lng,
       });
     });
-    if (state.gateOverrides.eastgate) {
-      const base = POI.get('eastgate') || {};
-      POI.set('eastgate', {
-        ...base,
-        id: 'eastgate',
-        lat: Number(state.gateOverrides.eastgate.lat),
-        lng: Number(state.gateOverrides.eastgate.lng),
-      });
-    }
     const plan = R.planDay({
       date: state.date,
       preset: state.preset,
@@ -2294,23 +2284,7 @@
         offcampus: savedHome.offcampus !== false,
       };
     }
-    const savedCustomRoute = JSON.parse(localStorage.getItem('huayuan.customRoute') || 'null');
-    if (Array.isArray(savedCustomRoute) && savedCustomRoute.length > 1) {
-      state.customRoute = savedCustomRoute;
-      state.tracePoints = savedCustomRoute.slice();
-      const clear = $('clearTraceBtn');
-      if (clear) clear.hidden = false;
-    }
     const savedMealPlaces = JSON.parse(localStorage.getItem('huayuan.mealPlaces') || 'null');
-    const savedGates = JSON.parse(localStorage.getItem('huayuan.gates') || 'null');
-    if (savedGates && savedGates.eastgate && Number.isFinite(Number(savedGates.eastgate.lat)) && Number.isFinite(Number(savedGates.eastgate.lng))) {
-      state.gateOverrides.eastgate = {
-        lat: Number(savedGates.eastgate.lat),
-        lng: Number(savedGates.eastgate.lng),
-      };
-      const reset = $('resetEastGateBtn');
-      if (reset) reset.hidden = false;
-    }
     if (savedMealPlaces && typeof savedMealPlaces === 'object') {
       for (const meal of ['breakfast', 'lunch', 'dinner']) {
         const place = savedMealPlaces[meal];
