@@ -470,6 +470,48 @@
     }
   }
 
+  const LEG_COLORS = {
+    wake: '#8a8f98',
+    meal: '#e08a2e',
+    study: '#3f6ad8',
+    class: '#3f6ad8',
+    sport: '#d94f4f',
+    play: '#8b5cf6',
+    task: '#7a5c3e',
+    default: '#f26b21',
+  };
+
+  function drawRouteSegments(segments, road) {
+    if (!routeGroup) return;
+    for (const layer of routeLayers) routeGroup.removeLayer(layer);
+    routeLayers = [];
+    for (const segment of segments) {
+      if (!segment.leg || segment.leg.length < 2) continue;
+      routeLayers.push(
+        L.polyline(segment.leg, {
+          color: '#fffdf7',
+          weight: 9,
+          opacity: 0.9,
+          lineCap: 'round',
+          lineJoin: 'round',
+        }).addTo(routeGroup)
+      );
+      routeLayers.push(
+        L.polyline(segment.leg, {
+          color: LEG_COLORS[segment.type] || LEG_COLORS.default,
+          weight: 4.5,
+          opacity: 0.98,
+          lineCap: 'round',
+          lineJoin: 'round',
+        }).addTo(routeGroup)
+      );
+    }
+    const attribution = $('mapAttribution');
+    if (attribution && road) {
+      attribution.textContent = '底图 © 高德地图 · 路线 © OpenStreetMap contributors · 颜色按停留类型';
+    }
+  }
+
   function drawTrace() {
     if (!map) return;
     if (!traceGroup) traceGroup = L.layerGroup().addTo(map);
@@ -505,7 +547,7 @@
       if (!poi) continue;
       const last = stopPoints[stopPoints.length - 1];
       if (last && Math.abs(last.lat - poi.lat) < 1e-7 && Math.abs(last.lng - poi.lng) < 1e-7) continue;
-      stopPoints.push(poi);
+      stopPoints.push({ ...poi, type: stop.type });
     }
     if (stopPoints.length > 1) {
       const seq = routeSeq;
@@ -548,20 +590,17 @@
         })
       ).then((results) => {
         if (seq !== routeSeq) return;
-        const merged = [];
+        const segments = [];
         let missed = 0;
         for (const { from, to, leg } of results) {
           if (leg && leg.length > 1) {
-            for (const point of leg) {
-              const last = merged[merged.length - 1];
-              if (!last || last[0] !== point[0] || last[1] !== point[1]) merged.push(point);
-            }
+            segments.push({ leg, type: to.type || 'default' });
           } else {
             missed += 1;
-            merged.push([from.lat, from.lng], [to.lat, to.lng]);
+            segments.push({ leg: [[from.lat, from.lng], [to.lat, to.lng]], type: to.type || 'default' });
           }
         }
-        if (merged.length > 1) drawRoute(merged, missed < results.length);
+        drawRouteSegments(segments, missed < results.length);
       });
     }
 
