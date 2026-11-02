@@ -302,9 +302,9 @@
     [23.0493, 113.4100],
     [23.0487, 113.40868],
   ];
-  const GYM_ENTRY = [23.04802, 113.40412];
-  const GYM_PLAZA = [23.0476, 113.40455];
-  const GYM_APPROACH = [GYM_PLAZA, [23.0478, 113.40435], GYM_ENTRY];
+  const GYM_ENTRY = [23.04775, 113.4042];
+  const GYM_PLAZA = [23.04745, 113.40455];
+  const GYM_APPROACH = [GYM_PLAZA, [23.04755, 113.40435], GYM_ENTRY];
 
   function gcj02ToWgs84(lat, lng) {
     let wlat = lat;
