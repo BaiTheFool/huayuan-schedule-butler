@@ -329,7 +329,7 @@
       Math.abs(Number(place.lat) - 23.05146) < 0.002 &&
       Math.abs(Number(place.lng) - 113.41378) < 0.003;
   }
-  async function blueLeg(from, to) {
+  function blueLeg(from, to) {
     const pair = `${from.id}->${to.id}`;
     if (pair === 'eastgate->library') return BLUE_EAST_LIBRARY.slice();
     if (pair === 'library->eastgate') return BLUE_EAST_LIBRARY.slice().reverse();
@@ -338,21 +338,19 @@
     const library = { lat: 23.04675, lng: 113.40455 };
     if (nearSuishi(from)) {
       if (to.id === 'eastgate') return BLUE_EAST_SUISHI.slice().reverse();
-      const tail = await fetchRoadLeg(library, to);
-      return [
+      return fetchRoadLeg(library, to).then((tail) => [
         ...BLUE_EAST_SUISHI.slice().reverse(),
         ...BLUE_EAST_LIBRARY.slice(1),
         ...(tail && tail.length ? tail.slice(1) : [[to.lat, to.lng]]),
-      ];
+      ]);
     }
     if (nearSuishi(to)) {
       if (from.id === 'eastgate') return BLUE_EAST_SUISHI.slice();
-      const tail = await fetchRoadLeg(from, library);
-      return [
+      return fetchRoadLeg(from, library).then((tail) => [
         ...(tail && tail.length ? tail : [[from.lat, from.lng]]),
         ...BLUE_EAST_LIBRARY.slice(1),
         ...BLUE_EAST_SUISHI.slice(1),
-      ];
+      ]);
     }
     return null;
   }
