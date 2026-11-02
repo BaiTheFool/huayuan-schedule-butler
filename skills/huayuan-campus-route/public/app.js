@@ -486,6 +486,20 @@
           const to = stopPoints[index + 1];
           if (from.id === 'home_custom' || to.id === 'home_custom') {
             const path = R.shortestPath(from.id, to.id);
+            const gateId = (path.nodes || []).find((id) => ['eastgate', 'southgate', 'westgate', 'northgate', 'west1gate', 'north1gate'].includes(id));
+            const gate = gateId && POI.get(gateId);
+            if (gate) {
+              return Promise.all([fetchRoadLeg(from, gate), fetchRoadLeg(gate, to)]).then(([head, tail]) => {
+                if (head && tail && head.length && tail.length) {
+                  return { from, to, leg: [...head, ...tail.slice(1)] };
+                }
+                return {
+                  from,
+                  to,
+                  leg: path.points.map((point) => [point.lat, point.lng]),
+                };
+              });
+            }
             if (path && path.points && path.points.length > 1) {
               return {
                 from,
