@@ -459,14 +459,14 @@
     },
     {
       id: 'north1gate',
-      name: '北一门（生活区北门）',
+      name: '北一门（北门西侧）',
       short: '北一门',
       category: 'gate',
       icon: '🚪',
-      lat: 23.05474,
-      lng: 113.40306,
+      lat: 23.05359,
+      lng: 113.40394,
       coord_confidence: 'high',
-      coord_source: '用户提供坐标：113.40306, 23.05474',
+      coord_source: '按北门向西约 50 米、华工北路上定位：113.40394, 23.05359',
       hours: null,
       hours_label: '机动车出入口',
       hours_source: '用户说明',
@@ -636,7 +636,7 @@
     { id: 'j_lake_e', name: '琴湖东岸路口', lat: 23.0472, lng: 113.4071, kind: 'junction' },
     { id: 'j_east', name: '东侧环路', lat: 23.0482, lng: 113.4065, kind: 'junction' },
     { id: 'j_ne', name: '东北路口', lat: 23.0509, lng: 113.40645, kind: 'junction' },
-    { id: 'j_north1', name: '北一门内侧', lat: 23.0525, lng: 113.4036, kind: 'junction' },
+    { id: 'j_north1', name: '北一门内侧', lat: 23.0530, lng: 113.4039, kind: 'junction' },
     { id: 'j_e', name: 'E 区宿舍路口', lat: 23.0534, lng: 113.4079, kind: 'junction' },
   ];
 
