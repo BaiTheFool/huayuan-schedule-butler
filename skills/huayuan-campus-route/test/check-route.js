@@ -497,6 +497,18 @@ check('午餐可选校外具体地点并接入路线', () => {
   assert.strictEqual(lunch.poi_id, 'meal_lunch');
 });
 
+check('六个校门坐标齐全，东门按用户坐标', () => {
+  const gates = DATA.POIS.filter((poi) => poi.category === 'gate' && poi.id !== 'suishi');
+  const ids = gates.map((poi) => poi.id);
+  for (const id of ['eastgate', 'southgate', 'westgate', 'northgate', 'west1gate', 'north1gate']) {
+    assert.ok(ids.includes(id), `missing gate ${id}`);
+  }
+  const east = gates.find((poi) => poi.id === 'eastgate');
+  assert.ok(Math.abs(east.lat - 23.0487) < 1e-6);
+  assert.ok(Math.abs(east.lng - 113.40868) < 1e-6);
+  assert.ok(east.access.includes('管制'));
+});
+
 check('固定时段待办会插入时间轴并在指定地点', () => {
   const plan = R.planDay({
     date: '2026-11-02',
