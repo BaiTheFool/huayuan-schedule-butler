@@ -309,13 +309,13 @@
     [23.0504, 113.4120],
     [23.0498, 113.4110],
     [23.0493, 113.4100],
-    [23.049, 113.4107],
+    [23.0487, 113.40868],
   ];
   const GYM_ENTRY = [23.04775, 113.4042];
   const GYM_PLAZA = [23.04745, 113.40455];
   const GYM_APPROACH = [GYM_PLAZA, [23.04755, 113.40435], GYM_ENTRY];
   const BLUE_EAST_LIBRARY = [
-    [23.049, 113.4107],
+    [23.0487, 113.40868],
     [23.0483, 113.4082],
     [23.048, 113.4074],
     [23.0478, 113.4065],
@@ -324,7 +324,7 @@
     [23.04675, 113.40455],
   ];
   const BLUE_EAST_SUISHI = [
-    [23.049, 113.4107],
+    [23.0487, 113.40868],
     [23.049, 113.4092],
     [23.0492, 113.4099],
     [23.0495, 113.4107],
@@ -2082,7 +2082,7 @@
       delete state.gateOverrides.eastgate;
       saveStorage('huayuan.gates', state.gateOverrides);
       const base = POI.get('eastgate') || {};
-      POI.set('eastgate', { ...base, id: 'eastgate', lat: 23.049, lng: 113.4107 });
+      POI.set('eastgate', { ...base, id: 'eastgate', lat: 23.0487, lng: 113.40868 });
       $('resetEastGateBtn').hidden = true;
       $('pickEastGateBtn').textContent = '📍 定位东门';
       replan(false);
