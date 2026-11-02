@@ -119,6 +119,9 @@
     pickTodoOnMap: false,
     pickEastGateOnMap: false,
     gateOverrides: {},
+    traceMode: false,
+    tracePoints: [],
+    customRoute: null,
     mealPrefs: { breakfast: 'auto', lunch: 'auto', dinner: 'auto', takeoutPlace: 'home' },
     sportPref: 'auto',
     sportType: 'auto',
@@ -132,6 +135,7 @@
   let routeGroup = null;
   let stopGroup = null;
   let gpsGroup = null;
+  let traceGroup = null;
   let routeSeq = 0;
   let routeLayers = [];
   const markerById = new Map();
@@ -229,6 +233,11 @@
     fitCampus();
 
     map.on('click', (event) => {
+      if (state.traceMode) {
+        state.tracePoints.push([event.latlng.lat, event.latlng.lng]);
+        drawTrace();
+        return;
+      }
       if (state.pickEastGateOnMap) {
         state.pickEastGateOnMap = false;
         map.getContainer().style.cursor = '';
@@ -432,6 +441,20 @@
     }
   }
 
+  function drawTrace() {
+    if (!map) return;
+    if (!traceGroup) traceGroup = L.layerGroup().addTo(map);
+    traceGroup.clearLayers();
+    if (state.tracePoints.length < 2) return;
+    L.polyline(state.tracePoints, {
+      color: '#1e88e5',
+      weight: 5,
+      opacity: 0.95,
+      lineCap: 'round',
+      lineJoin: 'round',
+    }).addTo(traceGroup);
+  }
+
   function renderRoute(plan) {
     if (!map) return;
     if (routeGroup) map.removeLayer(routeGroup);
@@ -447,6 +470,7 @@
     const points = (plan.route && plan.route.points) || [];
     const latlngs = points.map((point) => [point.lat, point.lng]);
     drawRoute(latlngs, false);
+    if (state.customRoute && state.customRoute.length > 1) drawRoute(state.customRoute, false);
 
     const stopPoints = [];
     for (const stop of plan.stops || []) {
@@ -456,7 +480,7 @@
       if (last && Math.abs(last.lat - poi.lat) < 1e-7 && Math.abs(last.lng - poi.lng) < 1e-7) continue;
       stopPoints.push(poi);
     }
-    if (stopPoints.length > 1) {
+    if (!state.customRoute && stopPoints.length > 1) {
       const seq = routeSeq;
       Promise.all(
         stopPoints.slice(0, -1).map((from, index) => {
@@ -2092,6 +2116,39 @@
       replan(false);
       toast('东门已恢复默认坐标');
     });
+    $('traceRouteBtn').addEventListener('click', () => {
+      if (!map) return;
+      state.traceMode = true;
+      state.tracePoints = [];
+      $('finishTraceBtn').hidden = false;
+      $('clearTraceBtn').hidden = false;
+      map.getContainer().style.cursor = 'crosshair';
+      toast('依次点路线拐点，点“完成录入”保存');
+    });
+    $('finishTraceBtn').addEventListener('click', () => {
+      if (state.tracePoints.length < 2) {
+        toast('至少点两个点');
+        return;
+      }
+      state.traceMode = false;
+      state.customRoute = state.tracePoints.slice();
+      saveStorage('huayuan.customRoute', state.customRoute);
+      map.getContainer().style.cursor = '';
+      $('finishTraceBtn').hidden = true;
+      toast('路线已保存');
+      replan(false);
+    });
+    $('clearTraceBtn').addEventListener('click', () => {
+      state.customRoute = null;
+      state.tracePoints = [];
+      localStorage.removeItem('huayuan.customRoute');
+      if (traceGroup) traceGroup.clearLayers();
+      $('finishTraceBtn').hidden = true;
+      $('clearTraceBtn').hidden = true;
+      $('traceRouteBtn').textContent = '✏️ 录入路线';
+      replan(false);
+      toast('已清除手绘路线');
+    });
     $('todoRepeat').addEventListener('change', (e) => {
       $('todoWeekday').hidden = e.target.value !== 'weekly';
     });
@@ -2264,6 +2321,13 @@
         lng: Number(savedHome.lng),
         offcampus: savedHome.offcampus !== false,
       };
+    }
+    const savedCustomRoute = JSON.parse(localStorage.getItem('huayuan.customRoute') || 'null');
+    if (Array.isArray(savedCustomRoute) && savedCustomRoute.length > 1) {
+      state.customRoute = savedCustomRoute;
+      state.tracePoints = savedCustomRoute.slice();
+      const clear = $('clearTraceBtn');
+      if (clear) clear.hidden = false;
     }
     const savedMealPlaces = JSON.parse(localStorage.getItem('huayuan.mealPlaces') || 'null');
     const savedGates = JSON.parse(localStorage.getItem('huayuan.gates') || 'null');
