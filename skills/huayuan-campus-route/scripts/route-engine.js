@@ -191,7 +191,7 @@
     }
     const linkIds = new Set();
     const links = [];
-    if (nearest) {
+    if (nearest && !node.offcampus) {
       links.push({ id: nearest.id, distance: nearest.distance * 1.12 });
       linkIds.add(nearest.id);
       customHomeNearest = { id: nearest.id, node: nearest.node };
