@@ -305,6 +305,58 @@
   const GYM_ENTRY = [23.04775, 113.4042];
   const GYM_PLAZA = [23.04745, 113.40455];
   const GYM_APPROACH = [GYM_PLAZA, [23.04755, 113.40435], GYM_ENTRY];
+  const BLUE_EAST_LIBRARY = [
+    [23.0487, 113.40868],
+    [23.0483, 113.4082],
+    [23.048, 113.4074],
+    [23.0478, 113.4065],
+    [23.0475, 113.4056],
+    [23.0471, 113.4049],
+    [23.04675, 113.40455],
+  ];
+  const BLUE_EAST_SUISHI = [
+    [23.0487, 113.40868],
+    [23.049, 113.4092],
+    [23.0492, 113.4099],
+    [23.0495, 113.4107],
+    [23.0498, 113.4115],
+    [23.0504, 113.4124],
+    [23.0509, 113.4131],
+    [23.05146, 113.41378],
+  ];
+  function nearSuishi(place) {
+    return place &&
+      Math.abs(Number(place.lat) - 23.05146) < 0.002 &&
+      Math.abs(Number(place.lng) - 113.41378) < 0.003;
+  }
+  async function blueLeg(from, to) {
+    const pair = `${from.id}->${to.id}`;
+    if (pair === 'eastgate->library') return BLUE_EAST_LIBRARY.slice();
+    if (pair === 'library->eastgate') return BLUE_EAST_LIBRARY.slice().reverse();
+    if (pair === 'eastgate->suishi') return BLUE_EAST_SUISHI.slice();
+    if (pair === 'suishi->eastgate') return BLUE_EAST_SUISHI.slice().reverse();
+    const library = { lat: 23.04675, lng: 113.40455 };
+    if (nearSuishi(from)) {
+      if (to.id === 'eastgate') return BLUE_EAST_SUISHI.slice().reverse();
+      const tail = await fetchRoadLeg(library, to);
+      return [
+        ...BLUE_EAST_SUISHI.slice().reverse(),
+        ...BLUE_EAST_LIBRARY.slice(1),
+        ...(tail && tail.length ? tail.slice(1) : [[to.lat, to.lng]]),
+      ];
+    }
+    if (nearSuishi(to)) {
+      if (from.id === 'eastgate') return BLUE_EAST_SUISHI.slice();
+      const tail = await fetchRoadLeg(from, library);
+      return [
+        ...(tail && tail.length ? tail : [[from.lat, from.lng]]),
+        ...BLUE_EAST_LIBRARY.slice(1),
+        ...BLUE_EAST_SUISHI.slice(1),
+      ];
+    }
+    return null;
+  }
+
 
   function gcj02ToWgs84(lat, lng) {
     let wlat = lat;
@@ -411,6 +463,8 @@
       Promise.all(
         stopPoints.slice(0, -1).map((from, index) => {
           const to = stopPoints[index + 1];
+          const blue = blueLeg(from, to);
+          if (blue) return Promise.resolve(blue).then((leg) => ({ from, to, leg }));
           const routeFrom = from.id === 'gym' ? { lat: GYM_PLAZA[0], lng: GYM_PLAZA[1] } : from;
           const routeTo = to.id === 'gym' ? { lat: GYM_PLAZA[0], lng: GYM_PLAZA[1] } : to;
           return fetchRoadLeg(routeFrom, routeTo).then((leg) => {
