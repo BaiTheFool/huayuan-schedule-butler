@@ -1273,16 +1273,28 @@
       return s.open && e.open;
     }
 
-    function pickStudyVenue(start, end) {
+    function pickStudyVenue(start, end, fromPoiId) {
       const pref = String(opts.studyPref || 'auto');
       const homeId = startPoiId;
       if (pref === 'home' && homeId && venueOpen(homeId, start, end)) return homeId;
       if (['a1', 'a2', 'a3', 'a4', 'a5'].includes(pref) && venueOpen(pref, start, end)) return pref;
       if (pref === 'library' && venueOpen('library', start, end)) return 'library';
-      for (const id of ['library', 'c11study']) {
-        if (venueOpen(id, start, end)) return id;
+      const candidates = ['library', 'c11study'].filter((id) => venueOpen(id, start, end));
+      if (!candidates.length) return null;
+      if (minWalk) {
+        const from = fromPoiId || startPoiId;
+        let best = candidates[0];
+        let bestMinutes = Infinity;
+        for (const id of candidates) {
+          const leg = pathFor(from, id, { ...travelOpts, at: start });
+          if (leg.minutes < bestMinutes) {
+            best = id;
+            bestMinutes = leg.minutes;
+          }
+        }
+        return best;
       }
-      return null;
+      return candidates[0];
     }
 
     function poiBefore(at) {
@@ -1335,17 +1347,29 @@
       return best ? best.id : null;
     }
 
-    function pickPlayVenue(start, end) {
+    function pickPlayVenue(start, end, fromPoiId) {
       const indoor = weather.play_indoor || (weather.is_hot && start < 18 * 60);
       const order = indoor
         ? ['cafe', 'c11study', 'library']
         : start >= 19 * 60
         ? ['cafe', 'lake']
         : ['lake', 'cafe'];
-      for (const id of order) {
-        if (venueOpen(id, start, end)) return id;
+      const open = order.filter((id) => venueOpen(id, start, end));
+      if (!open.length) return null;
+      if (minWalk) {
+        const from = fromPoiId || startPoiId;
+        let best = open[0];
+        let bestMinutes = Infinity;
+        for (const id of open) {
+          const leg = pathFor(from, id, { ...travelOpts, at: start });
+          if (leg.minutes < bestMinutes) {
+            best = id;
+            bestMinutes = leg.minutes;
+          }
+        }
+        return best;
       }
-      return null;
+      return open[0];
     }
 
     function pushBlock(type, venueId, start, end, reason) {
@@ -1371,7 +1395,7 @@
       let left = Math.min(desire, budget.study);
       let at = windowStart;
       while (left >= 20 && at + 20 <= limit) {
-        const venue = pickStudyVenue(at, Math.min(limit, at + Math.min(left, prefs.max_continuous)));
+        const venue = pickStudyVenue(at, Math.min(limit, at + Math.min(left, prefs.max_continuous)), poiBefore(at));
         if (!venue) {
           warnings.push(`${clock(at)} 附近图书馆与尚学空间都未开放，这一段没有排自习`);
           return;
@@ -1421,7 +1445,7 @@
       if (budget.play < 25) return null;
       const want = Math.min(budget.play, 55, limit - windowStart);
       if (want < 25) return null;
-      const venue = pickPlayVenue(windowStart, windowStart + want);
+      const venue = pickPlayVenue(windowStart, windowStart + want, poiBefore(windowStart));
       if (!venue) {
         warnings.push(`${label}因天气没有合适的室内去处，这一段留空`);
         return null;

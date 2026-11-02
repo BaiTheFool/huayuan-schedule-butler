@@ -256,6 +256,8 @@ check('少走路预设存在并生成完整路线', () => {
   assert.strictEqual(walk.meta.preset_name, '少走路');
   assert.ok(walk.summary.walk_minutes > 0);
   assert.ok(walk.route.points.length > 1);
+  const balanced = R.planDay({ date: '2026-11-02', preset: 'balanced' });
+  assert.ok(walk.summary.walk_minutes <= balanced.summary.walk_minutes, '少走路没有减少步行');
 });
 
 check('周六没有课，仍会排自习、运动和放松', () => {
