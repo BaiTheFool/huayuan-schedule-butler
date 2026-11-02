@@ -416,24 +416,19 @@
     return /^c([1-9]|1[0-7])$/.test(String(id || ''));
   }
 
-  function isUpperCDorm(id) {
-    return /^c(8|9|1[0-7])$/.test(String(id || '')) && id !== 'c10';
-  }
-
   async function fetchRoadLegWithDormFallback(from, to) {
-    const forceC10 = isUpperCDorm(from.id) || isUpperCDorm(to.id);
-    const direct = forceC10 ? null : await fetchRoadLeg(from, to);
+    const direct = await fetchRoadLeg(from, to);
     if (direct && direct.length > 1) return direct;
-    const c10 = POI.get('c10') || LOCATIONS.find((item) => item.id === 'c10');
-    if (!c10) return direct;
-    if (isCDorm(from.id) && to.id !== 'c10') {
-      const tail = await fetchRoadLeg(c10, to);
+    const hub = POI.get('c11');
+    if (!hub) return direct;
+    if (isCDorm(from.id) && to.id !== 'c11') {
+      const tail = await fetchRoadLeg(hub, to);
       if (tail && tail.length > 1) {
-        return [[from.lat, from.lng], [c10.lat, c10.lng], ...tail.slice(1)];
+        return [[from.lat, from.lng], [hub.lat, hub.lng], ...tail.slice(1)];
       }
     }
-    if (isCDorm(to.id) && from.id !== 'c10') {
-      const head = await fetchRoadLeg(from, c10);
+    if (isCDorm(to.id) && from.id !== 'c11') {
+      const head = await fetchRoadLeg(from, hub);
       if (head && head.length > 1) {
         return [...head, [to.lat, to.lng]];
       }
@@ -547,12 +542,7 @@
       if (!poi) continue;
       const last = stopPoints[stopPoints.length - 1];
       if (last && Math.abs(last.lat - poi.lat) < 1e-7 && Math.abs(last.lng - poi.lng) < 1e-7) continue;
-      let routePoi = poi;
-      if (/^c(8|9|1[0-7])$/.test(String(stop.poiId)) && stop.poiId !== 'c10') {
-        const c10 = POI.get('c10') || LOCATIONS.find((item) => item.id === 'c10');
-        if (c10) routePoi = c10;
-      }
-      stopPoints.push({ ...routePoi, id: routePoi.id, type: stop.type });
+      stopPoints.push({ ...poi, type: stop.type });
     }
     if (stopPoints.length > 1) {
       const seq = routeSeq;
