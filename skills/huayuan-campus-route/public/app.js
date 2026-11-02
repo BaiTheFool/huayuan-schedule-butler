@@ -117,6 +117,8 @@
     pickMealOnMap: false,
     todoPlace: { address: '', lat: null, lng: null },
     pickTodoOnMap: false,
+    pickEastGateOnMap: false,
+    gateOverrides: {},
     mealPrefs: { breakfast: 'auto', lunch: 'auto', dinner: 'auto', takeoutPlace: 'home' },
     sportPref: 'auto',
     sportType: 'auto',
@@ -227,6 +229,18 @@
     fitCampus();
 
     map.on('click', (event) => {
+      if (state.pickEastGateOnMap) {
+        state.pickEastGateOnMap = false;
+        map.getContainer().style.cursor = '';
+        state.gateOverrides.eastgate = { lat: event.latlng.lat, lng: event.latlng.lng };
+        saveStorage('huayuan.gates', state.gateOverrides);
+        const base = POI.get('eastgate') || {};
+        POI.set('eastgate', { ...base, id: 'eastgate', lat: event.latlng.lat, lng: event.latlng.lng });
+        $('resetEastGateBtn').hidden = false;
+        replan(false);
+        toast(`东门已定位到 ${event.latlng.lat.toFixed(5)}, ${event.latlng.lng.toFixed(5)}`);
+        return;
+      }
       if (state.pickTodoOnMap) {
         state.pickTodoOnMap = false;
         map.getContainer().style.cursor = '';
@@ -525,6 +539,15 @@
         lng: event.lng,
       });
     });
+    if (state.gateOverrides.eastgate) {
+      const base = POI.get('eastgate') || {};
+      POI.set('eastgate', {
+        ...base,
+        id: 'eastgate',
+        lat: Number(state.gateOverrides.eastgate.lat),
+        lng: Number(state.gateOverrides.eastgate.lng),
+      });
+    }
     const plan = R.planDay({
       date: state.date,
       preset: state.preset,
@@ -537,6 +560,7 @@
       preferences: state.preferences || undefined,
       dormPoiId: state.dormPoiId || undefined,
       home: state.dormPoiId === 'offcampus' || state.dormPoiId === 'custom_home' ? state.home : undefined,
+      gateOverrides: state.gateOverrides,
       mealPrefs: state.mealPrefs,
       mealPlaces: ['breakfast', 'lunch', 'dinner'].some((meal) => state.mealPrefs[meal] === 'offcampus')
         ? state.mealPlaces
@@ -1961,6 +1985,24 @@
       map.getContainer().style.cursor = 'crosshair';
       toast('在地图上点一下待办地点');
     });
+    $('pickEastGateBtn').addEventListener('click', () => {
+      if (!map) {
+        toast('地图还没准备好');
+        return;
+      }
+      state.pickEastGateOnMap = true;
+      map.getContainer().style.cursor = 'crosshair';
+      toast('在地图上点一下东门位置');
+    });
+    $('resetEastGateBtn').addEventListener('click', () => {
+      delete state.gateOverrides.eastgate;
+      saveStorage('huayuan.gates', state.gateOverrides);
+      const base = POI.get('eastgate') || {};
+      POI.set('eastgate', { ...base, id: 'eastgate', lat: 23.0487, lng: 113.40868 });
+      $('resetEastGateBtn').hidden = true;
+      replan(false);
+      toast('东门已恢复默认坐标');
+    });
     $('todoRepeat').addEventListener('change', (e) => {
       $('todoWeekday').hidden = e.target.value !== 'weekly';
     });
@@ -2135,6 +2177,15 @@
       };
     }
     const savedMealPlaces = JSON.parse(localStorage.getItem('huayuan.mealPlaces') || 'null');
+    const savedGates = JSON.parse(localStorage.getItem('huayuan.gates') || 'null');
+    if (savedGates && savedGates.eastgate && Number.isFinite(Number(savedGates.eastgate.lat)) && Number.isFinite(Number(savedGates.eastgate.lng))) {
+      state.gateOverrides.eastgate = {
+        lat: Number(savedGates.eastgate.lat),
+        lng: Number(savedGates.eastgate.lng),
+      };
+      const reset = $('resetEastGateBtn');
+      if (reset) reset.hidden = false;
+    }
     if (savedMealPlaces && typeof savedMealPlaces === 'object') {
       for (const meal of ['breakfast', 'lunch', 'dinner']) {
         const place = savedMealPlaces[meal];

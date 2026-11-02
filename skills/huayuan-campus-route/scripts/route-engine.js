@@ -291,6 +291,24 @@
     return node;
   }
 
+  function applyGateOverrides(gates) {
+    if (!gates || typeof gates !== 'object') return;
+    let changed = false;
+    for (const [id, coords] of Object.entries(gates)) {
+      const poi = POI_MAP.get(id);
+      const node = NODE_MAP.get(id);
+      const lat = Number(coords && coords.lat);
+      const lng = Number(coords && coords.lng);
+      if (!poi || !node || !Number.isFinite(lat) || !Number.isFinite(lng)) continue;
+      poi.lat = lat;
+      poi.lng = lng;
+      node.lat = lat;
+      node.lng = lng;
+      changed = true;
+    }
+    if (changed) pathCache.clear();
+  }
+
   function shortestPath(fromId, toId) {
     if (fromId === toId) {
       const p = NODE_MAP.get(fromId);
@@ -896,6 +914,7 @@
     warnings.push(...normalized.warnings);
     const classes = normalized.list;
 
+    applyGateOverrides(opts.gateOverrides);
     const customHome = installCustomHome(opts.home);
     const mealPlaces = opts.mealPlaces || (opts.mealPlace ? { lunch: opts.mealPlace } : {});
     for (const [meal, place] of Object.entries(mealPlaces)) installCustomMeal(meal, place);
