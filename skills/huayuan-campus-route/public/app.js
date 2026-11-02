@@ -485,8 +485,6 @@
       Promise.all(
         stopPoints.slice(0, -1).map((from, index) => {
           const to = stopPoints[index + 1];
-          const blue = blueLeg(from, to);
-          if (blue) return Promise.resolve(blue).then((leg) => ({ from, to, leg }));
           const routeFrom = from.id === 'gym' ? { lat: GYM_PLAZA[0], lng: GYM_PLAZA[1] } : from;
           const routeTo = to.id === 'gym' ? { lat: GYM_PLAZA[0], lng: GYM_PLAZA[1] } : to;
           return fetchRoadLeg(routeFrom, routeTo).then((leg) => {
@@ -1443,9 +1441,7 @@
   }
 
   function homeSelectValue() {
-    if (state.dormPoiId === 'offcampus') {
-      return state.home.id === 'suishi' ? 'suishi' : 'offcampus';
-    }
+    if (state.dormPoiId === 'offcampus') return 'offcampus';
     if (state.dormPoiId === 'custom_home') return state.home.id ? `dorm:${state.home.id}` : 'none';
     return state.dormPoiId ? `dorm:${state.dormPoiId}` : 'none';
   }
@@ -1466,7 +1462,6 @@
     select.innerHTML =
       '<option value="none">请选择住宿</option>' +
       '<option value="offcampus">校外住处（可填地址）</option>' +
-      '<option value="suishi">穗石牌坊（东门外）</option>' +
       dorms
         .map((dorm) => `<option value="dorm:${esc(dorm.id)}">${esc(dorm.name || dorm.short)}</option>`)
         .join('');
@@ -1541,11 +1536,6 @@
     }
     state.mealPlaces[meal] = { ...(state.mealPlaces[meal] || {}), address: raw };
     saveStorage('huayuan.mealPlaces', state.mealPlaces);
-    if (/穗石|牌坊/.test(raw)) {
-      setMealPlaceCoords(23.05146, 113.41378, '穗石牌坊（东门外）', meal);
-      $('mealPlaceHint').textContent = '已定位到穗石牌坊，按东门进校最近。';
-      return;
-    }
     const button = $('geocodeMealBtn');
     button.disabled = true;
     button.textContent = '定位中…';
@@ -1619,11 +1609,6 @@
       toast('先填一个校外地址');
       return;
     }
-    if (/穗石|牌坊/.test(raw)) {
-      setHomeCoords(23.05146, 113.41378, '穗石牌坊（东门外）');
-      $('homeHint').textContent = '已定位到穗石牌坊，走东门进校最近。';
-      return;
-    }
     state.home.address = raw;
     saveStorage('huayuan.home', state.home);
     const button = $('geocodeHomeBtn');
@@ -1661,10 +1646,6 @@
         state.mealPrefs[meal] = e.target.value;
         if (e.target.value === 'offcampus') {
           state.mealPlaceEditing = meal;
-          if (!mealPlaceValid(meal)) {
-            state.mealPlaces[meal] = { address: '穗石牌坊（东门外）', lat: 23.05146, lng: 113.41378 };
-            saveStorage('huayuan.mealPlaces', state.mealPlaces);
-          }
         }
         saveStorage('huayuan.mealPrefs', state.mealPrefs);
         syncMealPlaceFields();
@@ -1720,15 +1701,6 @@
         state.dormPoiId = '';
         state.home = { id: '', address: '', lat: null, lng: null, offcampus: false };
         $('prefsHint').textContent = '还没有选住宿；请选择校内宿舍或校外住处后再生成路线。';
-      } else if (value === 'suishi') {
-        state.dormPoiId = 'offcampus';
-        state.home = {
-          id: 'suishi',
-          address: '穗石牌坊（东门外）',
-          lat: 23.05146,
-          lng: 113.41378,
-          offcampus: true,
-        };
       } else if (value === 'offcampus') {
         state.dormPoiId = 'offcampus';
         if (!homeCoordsValid() || !state.home.offcampus) {
@@ -2394,9 +2366,6 @@
     if (!homeCoordsValid()) {
       state.home = { id: 'offcampus', address: '大学城南地铁站', lat: 23.04346, lng: 113.40111, offcampus: true };
     }
-  } else if (params.get('home') === 'suishi') {
-    state.dormPoiId = 'offcampus';
-    state.home = { id: 'suishi', address: '穗石牌坊（东门外）', lat: 23.05146, lng: 113.41378, offcampus: true };
   }
   if (TBL) {
     try {

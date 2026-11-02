@@ -475,23 +475,6 @@
       desc: '生活区北门，靠近 D5 宿舍，机动车出入口。',
       access: '开放',
     },
-    {
-      id: 'suishi',
-      name: '穗石牌坊（东门外）',
-      short: '穗石牌坊',
-      category: 'gate',
-      icon: '⛩️',
-      lat: 23.05146,
-      lng: 113.41378,
-      coord_confidence: 'high',
-      coord_source: '用户提供 WGS84 坐标：113.41378, 23.05146',
-      hours: null,
-      hours_label: '校外道路，无校园门禁',
-      hours_source: '用户可自选校外入口',
-      hours_confidence: 'low',
-      tags: ['穗石村', '校外', '东门'],
-      desc: '穗石村牌坊，走东门进校最近；从牌坊到东门沿穗石村大街，不进村内小巷。',
-    },
   ];
 
   // 可搜索的校园地点目录。除路线核心 POI 外，补充 OSM 已标注的学院楼和公共设施；
@@ -654,7 +637,6 @@
     { id: 'j_east', name: '东侧环路', lat: 23.0482, lng: 113.4065, kind: 'junction' },
     { id: 'j_ne', name: '东北路口', lat: 23.0509, lng: 113.40645, kind: 'junction' },
     { id: 'j_e', name: 'E 区宿舍路口', lat: 23.0534, lng: 113.4079, kind: 'junction' },
-    { id: 'j_suishi', name: '穗石牌坊路口', lat: 23.0513, lng: 113.4135, kind: 'junction' },
   ];
 
   const WALK_EDGES = [
@@ -704,14 +686,12 @@
     ['j_lake_s', 'lake'],
     ['j_library', 'j_lake_s'],
     ['j_east', 'eastgate'],
-    ['eastgate', 'j_suishi'],
     ['southgate', 'j_field'],
     ['southgate', 'j_library'],
     ['westgate', 'j_c1_gate'],
     ['northgate', 'j_ne'],
     ['west1gate', 'j_c11'],
     ['north1gate', 'j_ne'],
-    ['j_suishi', 'suishi'],
   ];
 
   const PRESETS = [

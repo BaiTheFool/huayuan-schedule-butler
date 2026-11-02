@@ -509,18 +509,6 @@ check('六个校门坐标齐全，东门按用户坐标', () => {
   assert.ok(east.access.includes('开放'));
 });
 
-check('手动校准的东门坐标会进入路线', () => {
-  const plan = R.planDay({
-    date: '2026-11-02',
-    dormPoiId: 'custom_home',
-    home: { id: 'suishi', address: '穗石牌坊', lat: 23.05146, lng: 113.41378, offcampus: true },
-    gateOverrides: { eastgate: { lat: 23.05005, lng: 113.41107 } },
-    timetable: { campus: { key: 'university_town', label: '大学城校区' }, courses: [] },
-  });
-  assert.ok(plan.route.points.some((point) => Math.abs(point.lat - 23.05005) < 1e-6 && Math.abs(point.lng - 113.41107) < 1e-6));
-});
-
-
 check('固定时段待办会插入时间轴并在指定地点', () => {
   const plan = R.planDay({
     date: '2026-11-02',
