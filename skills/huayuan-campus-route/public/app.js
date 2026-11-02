@@ -234,6 +234,7 @@
         map.getContainer().style.cursor = '';
         state.gateOverrides.eastgate = { lat: event.latlng.lat, lng: event.latlng.lng };
         saveStorage('huayuan.gates', state.gateOverrides);
+        $('pickEastGateBtn').textContent = '📍 定位东门';
         const base = POI.get('eastgate') || {};
         POI.set('eastgate', { ...base, id: 'eastgate', lat: event.latlng.lat, lng: event.latlng.lng });
         $('resetEastGateBtn').hidden = false;
@@ -1992,7 +1993,8 @@
       }
       state.pickEastGateOnMap = true;
       map.getContainer().style.cursor = 'crosshair';
-      toast('在地图上点一下东门位置');
+      $('pickEastGateBtn').textContent = '请在地图上点东门';
+      toast('已进入定位模式：请在地图上点一下东门位置');
     });
     $('resetEastGateBtn').addEventListener('click', () => {
       delete state.gateOverrides.eastgate;
@@ -2000,6 +2002,7 @@
       const base = POI.get('eastgate') || {};
       POI.set('eastgate', { ...base, id: 'eastgate', lat: 23.0487, lng: 113.40868 });
       $('resetEastGateBtn').hidden = true;
+      $('pickEastGateBtn').textContent = '📍 定位东门';
       replan(false);
       toast('东门已恢复默认坐标');
     });
