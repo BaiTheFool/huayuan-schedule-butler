@@ -416,13 +416,8 @@
     return /^c([1-9]|1[0-7])$/.test(String(id || ''));
   }
 
-  function isUpperCDorm(id) {
-    return /^c(8|9|1[0-7])$/.test(String(id || '')) && id !== 'c11';
-  }
-
   async function fetchRoadLegWithDormFallback(from, to) {
-    const forceHub = isUpperCDorm(from.id) || isUpperCDorm(to.id);
-    const direct = forceHub ? null : await fetchRoadLeg(from, to);
+    const direct = await fetchRoadLeg(from, to);
     if (direct && direct.length > 1) return direct;
     const hub = POI.get('c11');
     if (!hub) return direct;
