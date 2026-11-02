@@ -484,6 +484,16 @@
       Promise.all(
         stopPoints.slice(0, -1).map((from, index) => {
           const to = stopPoints[index + 1];
+          if (from.id === 'home_custom' || to.id === 'home_custom') {
+            const path = R.shortestPath(from.id, to.id);
+            if (path && path.points && path.points.length > 1) {
+              return {
+                from,
+                to,
+                leg: path.points.map((point) => [point.lat, point.lng]),
+              };
+            }
+          }
           const routeFrom = from.id === 'gym' ? { lat: GYM_PLAZA[0], lng: GYM_PLAZA[1] } : from;
           const routeTo = to.id === 'gym' ? { lat: GYM_PLAZA[0], lng: GYM_PLAZA[1] } : to;
           return fetchRoadLeg(routeFrom, routeTo).then((leg) => {
