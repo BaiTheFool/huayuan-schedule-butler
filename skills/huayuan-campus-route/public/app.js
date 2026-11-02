@@ -406,7 +406,6 @@
       roadCache.set(key, points);
       return points;
     } catch (error) {
-      roadCache.set(key, null);
       return null;
     } finally {
       clearTimeout(timer);
@@ -530,6 +529,7 @@
             }
           } else {
             missed += 1;
+            merged.push([from.lat, from.lng], [to.lat, to.lng]);
           }
         }
         if (merged.length > 1) drawRoute(merged, missed < results.length);
