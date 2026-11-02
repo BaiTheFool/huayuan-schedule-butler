@@ -302,9 +302,9 @@
     [23.0493, 113.4100],
     [23.0487, 113.40868],
   ];
-  const GYM_ENTRY = [23.04815, 113.40375];
-  const GYM_PLAZA = [23.04755, 113.40455];
-  const GYM_CANTEEN = [23.04795, 113.40335];
+  const GYM_ENTRY = [23.04802, 113.40412];
+  const GYM_PLAZA = [23.0476, 113.40455];
+  const GYM_APPROACH = [GYM_PLAZA, [23.0478, 113.40435], GYM_ENTRY];
 
   function gcj02ToWgs84(lat, lng) {
     let wlat = lat;
@@ -413,8 +413,8 @@
           const to = stopPoints[index + 1];
           return fetchRoadLeg(from, to).then((leg) => {
             if (leg && leg.length) {
-              if (to.id === 'gym') leg.push([to.lat, to.lng]);
-              if (from.id === 'gym') leg.unshift([from.lat, from.lng]);
+              if (to.id === 'gym') leg.push(...GYM_APPROACH);
+              if (from.id === 'gym') leg.unshift(...GYM_APPROACH.slice().reverse());
             }
             return { from, to, leg };
           });
