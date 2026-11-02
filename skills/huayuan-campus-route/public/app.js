@@ -411,7 +411,13 @@
       Promise.all(
         stopPoints.slice(0, -1).map((from, index) => {
           const to = stopPoints[index + 1];
-          return fetchRoadLeg(from, to).then((leg) => ({ from, to, leg }));
+          return fetchRoadLeg(from, to).then((leg) => {
+            if (leg && leg.length) {
+              if (to.id === 'gym') leg.push([to.lat, to.lng]);
+              if (from.id === 'gym') leg.unshift([from.lat, from.lng]);
+            }
+            return { from, to, leg };
+          });
         })
       ).then((results) => {
         if (seq !== routeSeq) return;
