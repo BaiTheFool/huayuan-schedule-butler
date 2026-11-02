@@ -504,7 +504,7 @@ check('六个校门坐标齐全，东门按用户坐标', () => {
     assert.ok(ids.includes(id), `missing gate ${id}`);
   }
   const east = gates.find((poi) => poi.id === 'eastgate');
-  assert.ok(Math.abs(east.lat - 23.0478) < 1e-6);
+  assert.ok(Math.abs(east.lat - 23.0469) < 1e-6);
   assert.ok(Math.abs(east.lng - 113.40868) < 1e-6);
   assert.ok(east.access.includes('开放'));
 });
