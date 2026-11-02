@@ -473,6 +473,17 @@ check('校内自定义宿舍仍按宿舍热水和门禁安排', () => {
   assert.ok(plan.blocks.find((b) => b.type === 'shower').title.includes('宿舍'));
 });
 
+check('校外住处会选总路程最短的校门', () => {
+  const plan = R.planDay({
+    date: '2026-11-02',
+    dormPoiId: 'custom_home',
+    home: { id: 'north-test', address: '北门附近', lat: 23.0545, lng: 113.402, offcampus: true },
+    timetable: { campus: { key: 'university_town', label: '大学城校区' }, courses: [] },
+  });
+  const gatePoint = plan.route.points.find((point) => Math.abs(point.lat - 23.05332) < 1e-6 && Math.abs(point.lng - 113.40309) < 1e-6);
+  assert.ok(gatePoint, 'expected route through north-1 gate');
+});
+
 check('校外住宿选外卖时默认在住处吃，不送回宿舍', () => {
   const plan = R.planDay({
     date: '2026-11-02',

@@ -177,12 +177,11 @@
     };
     POI_MAP.set(CUSTOM_HOME_ID, node);
     NODE_MAP.set(CUSTOM_HOME_ID, node);
-    if (customHomeNearest) {
-      const edges = GRAPH.get(customHomeNearest.id) || [];
-      GRAPH.set(
-        customHomeNearest.id,
-        edges.filter((edge) => edge.id !== CUSTOM_HOME_ID)
-      );
+    // 清掉上一次接入的所有边，避免换住处后残留
+    for (const [id, edges] of GRAPH) {
+      if (id !== CUSTOM_HOME_ID) {
+        GRAPH.set(id, edges.filter((edge) => edge.id !== CUSTOM_HOME_ID));
+      }
     }
     let nearest = null;
     for (const [id, candidate] of NODE_MAP) {
@@ -190,14 +189,27 @@
       const distance = haversine(node, candidate);
       if (!nearest || distance < nearest.distance) nearest = { id, node: candidate, distance };
     }
-    GRAPH.set(CUSTOM_HOME_ID, []);
+    const linkIds = new Set();
+    const links = [];
     if (nearest) {
-      const distance = nearest.distance * 1.12;
-      GRAPH.get(CUSTOM_HOME_ID).push({ id: nearest.id, distance });
-      GRAPH.get(nearest.id).push({ id: CUSTOM_HOME_ID, distance });
+      links.push({ id: nearest.id, distance: nearest.distance * 1.12 });
+      linkIds.add(nearest.id);
       customHomeNearest = { id: nearest.id, node: nearest.node };
     } else {
       customHomeNearest = null;
+    }
+    // 校外住处同时接到每个校门，让最短路自己挑总路程最短的门
+    for (const gateId of ['eastgate', 'southgate', 'westgate', 'northgate', 'west1gate', 'north1gate']) {
+      const gate = NODE_MAP.get(gateId);
+      if (!gate || linkIds.has(gateId)) continue;
+      links.push({ id: gateId, distance: haversine(node, gate) * 1.12 });
+      linkIds.add(gateId);
+    }
+    GRAPH.set(CUSTOM_HOME_ID, links);
+    for (const link of links) {
+      const edges = GRAPH.get(link.id) || [];
+      edges.push({ id: CUSTOM_HOME_ID, distance: link.distance });
+      GRAPH.set(link.id, edges);
     }
     pathCache.clear();
     return node;
