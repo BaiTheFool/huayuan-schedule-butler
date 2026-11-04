@@ -109,6 +109,25 @@
     visibleLocations: [],
     plan: null,
     selected: null,
+    dormPoiId: '',
+    home: { id: '', address: '', lat: null, lng: null, offcampus: false },
+    pickHomeOnMap: false,
+    mealPlaces: { breakfast: { address: '', lat: null, lng: null }, lunch: { address: '', lat: null, lng: null }, dinner: { address: '', lat: null, lng: null } },
+    mealPlaceEditing: 'lunch',
+    pickMealOnMap: false,
+    todoPlace: { address: '', lat: null, lng: null },
+    pickTodoOnMap: false,
+    pickEastGateOnMap: false,
+    gateOverrides: {},
+    traceMode: false,
+    tracePoints: [],
+    customRoute: null,
+    mealPrefs: { breakfast: 'auto', lunch: 'auto', dinner: 'auto', takeoutPlace: 'home' },
+    studyPref: 'auto',
+    sportPref: 'auto',
+    sportType: 'auto',
+    nap: true,
+    gym: { enabled: false, date: '', start: '19:00', minutes: 60 },
   };
 
   const $ = (id) => document.getElementById(id);
@@ -117,6 +136,7 @@
   let routeGroup = null;
   let stopGroup = null;
   let gpsGroup = null;
+  let traceGroup = null;
   let routeSeq = 0;
   let routeLayers = [];
   const markerById = new Map();
@@ -179,6 +199,15 @@
     });
   }
 
+  function homeIcon() {
+    return L.divIcon({
+      className: 'poi-marker-wrap',
+      html: '<div class="poi-marker home-marker" style="--c:#4a6fa5"><span class="poi-dot">🏠</span><span class="poi-label">住处</span></div>',
+      iconSize: [0, 0],
+      iconAnchor: [0, 0],
+    });
+  }
+
   function fitCampus() {
     if (map) map.fitBounds(CAMPUS_BOUNDS, { padding: [26, 26], maxZoom: 17 });
   }
@@ -204,7 +233,48 @@
     streetLayer.addTo(map);
     fitCampus();
 
-    map.on('click', () => {
+    map.on('click', (event) => {
+      if (state.traceMode) {
+        state.tracePoints.push([event.latlng.lat, event.latlng.lng]);
+        drawTrace();
+        return;
+      }
+      if (state.pickEastGateOnMap) {
+        state.pickEastGateOnMap = false;
+        map.getContainer().style.cursor = '';
+        state.gateOverrides.eastgate = { lat: event.latlng.lat, lng: event.latlng.lng };
+        saveStorage('huayuan.gates', state.gateOverrides);
+        $('pickEastGateBtn').textContent = '📍 定位东门';
+        const base = POI.get('eastgate') || {};
+        POI.set('eastgate', { ...base, id: 'eastgate', lat: event.latlng.lat, lng: event.latlng.lng });
+        $('resetEastGateBtn').hidden = false;
+        replan(false);
+        toast(`东门已定位到 ${event.latlng.lat.toFixed(5)}, ${event.latlng.lng.toFixed(5)}`);
+        return;
+      }
+      if (state.pickTodoOnMap) {
+        state.pickTodoOnMap = false;
+        map.getContainer().style.cursor = '';
+        state.todoPlace = {
+          address: $('todoLocation').value.trim() || '地图选点',
+          lat: event.latlng.lat,
+          lng: event.latlng.lng,
+        };
+        $('todoCoord').textContent = `${event.latlng.lat.toFixed(5)}, ${event.latlng.lng.toFixed(5)}`;
+        return;
+      }
+      if (state.pickMealOnMap) {
+        state.pickMealOnMap = false;
+        map.getContainer().style.cursor = '';
+        setMealPlaceCoords(event.latlng.lat, event.latlng.lng, (state.mealPlaces[state.mealPlaceEditing] || {}).address || '地图选点');
+        return;
+      }
+      if (state.pickHomeOnMap) {
+        state.pickHomeOnMap = false;
+        map.getContainer().style.cursor = '';
+        setHomeCoords(event.latlng.lat, event.latlng.lng, state.home.address || '地图选点');
+        return;
+      }
       const card = $('poiCard');
       if (card) card.hidden = true;
       state.selected = null;
@@ -234,6 +304,67 @@
   // ---------- 步行道路线（OSM foot routing） ----------
 
   const roadCache = new Map();
+  const SUISHI_APPROACH = [
+    [23.05146, 113.41378],
+    [23.0510, 113.4129],
+    [23.0504, 113.4120],
+    [23.0498, 113.4110],
+    [23.0493, 113.4100],
+    [23.04726, 113.40868],
+  ];
+  const GYM_ENTRY = [23.04775, 113.4042];
+  const GYM_PLAZA = [23.04745, 113.40455];
+  const GYM_APPROACH = [GYM_PLAZA, [23.04755, 113.40435], GYM_ENTRY];
+  const BLUE_EAST_LIBRARY = [
+    [23.04726, 113.40868],
+    [23.0483, 113.4082],
+    [23.048, 113.4074],
+    [23.0478, 113.4065],
+    [23.0475, 113.4056],
+    [23.0471, 113.4049],
+    [23.04675, 113.40455],
+  ];
+  const BLUE_EAST_SUISHI = [
+    [23.04726, 113.40868],
+    [23.049, 113.4092],
+    [23.0492, 113.4099],
+    [23.0495, 113.4107],
+    [23.0498, 113.4115],
+    [23.0504, 113.4124],
+    [23.0509, 113.4131],
+    [23.05146, 113.41378],
+  ];
+  function nearSuishi(place) {
+    return place &&
+      Math.abs(Number(place.lat) - 23.05146) < 0.002 &&
+      Math.abs(Number(place.lng) - 113.41378) < 0.003;
+  }
+  function blueLeg(from, to) {
+    const pair = `${from.id}->${to.id}`;
+    if (pair === 'eastgate->library') return BLUE_EAST_LIBRARY.slice();
+    if (pair === 'library->eastgate') return BLUE_EAST_LIBRARY.slice().reverse();
+    if (pair === 'eastgate->suishi') return BLUE_EAST_SUISHI.slice();
+    if (pair === 'suishi->eastgate') return BLUE_EAST_SUISHI.slice().reverse();
+    const library = { lat: 23.04675, lng: 113.40455 };
+    if (nearSuishi(from)) {
+      if (to.id === 'eastgate') return BLUE_EAST_SUISHI.slice().reverse();
+      return fetchRoadLeg(library, to).then((tail) => [
+        ...BLUE_EAST_SUISHI.slice().reverse(),
+        ...BLUE_EAST_LIBRARY.slice(1),
+        ...(tail && tail.length ? tail.slice(1) : [[to.lat, to.lng]]),
+      ]);
+    }
+    if (nearSuishi(to)) {
+      if (from.id === 'eastgate') return BLUE_EAST_SUISHI.slice();
+      return fetchRoadLeg(from, library).then((tail) => [
+        ...(tail && tail.length ? tail : [[from.lat, from.lng]]),
+        ...BLUE_EAST_LIBRARY.slice(1),
+        ...BLUE_EAST_SUISHI.slice(1),
+      ]);
+    }
+    return null;
+  }
+
 
   function gcj02ToWgs84(lat, lng) {
     let wlat = lat;
@@ -246,16 +377,23 @@
     return { lat: wlat, lng: wlng };
   }
 
-  async function fetchRoadLeg(from, to) {
-    const key = `${from.lat.toFixed(6)},${from.lng.toFixed(6)}|${to.lat.toFixed(6)},${to.lng.toFixed(6)}`;
+  async function fetchRoadLeg(from, to, via) {
+    const viaKey = via ? `${via.lat.toFixed(6)},${via.lng.toFixed(6)}` : '';
+    const key = `${from.lat.toFixed(6)},${from.lng.toFixed(6)}|${viaKey}|${to.lat.toFixed(6)},${to.lng.toFixed(6)}`;
     if (roadCache.has(key)) return roadCache.get(key);
     const a = gcj02ToWgs84(from.lat, from.lng);
     const b = gcj02ToWgs84(to.lat, to.lng);
+    const coords = [`${a.lng},${a.lat}`];
+    if (via) {
+      const v = gcj02ToWgs84(via.lat, via.lng);
+      coords.push(`${v.lng},${v.lat}`);
+    }
+    coords.push(`${b.lng},${b.lat}`);
     const url =
-      `https://routing.openstreetmap.de/routed-foot/route/v1/foot/${a.lng},${a.lat};${b.lng},${b.lat}` +
+      `https://routing.openstreetmap.de/routed-foot/route/v1/foot/${coords.join(';')}` +
       '?overview=full&geometries=geojson&steps=false';
     const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 7000);
+    const timer = setTimeout(() => controller.abort(), 20000);
     try {
       const response = await fetch(url, { signal: controller.signal, cache: 'force-cache' });
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
@@ -268,11 +406,34 @@
       roadCache.set(key, points);
       return points;
     } catch (error) {
-      roadCache.set(key, null);
       return null;
     } finally {
       clearTimeout(timer);
     }
+  }
+
+  function isCDorm(id) {
+    return /^c([1-9]|1[0-7])$/.test(String(id || ''));
+  }
+
+  async function fetchRoadLegWithDormFallback(from, to) {
+    const direct = await fetchRoadLeg(from, to);
+    if (direct && direct.length > 1) return direct;
+    const hub = POI.get('c11');
+    if (!hub) return direct;
+    if (isCDorm(from.id) && to.id !== 'c11') {
+      const tail = await fetchRoadLeg(hub, to);
+      if (tail && tail.length > 1) {
+        return [[from.lat, from.lng], [hub.lat, hub.lng], ...tail.slice(1)];
+      }
+    }
+    if (isCDorm(to.id) && from.id !== 'c11') {
+      const head = await fetchRoadLeg(from, hub);
+      if (head && head.length > 1) {
+        return [...head, [to.lat, to.lng]];
+      }
+    }
+    return direct;
   }
 
   function drawRoute(latlngs, road) {
@@ -304,6 +465,62 @@
     }
   }
 
+  const LEG_COLORS = {
+    wake: '#8a8f98',
+    meal: '#e08a2e',
+    study: '#3f6ad8',
+    class: '#3f6ad8',
+    sport: '#d94f4f',
+    play: '#8b5cf6',
+    task: '#7a5c3e',
+    default: '#f26b21',
+  };
+
+  function drawRouteSegments(segments, road) {
+    if (!routeGroup) return;
+    for (const layer of routeLayers) routeGroup.removeLayer(layer);
+    routeLayers = [];
+    for (const segment of segments) {
+      if (!segment.leg || segment.leg.length < 2) continue;
+      routeLayers.push(
+        L.polyline(segment.leg, {
+          color: '#fffdf7',
+          weight: 9,
+          opacity: 0.9,
+          lineCap: 'round',
+          lineJoin: 'round',
+        }).addTo(routeGroup)
+      );
+      routeLayers.push(
+        L.polyline(segment.leg, {
+          color: LEG_COLORS[segment.type] || LEG_COLORS.default,
+          weight: 4.5,
+          opacity: 0.98,
+          lineCap: 'round',
+          lineJoin: 'round',
+        }).addTo(routeGroup)
+      );
+    }
+    const attribution = $('mapAttribution');
+    if (attribution && road) {
+      attribution.textContent = '底图 © 高德地图 · 路线 © OpenStreetMap contributors · 颜色按停留类型';
+    }
+  }
+
+  function drawTrace() {
+    if (!map) return;
+    if (!traceGroup) traceGroup = L.layerGroup().addTo(map);
+    traceGroup.clearLayers();
+    if (state.tracePoints.length < 2) return;
+    L.polyline(state.tracePoints, {
+      color: '#1e88e5',
+      weight: 5,
+      opacity: 0.95,
+      lineCap: 'round',
+      lineJoin: 'round',
+    }).addTo(traceGroup);
+  }
+
   function renderRoute(plan) {
     if (!map) return;
     if (routeGroup) map.removeLayer(routeGroup);
@@ -318,7 +535,6 @@
 
     const points = (plan.route && plan.route.points) || [];
     const latlngs = points.map((point) => [point.lat, point.lng]);
-    drawRoute(latlngs, false);
 
     const stopPoints = [];
     for (const stop of plan.stops || []) {
@@ -326,37 +542,67 @@
       if (!poi) continue;
       const last = stopPoints[stopPoints.length - 1];
       if (last && Math.abs(last.lat - poi.lat) < 1e-7 && Math.abs(last.lng - poi.lng) < 1e-7) continue;
-      stopPoints.push(poi);
+      stopPoints.push({ ...poi, type: stop.type });
     }
     if (stopPoints.length > 1) {
+      const seq = routeSeq;
       Promise.all(
-        stopPoints.slice(0, -1).map((from, index) => fetchRoadLeg(from, stopPoints[index + 1]))
-      ).then((legs) => {
-        if (seq !== routeSeq) return;
-        const merged = [];
-        let missed = 0;
-        for (let i = 0; i < legs.length; i += 1) {
-          const leg = legs[i];
-          const from = stopPoints[i];
-          const to = stopPoints[i + 1];
-          if (leg && leg.length > 1) {
-            for (const point of leg) {
-              const last = merged[merged.length - 1];
-              if (!last || last[0] !== point[0] || last[1] !== point[1]) merged.push(point);
+        stopPoints.slice(0, -1).map((from, index) => {
+          const to = stopPoints[index + 1];
+          if (from.id === 'home_custom' || to.id === 'home_custom') {
+            const path = R.shortestPath(from.id, to.id);
+            const gateId = (path.nodes || []).find((id) => ['eastgate', 'southgate', 'westgate', 'northgate', 'west1gate', 'north1gate'].includes(id));
+            const gate = gateId && POI.get(gateId);
+            if (gate) {
+              return Promise.all([fetchRoadLeg(from, gate), fetchRoadLeg(gate, to)]).then(([head, tail]) => {
+                if (head && tail && head.length && tail.length) {
+                  return { from, to, leg: [...head, ...tail.slice(1)] };
+                }
+                return {
+                  from,
+                  to,
+                  leg: [],
+                };
+              });
             }
+            if (path && path.points && path.points.length > 1) {
+              return {
+                from,
+                to,
+                leg: [],
+              };
+            }
+          }
+          const routeFrom = from.id === 'gym' ? { lat: GYM_PLAZA[0], lng: GYM_PLAZA[1] } : from;
+          const routeTo = to.id === 'gym' ? { lat: GYM_PLAZA[0], lng: GYM_PLAZA[1] } : to;
+          return fetchRoadLegWithDormFallback(routeFrom, routeTo).then((leg) => {
+            if (leg && leg.length) {
+              if (to.id === 'gym') leg.push(...GYM_APPROACH);
+              if (from.id === 'gym') leg.unshift(...GYM_APPROACH.slice().reverse());
+            }
+            return { from, to, leg };
+          });
+        })
+      ).then((results) => {
+        if (seq !== routeSeq) return;
+        const segments = [];
+        let missed = 0;
+        for (const { from, to, leg } of results) {
+          if (leg && leg.length > 1) {
+            segments.push({ leg, type: to.type || 'default' });
           } else {
             missed += 1;
-            merged.push([from.lat, from.lng], [to.lat, to.lng]);
+            segments.push({ leg: [[from.lat, from.lng], [to.lat, to.lng]], type: to.type || 'default' });
           }
         }
-        if (merged.length > 1) drawRoute(merged, missed < legs.length);
+        drawRouteSegments(segments, missed < results.length);
       });
     }
 
     const grouped = new Map();
     plan.stops.forEach((stop, index) => {
       const poi = POI.get(stop.poiId);
-      if (!poi) return;
+      if (!poi || poi.id === 'home_custom') return;
       if (!grouped.has(poi.id)) grouped.set(poi.id, { poi, first: index + 1, count: 0 });
       grouped.get(poi.id).count += 1;
     });
@@ -373,6 +619,15 @@
         icon: gpsIcon(),
         keyboard: false,
         zIndexOffset: 900,
+      }).addTo(gpsGroup);
+    }
+
+    if ((state.dormPoiId === 'offcampus' || state.dormPoiId === 'custom_home') && homeCoordsValid()) {
+      L.marker([Number(state.home.lat), Number(state.home.lng)], {
+        icon: homeIcon(),
+        keyboard: false,
+        interactive: false,
+        zIndexOffset: 850,
       }).addTo(gpsGroup);
     }
   }
@@ -445,8 +700,39 @@
     });
   }
 
+  function fixedEventsForDate() {
+    const weekday = new Date(`${state.date}T12:00:00`).getDay() || 7;
+    return state.manualTasks
+      .filter((task) => task.start && task.end && Number.isFinite(Number(task.lat)) && Number.isFinite(Number(task.lng)))
+      .filter((task) => {
+        if (task.repeat === 'daily') return true;
+        if (task.repeat === 'weekly') return Number(task.weekday) === weekday;
+        return String(task.date || '') === state.date;
+      })
+      .map((task) => ({
+        title: task.title,
+        start: task.start,
+        end: task.end,
+        location: task.location || '',
+        lat: Number(task.lat),
+        lng: Number(task.lng),
+      }));
+  }
+
   function replan(showToast) {
     refreshTasks();
+    const fixedEvents = fixedEventsForDate();
+    fixedEvents.forEach((event, index) => {
+      POI.set(`event_${index}`, {
+        id: `event_${index}`,
+        name: event.location || event.title,
+        short: String(event.location || '待办').slice(0, 12),
+        category: 'task',
+        icon: '📌',
+        lat: event.lat,
+        lng: event.lng,
+      });
+    });
     const plan = R.planDay({
       date: state.date,
       preset: state.preset,
@@ -457,15 +743,31 @@
       gps: state.gps,
       timetable: state.timetable || undefined,
       preferences: state.preferences || undefined,
+      dormPoiId: state.dormPoiId || undefined,
+      home: state.dormPoiId === 'offcampus' || state.dormPoiId === 'custom_home' ? state.home : undefined,
+      gateOverrides: state.gateOverrides,
+      mealPrefs: state.mealPrefs,
+      mealPlaces: ['breakfast', 'lunch', 'dinner'].some((meal) => state.mealPrefs[meal] === 'offcampus')
+        ? state.mealPlaces
+        : undefined,
+      studyPref: state.studyPref,
+      sportPref: state.sportPref,
+      sportType: state.sportType,
+      nap: state.nap,
+      gym: state.gym.enabled ? state.gym : undefined,
       weekNumber: state.timetableInfo ? state.timetableInfo.week_number : null,
       major: state.major || undefined,
       tasks: tasksForRoute(),
+      fixedEvents,
     });
 
     if (!plan.ok) {
       state.plan = null;
       toast(plan.message || '没有生成路线');
       return;
+    }
+    if (!state.dormPoiId) {
+      plan.warnings.unshift('尚未选择住宿，当前暂按 C11 计算；请在“住宿 / 休息”里选宿舍或校外住处');
     }
     if (!plan.validation.ok) {
       state.plan = null;
@@ -988,11 +1290,15 @@
             const control = task.external
               ? '<span class="task-lock" title="请回到左侧对话区标记完成">只读</span>'
               : `<input type="checkbox" data-task-check ${task.done ? 'checked' : ''} aria-label="完成 ${esc(task.title)}" />`;
+            const repeatText = task.repeat === 'weekly' ? `每周${['一', '二', '三', '四', '五', '六', '日'][Number(task.weekday) - 1] || ''}` : task.repeat === 'daily' ? '每天' : '一次';
+            const schedule = task.start
+              ? `${task.start}–${task.end} · ${task.location || '自选地点'} · ${repeatText}`
+              : `预计 ${task.estimated_minutes} 分钟`;
             return `<div class="task-item ${task.done ? 'done' : ''}" data-task-id="${esc(task.id)}">
               ${control}
               <div>
                 <div class="task-title">${esc(task.title)}</div>
-                <div class="task-meta">[${esc(source)}] ${esc(due)} · 预计 ${task.estimated_minutes} 分钟${task.course ? ` · ${esc(task.course)}` : ''}</div>
+                <div class="task-meta">[${esc(source)}] ${esc(due)} · ${esc(schedule)}${task.course ? ` · ${esc(task.course)}` : ''}</div>
               </div>
               <div class="task-side">
                 <span class="task-due ${st.key}">${esc(st.label)}</span>
@@ -1053,13 +1359,35 @@
       return;
     }
     const date = $('todoDate').value || state.date;
-    const minutes = Math.max(10, Math.min(480, Number($('todoMinutes').value) || 60));
+    const start = $('todoStart').value || '09:00';
+    const end = $('todoEnd').value || '10:00';
+    const repeat = $('todoRepeat').value || 'once';
+    const weekday = repeat === 'weekly' ? Number($('todoWeekday').value) || 1 : null;
+    if (end <= start) {
+      toast('结束时间要晚于开始时间');
+      return;
+    }
+    if (!state.todoPlace || !Number.isFinite(Number(state.todoPlace.lat)) || !Number.isFinite(Number(state.todoPlace.lng))) {
+      toast('先点“地图选点”给待办定位');
+      return;
+    }
+    const startMin = Number(start.slice(0, 2)) * 60 + Number(start.slice(3, 5));
+    const endMin = Number(end.slice(0, 2)) * 60 + Number(end.slice(3, 5));
+    const minutes = Math.max(10, endMin - startMin);
     const priority = $('todoPriority').value || 'P2';
     state.manualTasks.push({
       id: `manual-${Date.now()}`,
       title: title.slice(0, 100),
-      due: `${date}T23:59`,
+      due: `${date}T${end}`,
       due_date: date,
+      start,
+      end,
+      repeat,
+      weekday,
+      date,
+      location: state.todoPlace.address || $('todoLocation').value.trim() || '自选地点',
+      lat: Number(state.todoPlace.lat),
+      lng: Number(state.todoPlace.lng),
       priority,
       estimated_minutes: minutes,
       source: 'manual',
@@ -1067,6 +1395,9 @@
     });
     saveStorage('huayuan.manualTasks', state.manualTasks);
     $('todoTitle').value = '';
+    $('todoLocation').value = '';
+    $('todoCoord').textContent = '未定位';
+    state.todoPlace = { address: '', lat: null, lng: null };
     openTaskSection();
     replan(true);
     toast(`已加入待办：${title}`);
@@ -1184,6 +1515,382 @@
       if (permission === 'granted') start();
       else toast('没有拿到通知权限；可以继续看页面里的截止标签');
     });
+  }
+
+  function homeSelectValue() {
+    if (state.dormPoiId === 'offcampus') return 'offcampus';
+    if (state.dormPoiId === 'custom_home') return state.home.id ? `dorm:${state.home.id}` : 'none';
+    return state.dormPoiId ? `dorm:${state.dormPoiId}` : 'none';
+  }
+
+  function populateHomeOptions() {
+    const select = $('homeSelect');
+    if (!select || select.dataset.populated === '1') return;
+    const dorms = [];
+    const seen = new Set();
+    for (const location of LOCATIONS) {
+      if (!['dorm', '宿舍'].includes(location.group)) continue;
+      if (location.id === 'offcampus') continue;
+      if (!location.id || seen.has(location.id)) continue;
+      seen.add(location.id);
+      dorms.push(location);
+    }
+    dorms.sort((a, b) => String(a.short || a.name).localeCompare(String(b.short || b.name), 'zh-Hans-CN', { numeric: true }));
+    select.innerHTML =
+      '<option value="none">请选择住宿</option>' +
+      '<option value="offcampus">校外住处（可填地址）</option>' +
+      dorms
+        .map((dorm) => `<option value="dorm:${esc(dorm.id)}">${esc(dorm.name || dorm.short)}</option>`)
+        .join('');
+    select.dataset.populated = '1';
+  }
+
+  function homeCoordsValid() {
+    if (state.home.lat == null || state.home.lng == null || state.home.lat === '' || state.home.lng === '') return false;
+    const lat = Number(state.home.lat);
+    const lng = Number(state.home.lng);
+    return Number.isFinite(lat) && Number.isFinite(lng) && Math.abs(lat) <= 90 && Math.abs(lng) <= 180;
+  }
+
+  function mealPlaceValid(meal) {
+    const place = state.mealPlaces[meal] || {};
+    if (place.lat == null || place.lng == null) return false;
+    const lat = Number(place.lat);
+    const lng = Number(place.lng);
+    return Number.isFinite(lat) && Number.isFinite(lng) && Math.abs(lat) <= 90 && Math.abs(lng) <= 180;
+  }
+
+  function syncMealPlaceFields() {
+    const used = ['breakfast', 'lunch', 'dinner'].filter((meal) => state.mealPrefs[meal] === 'offcampus');
+    if (!used.includes(state.mealPlaceEditing)) state.mealPlaceEditing = used[0] || 'lunch';
+    const meal = state.mealPlaceEditing;
+    const place = state.mealPlaces[meal] || {};
+    $('mealPlaceFields').hidden = used.length === 0;
+    $('mealPlaceMeal').value = meal;
+    $('mealPlaceAddress').value = place.address || '';
+    $('mealPlaceCoord').textContent = used.length && mealPlaceValid(meal)
+      ? `${Number(place.lat).toFixed(5)}, ${Number(place.lng).toFixed(5)}`
+      : '未定位';
+    for (const item of ['breakfast', 'lunch', 'dinner']) {
+      const id = `meal_${item}`;
+      if (used.includes(item) && mealPlaceValid(item)) {
+        const current = state.mealPlaces[item];
+        POI.set(id, {
+          id,
+          name: current.address || '校外用餐地点',
+          short: String(current.address || '校外用餐').slice(0, 12),
+          category: 'meal',
+          icon: '🍽️',
+          lat: Number(current.lat),
+          lng: Number(current.lng),
+        });
+      } else {
+        POI.delete(id);
+      }
+    }
+  }
+
+  function setMealPlaceCoords(lat, lng, address, meal) {
+    const target = meal || state.mealPlaceEditing;
+    state.mealPlaces[target] = {
+      ...(state.mealPlaces[target] || {}),
+      address: address || (state.mealPlaces[target] && state.mealPlaces[target].address) || '地图选点',
+      lat: Number(lat),
+      lng: Number(lng),
+    };
+    saveStorage('huayuan.mealPlaces', state.mealPlaces);
+    syncMealPlaceFields();
+    replan(false);
+    toast(`${target === 'breakfast' ? '早餐' : target === 'dinner' ? '晚餐' : '午餐'}校外地点已设为 ${state.mealPlaces[target].address}`);
+  }
+
+  async function geocodeMealPlace() {
+    const meal = state.mealPlaceEditing;
+    const raw = String($('mealPlaceAddress').value || '').trim();
+    if (!raw) {
+      toast('先填一个校外用餐地点');
+      return;
+    }
+    state.mealPlaces[meal] = { ...(state.mealPlaces[meal] || {}), address: raw };
+    saveStorage('huayuan.mealPlaces', state.mealPlaces);
+    const button = $('geocodeMealBtn');
+    button.disabled = true;
+    button.textContent = '定位中…';
+    try {
+      const query = /广州|番禺|大学城|穗石|南亭|北亭/.test(raw) ? raw : `广州 ${raw}`;
+      const url =
+        `https://photon.komoot.io/api/?q=${encodeURIComponent(query)}&limit=1` +
+        '&lat=23.0486&lon=113.4041';
+      const response = await fetch(url, { cache: 'force-cache' });
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      const data = await response.json();
+      const feature = data.features && data.features[0];
+      if (!feature || !feature.geometry) throw new Error('NO_RESULT');
+      const [lng, lat] = feature.geometry.coordinates;
+      const gcj = R.wgs84ToGcj02(Number(lat), Number(lng));
+      const props = feature.properties || {};
+      setMealPlaceCoords(gcj.lat, gcj.lng, raw, meal);
+      $('mealPlaceHint').textContent = `已定位到 ${props.name || props.street || raw}；地址按你填写的保留，可在地图上微调。`;
+    } catch (error) {
+      toast('用餐地点没定位到，请换个说法或在地图上选点');
+      $('mealPlaceHint').textContent = '没定位到；点“在地图上选点”直接指定用餐位置。';
+    } finally {
+      button.disabled = false;
+      button.textContent = '按地址定位';
+    }
+  }
+
+  function syncHomeFields() {
+    const offcampus = state.dormPoiId === 'offcampus';
+    const customHome = state.dormPoiId === 'custom_home';
+    $('homeFields').hidden = !offcampus;
+    $('homeAddress').value = state.home.address || '';
+    $('homeCoord').textContent = (offcampus || customHome) && homeCoordsValid()
+      ? `${Number(state.home.lat).toFixed(5)}, ${Number(state.home.lng).toFixed(5)}`
+      : '未定位';
+    if ((offcampus || customHome) && homeCoordsValid()) {
+      POI.set('home_custom', {
+        id: 'home_custom',
+        name: state.home.address || '住处',
+        short: '住处',
+        category: 'dorm',
+        icon: '🏠',
+        lat: Number(state.home.lat),
+        lng: Number(state.home.lng),
+      });
+    } else {
+      POI.delete('home_custom');
+    }
+  }
+
+  function setHomeCoords(lat, lng, address) {
+    state.home = {
+      ...state.home,
+      address: address || state.home.address || '地图选点',
+      lat: Number(lat),
+      lng: Number(lng),
+    };
+    saveStorage('huayuan.home', state.home);
+    syncHomeFields();
+    replan(false);
+    if (map) {
+      const bounds = L.latLngBounds(CAMPUS_BOUNDS).extend([Number(state.home.lat), Number(state.home.lng)]);
+      map.fitBounds(bounds, { padding: [26, 26], maxZoom: 17 });
+    }
+    toast(`住处已设为 ${state.home.address}`);
+  }
+
+  async function geocodeHome() {
+    const raw = String($('homeAddress').value || '').trim();
+    if (!raw) {
+      toast('先填一个校外地址');
+      return;
+    }
+    state.home.address = raw;
+    saveStorage('huayuan.home', state.home);
+    const button = $('geocodeHomeBtn');
+    button.disabled = true;
+    button.textContent = '定位中…';
+    try {
+      const query = /广州|番禺|大学城|穗石|南亭|北亭/.test(raw) ? raw : `广州 ${raw}`;
+      const url =
+        `https://photon.komoot.io/api/?q=${encodeURIComponent(query)}&limit=1` +
+        '&lat=23.0486&lon=113.4041';
+      const response = await fetch(url, { cache: 'force-cache' });
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      const data = await response.json();
+      const feature = data.features && data.features[0];
+      if (!feature || !feature.geometry) throw new Error('NO_RESULT');
+      const [lng, lat] = feature.geometry.coordinates;
+      const gcj = R.wgs84ToGcj02(Number(lat), Number(lng));
+      const props = feature.properties || {};
+      const label = props.name || props.street || raw;
+      setHomeCoords(gcj.lat, gcj.lng, raw);
+      $('homeHint').textContent = `已定位到 ${label}${props.city ? `（${props.city}）` : ''}；地址仍按你填写的保留，可点地图微调。`;
+    } catch (error) {
+      toast('地址没定位到，请换个说法或在地图上选点');
+      $('homeHint').textContent = '地址没定位到；点“在地图上选点”直接指定住处位置。';
+    } finally {
+      button.disabled = false;
+      button.textContent = '按地址定位';
+    }
+  }
+
+  function bindPreferences() {
+    const mealIds = { breakfast: 'mealBreakfast', lunch: 'mealLunch', dinner: 'mealDinner' };
+    for (const [meal, id] of Object.entries(mealIds)) {
+      $(id).addEventListener('change', (e) => {
+        state.mealPrefs[meal] = e.target.value;
+        if (e.target.value === 'offcampus') {
+          state.mealPlaceEditing = meal;
+        }
+        saveStorage('huayuan.mealPrefs', state.mealPrefs);
+        syncMealPlaceFields();
+        replan(false);
+      });
+    }
+    $('takeoutPlace').addEventListener('change', (e) => {
+      state.mealPrefs.takeoutPlace = e.target.value;
+      saveStorage('huayuan.mealPrefs', state.mealPrefs);
+      replan(false);
+    });
+    $('mealPlaceMeal').addEventListener('change', (e) => {
+      state.mealPlaceEditing = e.target.value;
+      syncMealPlaceFields();
+    });
+    $('mealPlaceAddress').addEventListener('change', (e) => {
+      const meal = state.mealPlaceEditing;
+      state.mealPlaces[meal] = {
+        ...(state.mealPlaces[meal] || {}),
+        address: String(e.target.value || '').trim().slice(0, 80),
+      };
+      saveStorage('huayuan.mealPlaces', state.mealPlaces);
+    });
+    $('mealPlaceAddress').addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        geocodeMealPlace();
+      }
+    });
+    $('geocodeMealBtn').addEventListener('click', geocodeMealPlace);
+    $('pickMealOnMapBtn').addEventListener('click', () => {
+      if (!map) {
+        toast('地图还没准备好');
+        return;
+      }
+      state.pickMealOnMap = true;
+      map.getContainer().style.cursor = 'crosshair';
+      toast('在地图上点一下校外用餐地点');
+    });
+    $('studyPref').addEventListener('change', (e) => {
+      state.studyPref = e.target.value || 'auto';
+      saveStorage('huayuan.studyPref', state.studyPref);
+      replan(false);
+    });
+    $('sportPref').addEventListener('change', (e) => {
+      state.sportPref = e.target.value || 'auto';
+      saveStorage('huayuan.sportPref', state.sportPref);
+      replan(false);
+    });
+    $('sportType').addEventListener('change', (e) => {
+      state.sportType = e.target.value || 'auto';
+      saveStorage('huayuan.sportType', state.sportType);
+      replan(false);
+    });
+    $('homeSelect').addEventListener('change', (e) => {
+      const value = e.target.value;
+      if (value === 'none') {
+        state.dormPoiId = '';
+        state.home = { id: '', address: '', lat: null, lng: null, offcampus: false };
+        $('prefsHint').textContent = '还没有选住宿；请选择校内宿舍或校外住处后再生成路线。';
+      } else if (value === 'offcampus') {
+        state.dormPoiId = 'offcampus';
+        if (!homeCoordsValid() || !state.home.offcampus) {
+          state.home = { id: 'offcampus', address: '大学城南地铁站', lat: 23.04346, lng: 113.40111, offcampus: true };
+        }
+      } else {
+        const id = value.replace(/^dorm:/, '');
+        const location = LOCATIONS.find((item) => item.id === id);
+        if (location) {
+          state.home = {
+            id,
+            address: location.name,
+            lat: Number(location.lat),
+            lng: Number(location.lng),
+            offcampus: false,
+          };
+          state.dormPoiId = POI.has(id) ? id : 'custom_home';
+        }
+      }
+      $('prefsHint').textContent =
+        state.dormPoiId === 'offcampus'
+          ? '填地址后点“按地址定位”，或点“在地图上选点”；路线按住处坐标重算。'
+          : '已选校内宿舍；起床、洗漱、睡觉会按这个宿舍安排。';
+      if (state.dormPoiId === 'offcampus' && ['c11', 'c11study'].includes(state.mealPrefs.takeoutPlace)) {
+        state.mealPrefs.takeoutPlace = 'home';
+        $('takeoutPlace').value = 'home';
+        saveStorage('huayuan.mealPrefs', state.mealPrefs);
+      }
+      syncHomeFields();
+      saveStorage('huayuan.dormPoiId', state.dormPoiId);
+      saveStorage('huayuan.home', state.home);
+      replan(false);
+    });
+    $('homeAddress').addEventListener('change', (e) => {
+      state.home.address = String(e.target.value || '').trim().slice(0, 80);
+      saveStorage('huayuan.home', state.home);
+    });
+    $('homeAddress').addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        geocodeHome();
+      }
+    });
+    $('geocodeHomeBtn').addEventListener('click', geocodeHome);
+    $('pickHomeOnMapBtn').addEventListener('click', () => {
+      if (!map) {
+        toast('地图还没准备好');
+        return;
+      }
+      state.pickHomeOnMap = true;
+      map.getContainer().style.cursor = 'crosshair';
+      toast('在地图上点一下住处位置');
+    });
+    $('gymEnabled').addEventListener('change', (e) => {
+      state.gym.enabled = e.target.checked;
+      if (state.gym.enabled && !state.gym.date) state.gym.date = state.date;
+      $('gymDate').value = state.gym.date || state.date;
+      $('gymDate').disabled = !state.gym.enabled;
+      $('gymStart').disabled = !state.gym.enabled;
+      $('gymMinutes').disabled = !state.gym.enabled;
+      saveStorage('huayuan.gym', state.gym);
+      replan(false);
+    });
+    $('gymDate').addEventListener('change', (e) => {
+      state.gym.date = e.target.value || state.date;
+      saveStorage('huayuan.gym', state.gym);
+      replan(false);
+    });
+    $('gymStart').addEventListener('change', (e) => {
+      state.gym.start = e.target.value || '19:00';
+      saveStorage('huayuan.gym', state.gym);
+      replan(false);
+    });
+    $('gymMinutes').addEventListener('change', (e) => {
+      state.gym.minutes = Number(e.target.value) || 60;
+      saveStorage('huayuan.gym', state.gym);
+      replan(false);
+    });
+    $('napEnabled').addEventListener('change', (e) => {
+      state.nap = e.target.checked;
+      saveStorage('huayuan.nap', state.nap);
+      replan(false);
+    });
+  }
+
+  function syncPreferencesUI() {
+    $('mealBreakfast').value = state.mealPrefs.breakfast;
+    $('mealLunch').value = state.mealPrefs.lunch;
+    $('mealDinner').value = state.mealPrefs.dinner;
+    $('takeoutPlace').value = state.mealPrefs.takeoutPlace;
+    $('studyPref').value = state.studyPref || 'auto';
+    $('sportPref').value = state.sportPref || 'auto';
+    $('sportType').value = state.sportType || 'auto';
+    $('homeSelect').value = homeSelectValue();
+    syncHomeFields();
+    syncMealPlaceFields();
+    $('gymEnabled').checked = Boolean(state.gym.enabled);
+    $('gymDate').value = state.gym.date || state.date;
+    $('gymStart').value = state.gym.start || '19:00';
+    $('gymMinutes').value = String(state.gym.minutes || 60);
+    $('gymDate').disabled = !state.gym.enabled;
+    $('gymStart').disabled = !state.gym.enabled;
+    $('gymMinutes').disabled = !state.gym.enabled;
+    $('napEnabled').checked = state.nap !== false;
+    $('prefsHint').textContent =
+      state.dormPoiId === 'offcampus'
+        ? '填地址后点“按地址定位”，或点“在地图上选点”；路线按住处坐标重算。'
+        : '默认住 C11；校外住宿时填写地址或在地图上选点。';
   }
 
   function saveMajor() {
@@ -1407,11 +2114,30 @@
 
   function bind() {
     $('dateInput').addEventListener('change', (e) => {
+      const previousDate = state.date;
       state.date = e.target.value || state.date;
       if (!$('todoDate').value) $('todoDate').value = state.date;
+      if (state.gym.enabled && (!state.gym.date || state.gym.date === previousDate)) {
+        state.gym.date = state.date;
+        $('gymDate').value = state.date;
+      }
       refreshWeekForDate();
       replan(false);
     });
+
+    function jumpToDate(offsetDays) {
+      const base = new Date(`${state.date}T12:00:00`);
+      base.setDate(base.getDate() + offsetDays);
+      state.date = `${base.getFullYear()}-${String(base.getMonth() + 1).padStart(2, '0')}-${String(base.getDate()).padStart(2, '0')}`;
+      $('dateInput').value = state.date;
+      $('todoDate').value = state.date;
+      if (state.gym.enabled) state.gym.date = state.date;
+      refreshWeekForDate();
+      syncPreferencesUI();
+      replan(false);
+    }
+    $('todayBtn').addEventListener('click', () => jumpToDate(0));
+    $('tomorrowBtn').addEventListener('click', () => jumpToDate(1));
 
     $('saveMajorBtn').addEventListener('click', saveMajor);
     $('majorInput').addEventListener('keydown', (e) => {
@@ -1438,6 +2164,71 @@
     $('demoExamsBtn').addEventListener('click', loadDemoExams);
     $('clearExamsBtn').addEventListener('click', clearExams);
     $('remindBtn').addEventListener('click', enableReminders);
+    $('pickTodoOnMapBtn').addEventListener('click', () => {
+      if (!map) {
+        toast('地图还没准备好');
+        return;
+      }
+      state.pickTodoOnMap = true;
+      map.getContainer().style.cursor = 'crosshair';
+      toast('在地图上点一下待办地点');
+    });
+    $('pickEastGateBtn').addEventListener('click', () => {
+      if (!map) {
+        toast('地图还没准备好');
+        return;
+      }
+      state.pickEastGateOnMap = true;
+      map.getContainer().style.cursor = 'crosshair';
+      $('pickEastGateBtn').textContent = '请在地图上点东门';
+      toast('已进入定位模式：请在地图上点一下东门位置');
+    });
+    $('resetEastGateBtn').addEventListener('click', () => {
+      delete state.gateOverrides.eastgate;
+      saveStorage('huayuan.gates', state.gateOverrides);
+      const base = POI.get('eastgate') || {};
+      POI.set('eastgate', { ...base, id: 'eastgate', lat: 23.04726, lng: 113.40868 });
+      $('resetEastGateBtn').hidden = true;
+      $('pickEastGateBtn').textContent = '📍 定位东门';
+      replan(false);
+      toast('东门已恢复默认坐标');
+    });
+    $('traceRouteBtn').addEventListener('click', () => {
+      if (!map) return;
+      state.traceMode = true;
+      state.tracePoints = [];
+      $('finishTraceBtn').hidden = false;
+      $('clearTraceBtn').hidden = false;
+      map.getContainer().style.cursor = 'crosshair';
+      toast('依次点路线拐点，点“完成录入”保存');
+    });
+    $('finishTraceBtn').addEventListener('click', () => {
+      if (state.tracePoints.length < 2) {
+        toast('至少点两个点');
+        return;
+      }
+      state.traceMode = false;
+      state.customRoute = state.tracePoints.slice();
+      saveStorage('huayuan.customRoute', state.customRoute);
+      map.getContainer().style.cursor = '';
+      $('finishTraceBtn').hidden = true;
+      toast('路线已保存');
+      replan(false);
+    });
+    $('clearTraceBtn').addEventListener('click', () => {
+      state.customRoute = null;
+      state.tracePoints = [];
+      localStorage.removeItem('huayuan.customRoute');
+      if (traceGroup) traceGroup.clearLayers();
+      $('finishTraceBtn').hidden = true;
+      $('clearTraceBtn').hidden = true;
+      $('traceRouteBtn').textContent = '✏️ 录入路线';
+      replan(false);
+      toast('已清除手绘路线');
+    });
+    $('todoRepeat').addEventListener('change', (e) => {
+      $('todoWeekday').hidden = e.target.value !== 'weekly';
+    });
     $('addTodoBtn').addEventListener('click', addManualTask);
     $('todoTitle').addEventListener('keydown', (e) => {
       if (e.key === 'Enter') {
@@ -1536,7 +2327,7 @@
       $('clearGpsBtn').hidden = true;
       $('locationSearch').value = '';
       $('locationSelected').className = 'location-selected';
-      $('locationSelected').textContent = '未选择楼栋 · 可搜索 82 个校园地点；也可使用设备定位';
+      $('locationSelected').textContent = `未选择楼栋 · 可搜索 ${LOCATIONS.length} 个校园地点；也可使用设备定位`;
       replan(false);
     });
 
@@ -1593,6 +2384,58 @@
     if (Array.isArray(savedTasks)) state.manualTasks = savedTasks;
     const savedDone = JSON.parse(localStorage.getItem('huayuan.doneTaskIds') || '[]');
     if (Array.isArray(savedDone)) state.doneTaskIds = savedDone;
+    const savedMealPrefs = JSON.parse(localStorage.getItem('huayuan.mealPrefs') || 'null');
+    if (savedMealPrefs && typeof savedMealPrefs === 'object') {
+      state.mealPrefs = { ...state.mealPrefs, ...savedMealPrefs };
+    }
+    const savedDorm = localStorage.getItem('huayuan.dormPoiId');
+    if (['offcampus', 'c11', 'custom_home'].includes(savedDorm)) state.dormPoiId = savedDorm;
+    const savedHome = JSON.parse(localStorage.getItem('huayuan.home') || 'null');
+    if (savedHome && typeof savedHome === 'object' && Number.isFinite(Number(savedHome.lat)) && Number.isFinite(Number(savedHome.lng))) {
+      state.home = {
+        id: String(savedHome.id || 'offcampus').slice(0, 40),
+        address: String(savedHome.address || '').slice(0, 80),
+        lat: Number(savedHome.lat),
+        lng: Number(savedHome.lng),
+        offcampus: savedHome.offcampus !== false,
+      };
+    }
+    const savedMealPlaces = JSON.parse(localStorage.getItem('huayuan.mealPlaces') || 'null');
+    if (savedMealPlaces && typeof savedMealPlaces === 'object') {
+      for (const meal of ['breakfast', 'lunch', 'dinner']) {
+        const place = savedMealPlaces[meal];
+        if (place && Number.isFinite(Number(place.lat)) && Number.isFinite(Number(place.lng))) {
+          state.mealPlaces[meal] = {
+            address: String(place.address || '').slice(0, 80),
+            lat: Number(place.lat),
+            lng: Number(place.lng),
+          };
+        }
+      }
+    } else {
+      const savedMealPlace = JSON.parse(localStorage.getItem('huayuan.mealPlace') || 'null');
+      if (savedMealPlace && Number.isFinite(Number(savedMealPlace.lat)) && Number.isFinite(Number(savedMealPlace.lng))) {
+        state.mealPlaces.lunch = {
+          address: String(savedMealPlace.address || '').slice(0, 80),
+          lat: Number(savedMealPlace.lat),
+          lng: Number(savedMealPlace.lng),
+        };
+      }
+    }
+    const savedStudyPref = localStorage.getItem('huayuan.studyPref');
+    if (['auto', 'library', 'a1', 'a2', 'a3', 'a4', 'a5', 'home'].includes(savedStudyPref)) state.studyPref = savedStudyPref;
+    const savedSportPref = localStorage.getItem('huayuan.sportPref');
+    if (['auto', 'field_life', 'field', 'gym'].includes(savedSportPref)) state.sportPref = savedSportPref;
+    const savedSportType = localStorage.getItem('huayuan.sportType');
+    if (['auto', 'run', 'football', 'longjump', 'pullup', 'badminton', 'basketball', 'fitness', 'walk'].includes(savedSportType)) {
+      state.sportType = savedSportType;
+    }
+    const savedGym = JSON.parse(localStorage.getItem('huayuan.gym') || 'null');
+    if (savedGym && typeof savedGym === 'object') {
+      state.gym = { ...state.gym, ...savedGym };
+    }
+    const savedNap = localStorage.getItem('huayuan.nap');
+    if (savedNap !== null) state.nap = savedNap === 'true';
     state.reminders = localStorage.getItem('huayuan.reminders') === 'true';
   } catch (error) {
     // 隐私模式下 localStorage 可能不可用
@@ -1603,6 +2446,19 @@
   }
   $('dateInput').value = state.date;
   $('todoDate').value = state.date;
+  if (!state.gym.date) state.gym.date = state.date;
+  if (params.get('gym') === '1') {
+    state.gym.enabled = true;
+    state.gym.date = state.date;
+    state.gym.start = state.gym.start || '19:00';
+    state.gym.minutes = state.gym.minutes || 60;
+  }
+  if (params.get('home') === 'offcampus') {
+    state.dormPoiId = 'offcampus';
+    if (!homeCoordsValid()) {
+      state.home = { id: 'offcampus', address: '大学城南地铁站', lat: 23.04346, lng: 113.40111, offcampus: true };
+    }
+  }
   if (TBL) {
     try {
       const savedTimetable = JSON.parse(localStorage.getItem('huayuan.timetable') || 'null');
@@ -1651,10 +2507,14 @@
     initMap();
     syncSliders();
     syncWeatherControls();
+    if (params.get('prefs') === '1') $('prefsCard').open = true;
     document.querySelectorAll('#presets button').forEach((btn) => {
       btn.classList.toggle('active', btn.dataset.preset === state.preset);
     });
     bind();
+    bindPreferences();
+    populateHomeOptions();
+    syncPreferencesUI();
     replan(false);
     refreshDashboardContext();
     setInterval(refreshDashboardContext, 30000);

@@ -1,6 +1,4 @@
-VERSION=0.15.0
-
-### 0.15.0 · 2026-10-31 · feat: campus route on AMap standard map with OSM walking paths; fix Edge login fallback
+VERSION=0.16.0
 
 # 华园日程管家 · 版本记录
 
@@ -9,6 +7,18 @@ VERSION=0.15.0
 > 规则：版本号一律由脚本递增，**不要手动改** VERSION.md 与 plugin.json 的版本号；确需大/中版本时用 `-Part major|minor`。
 
 ## 变更日志（新→旧）
+
+### 0.16.0 · 2026-11-04 · feat: merge advanced campus route preferences and C-area routing
+- 合入“少走路”画像，自习、运动和放松地点会优先选择当前路线附近的位置。
+- 支持自习地点、运动类型与场地、三餐、外卖、校外用餐地点和校外住所偏好。
+- 校外住所、用餐地点与固定时段待办支持地址搜索或地图选点，并自动选择总路程最短的校门。
+- 支持固定时间健身馆和带地点、开始结束时间、重复规则的待办。
+- 路线按停留类型着色，补全 C8-C17 宿舍与校门路由；保留主干的高德地图、OSM 道路、Edge 登录和午夜作息修复。
+- 路线回归扩展到 58 项，主线 49/49、驾驶舱复用 9/9、手机 44/44、驾驶舱服务 91/91。
+
+### 0.15.0 · 2026-10-31 · feat: campus route on AMap standard map with OSM walking paths; fix Edge login fallback
+- 路线底图改用高德标准地图，Leaflet 资源本地加载；步行路线优先沿 OSM 道路绘制。
+- Chrome 缺失时回退 Edge；导入课表持久化，并补充体育场地与晚餐通勤修复。
 
 ### 0.14.11 · 2026-10-30 · fix: use live device clock in mobile workbench
 - 手机顶部和“此刻”改用设备实时时间，每 30 秒自动更新，不再显示 `now.json` 生成时间。

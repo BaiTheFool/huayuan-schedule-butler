@@ -137,20 +137,208 @@
     GRAPH.get(b).push({ id: a, distance: d });
   }
 
-  const pathCache = new Map();
+  const CAMPUS_OUTSIDE_IDS = new Set(['offcampus', 'suishi', 'j_offcampus', 'j_suishi', 'eastgate']);
+  const CAMPUS_GRAPH = new Map();
+  for (const [id, edges] of GRAPH) {
+    if (CAMPUS_OUTSIDE_IDS.has(id)) continue;
+    CAMPUS_GRAPH.set(
+      id,
+      edges.filter((edge) => !CAMPUS_OUTSIDE_IDS.has(edge.id))
+    );
+  }
 
-  /** Dijkstra：节点少，直接用 O(n²)，不引依赖。 */
+  const pathCache = new Map();
+  const CUSTOM_HOME_ID = 'home_custom';
+  let customHomeNearest = null;
+  const MEAL_CUSTOM_IDS = {
+    breakfast: 'meal_breakfast',
+    lunch: 'meal_lunch',
+    dinner: 'meal_dinner',
+  };
+  const customMealNearest = new Map();
+
+  /** 把用户填写的校外住址临时接入步行图；每次重排更新，不污染固定 POI 数据。 */
+  function installCustomHome(home) {
+    if (!home || !Number.isFinite(Number(home.lat)) || !Number.isFinite(Number(home.lng))) return null;
+    const lat = Number(home.lat);
+    const lng = Number(home.lng);
+    if (lat < -90 || lat > 90 || lng < -180 || lng > 180) return null;
+    const node = {
+      id: CUSTOM_HOME_ID,
+      name: home.name || home.address || '校外住处',
+      short: '住处',
+      category: 'dorm',
+      icon: '🏠',
+      lat,
+      lng,
+      coord_confidence: 'user',
+      hours: null,
+      offcampus: home.offcampus !== false,
+    };
+    POI_MAP.set(CUSTOM_HOME_ID, node);
+    NODE_MAP.set(CUSTOM_HOME_ID, node);
+    // 清掉上一次接入的所有边，避免换住处后残留
+    for (const [id, edges] of GRAPH) {
+      if (id !== CUSTOM_HOME_ID) {
+        GRAPH.set(id, edges.filter((edge) => edge.id !== CUSTOM_HOME_ID));
+      }
+    }
+    let nearest = null;
+    for (const [id, candidate] of NODE_MAP) {
+      if (id === CUSTOM_HOME_ID) continue;
+      const distance = haversine(node, candidate);
+      if (!nearest || distance < nearest.distance) nearest = { id, node: candidate, distance };
+    }
+    const linkIds = new Set();
+    const links = [];
+    if (nearest && !node.offcampus) {
+      links.push({ id: nearest.id, distance: nearest.distance * 1.12 });
+      linkIds.add(nearest.id);
+      customHomeNearest = { id: nearest.id, node: nearest.node };
+    } else {
+      customHomeNearest = null;
+    }
+    // 校外住处同时接到每个校门，让最短路自己挑总路程最短的门
+    for (const gateId of ['eastgate', 'southgate', 'westgate', 'northgate', 'west1gate', 'north1gate']) {
+      const gate = NODE_MAP.get(gateId);
+      if (!gate || linkIds.has(gateId)) continue;
+      links.push({ id: gateId, distance: haversine(node, gate) * 1.12 });
+      linkIds.add(gateId);
+    }
+    GRAPH.set(CUSTOM_HOME_ID, links);
+    for (const link of links) {
+      const edges = GRAPH.get(link.id) || [];
+      edges.push({ id: CUSTOM_HOME_ID, distance: link.distance });
+      GRAPH.set(link.id, edges);
+    }
+    pathCache.clear();
+    return node;
+  }
+
+  /** 把用户选择的校外用餐点临时接入步行图；早/午/晚各自一个节点。 */
+  function installCustomMeal(meal, place) {
+    const id = MEAL_CUSTOM_IDS[meal];
+    if (!id) return null;
+    if (!place || !Number.isFinite(Number(place.lat)) || !Number.isFinite(Number(place.lng))) return null;
+    const lat = Number(place.lat);
+    const lng = Number(place.lng);
+    if (lat < -90 || lat > 90 || lng < -180 || lng > 180) return null;
+    const node = {
+      id,
+      name: place.name || place.address || '校外用餐地点',
+      short: String(place.name || place.address || '校外用餐').slice(0, 12),
+      category: 'meal',
+      icon: '🍽️',
+      lat,
+      lng,
+      coord_confidence: 'user',
+      hours: null,
+      offcampus: true,
+    };
+    POI_MAP.set(id, node);
+    NODE_MAP.set(id, node);
+    const previous = customMealNearest.get(id);
+    if (previous) {
+      const edges = GRAPH.get(previous.id) || [];
+      GRAPH.set(previous.id, edges.filter((edge) => edge.id !== id));
+    }
+    let nearest = null;
+    for (const [candidateId, candidate] of NODE_MAP) {
+      if (candidateId === id) continue;
+      const distance = haversine(node, candidate);
+      if (!nearest || distance < nearest.distance) nearest = { id: candidateId, node: candidate, distance };
+    }
+    GRAPH.set(id, []);
+    if (nearest) {
+      const distance = nearest.distance * 1.12;
+      GRAPH.get(id).push({ id: nearest.id, distance });
+      GRAPH.get(nearest.id).push({ id, distance });
+      customMealNearest.set(id, { id: nearest.id, node: nearest.node });
+    } else {
+      customMealNearest.delete(id);
+    }
+    pathCache.clear();
+    return node;
+  }
+  const customEventNearest = new Map();
+
+  /** 把待办的固定地点临时接入步行图。 */
+  function installCustomEvent(event, index) {
+    if (!event || !Number.isFinite(Number(event.lat)) || !Number.isFinite(Number(event.lng))) return null;
+    const id = `event_${index}`;
+    const node = {
+      id,
+      name: event.location || event.title || '待办地点',
+      short: String(event.location || '待办').slice(0, 12),
+      category: 'task',
+      icon: '📌',
+      lat: Number(event.lat),
+      lng: Number(event.lng),
+      coord_confidence: 'user',
+      hours: null,
+    };
+    POI_MAP.set(id, node);
+    NODE_MAP.set(id, node);
+    const previous = customEventNearest.get(id);
+    if (previous) {
+      const edges = GRAPH.get(previous.id) || [];
+      GRAPH.set(previous.id, edges.filter((edge) => edge.id !== id));
+    }
+    let nearest = null;
+    for (const [candidateId, candidate] of NODE_MAP) {
+      if (candidateId === id) continue;
+      const distance = haversine(node, candidate);
+      if (!nearest || distance < nearest.distance) nearest = { id: candidateId, node: candidate, distance };
+    }
+    GRAPH.set(id, []);
+    if (nearest) {
+      const distance = nearest.distance * 1.12;
+      GRAPH.get(id).push({ id: nearest.id, distance });
+      GRAPH.get(nearest.id).push({ id, distance });
+      customEventNearest.set(id, { id: nearest.id, node: nearest.node });
+    } else {
+      customEventNearest.delete(id);
+    }
+    pathCache.clear();
+    return node;
+  }
+
+  function applyGateOverrides(gates) {
+    if (!gates || typeof gates !== 'object') return;
+    let changed = false;
+    for (const [id, coords] of Object.entries(gates)) {
+      const poi = POI_MAP.get(id);
+      const node = NODE_MAP.get(id);
+      const lat = Number(coords && coords.lat);
+      const lng = Number(coords && coords.lng);
+      if (!poi || !node || !Number.isFinite(lat) || !Number.isFinite(lng)) continue;
+      poi.lat = lat;
+      poi.lng = lng;
+      node.lat = lat;
+      node.lng = lng;
+      changed = true;
+    }
+    if (changed) pathCache.clear();
+  }
+
   function shortestPath(fromId, toId) {
     if (fromId === toId) {
       const p = NODE_MAP.get(fromId);
       return { nodes: [fromId], points: p ? [{ lat: p.lat, lng: p.lng }] : [], distance: 0 };
     }
-    const key = `${fromId}->${toId}`;
+    const isCampusId = (id) =>
+      !CAMPUS_OUTSIDE_IDS.has(id) &&
+      !String(id).startsWith('event_') &&
+      !String(id).startsWith('meal_') &&
+      id !== 'home_custom';
+    const useCampusGraph = isCampusId(fromId) && isCampusId(toId);
+    const graph = useCampusGraph ? CAMPUS_GRAPH : GRAPH;
+    const key = `${useCampusGraph ? 'campus' : 'full'}:${fromId}->${toId}`;
     if (pathCache.has(key)) return pathCache.get(key);
     const dist = new Map();
     const prev = new Map();
     const visited = new Set();
-    for (const id of GRAPH.keys()) dist.set(id, Infinity);
+    for (const id of graph.keys()) dist.set(id, Infinity);
     dist.set(fromId, 0);
     while (true) {
       let current = null;
@@ -164,7 +352,7 @@
       if (!current || best === Infinity) break;
       if (current === toId) break;
       visited.add(current);
-      for (const edge of GRAPH.get(current) || []) {
+      for (const edge of graph.get(current) || []) {
         const next = best + edge.distance;
         if (next < (dist.get(edge.id) ?? Infinity)) {
           dist.set(edge.id, next);
@@ -689,7 +877,26 @@
     const parts = dateParts(opts.date || new Date());
     const preset = PRESETS.find((item) => item.id === opts.preset) || PRESETS[1];
     const weights = normalizeWeights(opts.weights || preset.weights);
+    const minWalk = opts.minWalk === true || preset.id === 'walk';
     const prefs = normalizePrefs(opts.preferences);
+    const mealPrefs = opts.mealPrefs || {};
+    const takeoutPlaceId = POI_MAP.has(mealPrefs.takeoutPlace) ? mealPrefs.takeoutPlace : 'c11';
+    const gymPref = opts.gym || {};
+    const gymEnabled = Boolean(gymPref.enabled) && (!gymPref.date || gymPref.date === parts.iso);
+    const gymStart = parseTime(gymPref.start || '18:00');
+    const gymMinutes = Math.min(120, Math.max(30, Number(gymPref.minutes) || 60));
+    const sportType = opts.sportType || 'auto';
+    const SPORT_TYPE_LABELS = {
+      run: '跑步',
+      football: '足球',
+      longjump: '跳远',
+      pullup: '引体向上',
+      badminton: '羽毛球',
+      basketball: '篮球',
+      fitness: '健身',
+      walk: '散步',
+    };
+    const sportTypeLabel = SPORT_TYPE_LABELS[sportType] || '';
     if (parts.is_weekend && opts.preferences && opts.preferences.weekend) {
       const weekend = opts.preferences.weekend;
       const weekendWake = parseTime(weekend.wake);
@@ -731,7 +938,12 @@
     warnings.push(...normalized.warnings);
     const classes = normalized.list;
 
-    const dormPoiId = opts.dormPoiId && POI_MAP.has(opts.dormPoiId) ? opts.dormPoiId : 'c11';
+    applyGateOverrides(opts.gateOverrides);
+    const customHome = installCustomHome(opts.home);
+    const mealPlaces = opts.mealPlaces || (opts.mealPlace ? { lunch: opts.mealPlace } : {});
+    for (const [meal, place] of Object.entries(mealPlaces)) installCustomMeal(meal, place);
+    const dormPoiId = customHome ? CUSTOM_HOME_ID : opts.dormPoiId && POI_MAP.has(opts.dormPoiId) ? opts.dormPoiId : 'c11';
+    const isOffCampus = dormPoiId === 'offcampus' || (dormPoiId === CUSTOM_HOME_ID && customHome && customHome.offcampus);
     let startPoiId = dormPoiId;
     if (gps && gps.in_campus && gps.nearest_poi) startPoiId = gps.nearest_poi;
     if (gps && !gps.in_campus) {
@@ -776,23 +988,92 @@
 
     // 早餐：离第一节课最近的那个饭堂
     blocks.push(...classes);
+
+    // 用户固定时段待办：先占住时间，三餐和自习会绕开；冲突则只提醒
+    const eventBlocks = [];
+    (Array.isArray(opts.fixedEvents) ? opts.fixedEvents : []).forEach((event, index) => {
+      const start = parseTime(event.start);
+      const end = parseTime(event.end);
+      if (start === null || end === null || end <= start) return;
+      if (!Number.isFinite(Number(event.lat)) || !Number.isFinite(Number(event.lng))) {
+        warnings.push(`待办「${event.title || '未命名'}」没有定位，未排入`);
+        return;
+      }
+      if (start < wake || end > prefs.sleep) {
+        warnings.push(`待办「${event.title || '未命名'}」超出作息，未排入`);
+        return;
+      }
+      const collision = classes.find((item) => item.start < end && item.end > start);
+      if (collision) {
+        warnings.push(`待办「${event.title || '未命名'}」与「${collision.title}」冲突，未排入`);
+        return;
+      }
+      installCustomEvent(event, index);
+      eventBlocks.push({
+        id: `event-${index}`,
+        type: 'task',
+        title: event.title || '待办',
+        subtitle: event.location || '自选地点',
+        poiId: `event_${index}`,
+        start,
+        end,
+        locked: true,
+        source: '[待办]',
+        reason: `你指定 ${clock(start)}–${clock(end)} 在${event.location || '自选地点'}完成`,
+      });
+    });
+    blocks.push(...eventBlocks);
+
+    function mealChoice(meal, fromPoiId) {
+      const pref = String(mealPrefs[meal] || 'auto');
+      if (pref === 'offcampus') {
+        const poi = POI_MAP.get(MEAL_CUSTOM_IDS[meal]);
+        if (poi) return { poi, takeout: false, offcampus: true, preferred: true };
+        warnings.push('校外用餐地点没有定位，已先按最近饭堂安排');
+        return { poi: nearestPoi(['canteen1', 'canteen2'], fromPoiId), takeout: false, preferred: false };
+      }
+      if (pref === 'takeout') {
+        const placeId = mealPrefs.takeoutPlace === 'home' ? dormPoiId : takeoutPlaceId;
+        return { poi: POI_MAP.get(placeId) || POI_MAP.get('c11'), takeout: true, preferred: true };
+      }
+      if (pref === 'canteen1' || pref === 'canteen2') {
+        return { poi: POI_MAP.get(pref), takeout: false, preferred: true };
+      }
+      return { poi: nearestPoi(['canteen1', 'canteen2'], fromPoiId), takeout: false, preferred: false };
+    }
+
+    function mealTitle(choice, label) {
+      const place = choice.poi ? choice.poi.short : '饭堂';
+      if (choice.offcampus) return `${label} · 校外（${place}）`;
+      return choice.takeout ? `${label} · 外卖（${place}）` : `${label} · ${place}`;
+    }
+
+    function mealReason(choice, fallback) {
+      if (choice.offcampus) return `按你的偏好，去校外${choice.poi ? choice.poi.name : '用餐地点'}用餐`;
+      if (choice.takeout) return `按你的偏好，在${choice.poi ? choice.poi.short : '宿舍'}吃外卖`;
+      if (choice.preferred) return `按你的偏好，去${choice.poi ? choice.poi.short : '饭堂'}`;
+      return fallback;
+    }
+
     let breakfast = null;
     const firstClass = classes[0] || null;
     const morningLimit = firstClass ? Math.min(firstClass.start - 25, 9 * 60) : 10 * 60;
-    const breakfastStart = findSlot(occupiedFrom(blocks), wake + 35, morningLimit, 30);    if (breakfastStart !== null) {
-      const venue = nearestPoi(['canteen1', 'canteen2'], firstClass ? firstClass.poiId : startPoiId);
+    const breakfastStart = findSlot(occupiedFrom(blocks), wake + 35, morningLimit, 30);
+    if (breakfastStart !== null) {
+      const choice = mealChoice('breakfast', firstClass ? firstClass.poiId : startPoiId);
+      const venue = choice.poi;
       breakfast = {
         id: 'breakfast',
         type: 'meal',
         meal: 'breakfast',
-        title: `早餐 · ${venue ? venue.short : '饭堂'}`,
+        title: mealTitle(choice, '早餐'),
         subtitle: venue ? venue.name : null,
         poiId: venue ? venue.id : 'canteen1',
         start: breakfastStart,
         end: breakfastStart + 30,
         locked: false,
-        source: '[偏好]',
-        reason: firstClass ? `第一节课在 ${POI_MAP.get(firstClass.poiId).short}，顺路吃早餐` : '今天没有早课，吃完再安排',
+        source: choice.preferred ? '[用户偏好]' : '[偏好]',
+        reason: mealReason(choice, firstClass ? `第一节课在 ${POI_MAP.get(firstClass.poiId).short}，顺路吃早餐` : '今天没有早课，吃完再安排'),
       };
       blocks.push(breakfast);
     } else {
@@ -801,7 +1082,8 @@
 
     // 午餐：先给上一节课到饭堂留出真实通勤时间，避免饭后与步行块重叠。
     const lunchAnchor = lastClassEndingBefore(classes, 13 * 60 + 20);
-    const lunchVenue = nearestPoi(['canteen1', 'canteen2'], lunchAnchor ? lunchAnchor.poiId : startPoiId);
+    const lunchChoice = mealChoice('lunch', lunchAnchor ? lunchAnchor.poiId : startPoiId);
+    const lunchVenue = lunchChoice.poi;
     const lunchTravel = lunchAnchor && lunchVenue
       ? pathFor(lunchAnchor.poiId, lunchVenue.id, { ...travelOpts, at: lunchAnchor.end }).minutes + 3
       : 12;
@@ -815,14 +1097,14 @@
         id: 'lunch',
         type: 'meal',
         meal: 'lunch',
-        title: `午餐 · ${venue ? venue.short : '饭堂'}`,
+        title: mealTitle(lunchChoice, '午餐'),
         subtitle: venue ? venue.name : null,
         poiId: venue ? venue.id : 'canteen1',
         start: lunchStart,
         end: lunchStart + 40,
         locked: true,
-        source: '[偏好]',
-        reason: `上午最后一节在 ${POI_MAP.get(morning.poiId).short}，就近去${venue ? venue.short : '饭堂'}`,
+        source: lunchChoice.preferred ? '[用户偏好]' : '[偏好]',
+        reason: mealReason(lunchChoice, `上午最后一节在 ${POI_MAP.get(morning.poiId).short}，就近去${venue ? venue.short : '饭堂'}`),
       };
       blocks.push(lunch);
     } else {
@@ -834,7 +1116,8 @@
     const dinnerTo = eveningClass ? Math.min(19 * 60 + 10, eveningClass.start - 20) : 19 * 60 + 10;
     const dinnerAnchor = lastClassEndingBefore(classes, dinnerTo);
     const dinnerAnchorPoi = dinnerAnchor ? dinnerAnchor.poiId : startPoiId;
-    const dinnerVenue = nearestPoi(['canteen1', 'canteen2'], dinnerAnchorPoi);
+    const dinnerChoice = mealChoice('dinner', dinnerAnchorPoi);
+    const dinnerVenue = dinnerChoice.poi;
     const dinnerTravel = dinnerAnchor && dinnerVenue
       ? pathFor(dinnerAnchorPoi, dinnerVenue.id, { ...travelOpts, at: dinnerAnchor.end }).minutes + 3
       : 8;
@@ -847,18 +1130,46 @@
         id: 'dinner',
         type: 'meal',
         meal: 'dinner',
-        title: `晚餐 · ${venue ? venue.short : '饭堂'}`,
+        title: mealTitle(dinnerChoice, '晚餐'),
         subtitle: venue ? venue.name : null,
         poiId: venue ? venue.id : 'canteen2',
         start: dinnerStart,
         end: dinnerStart + 40,
         locked: false,
-        source: '[偏好]',
-        reason: eveningClass ? `晚课在 ${POI_MAP.get(eveningClass.poiId).short}，先吃饭再过去` : '按作息固定晚餐，给晚上留出完整空档',
+        source: dinnerChoice.preferred ? '[用户偏好]' : '[偏好]',
+        reason: mealReason(dinnerChoice, eveningClass ? `晚课在 ${POI_MAP.get(eveningClass.poiId).short}，先吃饭再过去` : '按作息固定晚餐，给晚上留出完整空档'),
       };
       blocks.push(dinner);
     } else {
       warnings.push('晚餐没有找到 40 分钟空档，晚课前可能来不及吃饭');
+    }
+
+    // 健身馆：用户指定日期/时间/时长，作为固定运动块；与课程或三餐冲突时只提醒不硬塞
+    let gymBlock = null;
+    if (gymEnabled && gymStart !== null) {
+      const gymEnd = gymStart + gymMinutes;
+      const collision = blocks.find((b) => b.start < gymEnd && b.end > gymStart);
+      if (gymStart < wake || gymEnd > prefs.sleep) {
+        warnings.push(`健身馆 ${clock(gymStart)}–${clock(gymEnd)} 超出作息，未排入`);
+      } else if (collision) {
+        warnings.push(`健身馆 ${clock(gymStart)}–${clock(gymEnd)} 与「${collision.title}」冲突，未排入`);
+      } else if (!venueOpen('gym', gymStart, gymEnd)) {
+        warnings.push(`健身馆 ${clock(gymStart)}–${clock(gymEnd)} 不在开放时间内，未排入`);
+      } else {
+        gymBlock = {
+          id: 'gym',
+          type: 'sport',
+          title: '健身馆',
+          subtitle: POI_MAP.get('gym').name,
+          poiId: 'gym',
+          start: gymStart,
+          end: gymEnd,
+          locked: true,
+          source: '[用户]',
+          reason: `你指定 ${clock(gymStart)} 去健身馆，${gymMinutes} 分钟`,
+        };
+        blocks.push(gymBlock);
+      }
     }
 
     // 洗澡：必须落在热水时段与门禁之前
@@ -870,21 +1181,21 @@
     }
     showerStart = Math.min(showerStart, 22 * 60 + 40);
     const curfew = parts.is_weekend ? parseTime(CURFEW.weekend) : parseTime(CURFEW.weekday);
-    if (showerStart + 20 > curfew - 5) {
+    if (!isOffCampus && showerStart + 20 > curfew - 5) {
       warnings.push(`洗澡结束会接近门禁 ${clock(curfew)}，请把晚课后的安排再压缩`);
     }
     const showerPoi = POI_MAP.get(dormPoiId);
     const shower = {
       id: 'shower',
       type: 'shower',
-      title: '回宿舍洗澡',
+      title: isOffCampus ? '回住处洗漱' : '回宿舍洗澡',
       subtitle: showerPoi.name,
       poiId: dormPoiId,
       start: showerStart,
       end: showerStart + 20,
       locked: true,
       source: '[开放时间]',
-      reason: `热水 ${HOT_WATER.label}，门禁 ${CURFEW.label}`,
+      reason: isOffCampus ? '校外住宿，按你的作息回住处洗漱' : `热水 ${HOT_WATER.label}，门禁 ${CURFEW.label}`,
     };
     blocks.push(shower);
 
@@ -921,7 +1232,7 @@
     }
 
     // 固定块 = 课程 + 三餐 + 洗澡
-    const fixed = blocks.filter((b) => b.type === 'class' || b.type === 'meal' || b.type === 'shower');
+    const fixed = blocks.filter((b) => b.type === 'class' || b.type === 'meal' || b.type === 'shower' || b.type === 'task' || (b.type === 'sport' && b.locked));
     const flexWindows = [];
     const dayEnd = showerStart;
     const boundaries = fixed
@@ -945,6 +1256,7 @@
     budget.study = Math.min(budget.study, prefs.study_limit);
     budget.sport = Math.min(budget.sport, 100);
     budget.play = Math.min(budget.play, 120);
+    if (gymBlock) budget.sport = 0;
 
     const flexible = [];
     let studyScheduled = 0;
@@ -975,38 +1287,103 @@
       return s.open && e.open;
     }
 
-    function pickStudyVenue(start, end) {
-      for (const id of ['library', 'c11study']) {
-        if (venueOpen(id, start, end)) return id;
+    function pickStudyVenue(start, end, fromPoiId) {
+      const pref = String(opts.studyPref || 'auto');
+      const homeId = startPoiId;
+      if (pref === 'home' && homeId && venueOpen(homeId, start, end)) return homeId;
+      if (['a1', 'a2', 'a3', 'a4', 'a5'].includes(pref) && venueOpen(pref, start, end)) return pref;
+      if (pref === 'library' && venueOpen('library', start, end)) return 'library';
+      const candidates = ['library', 'c11study'].filter((id) => venueOpen(id, start, end));
+      if (!candidates.length) return null;
+      if (minWalk) {
+        const from = fromPoiId || startPoiId;
+        let best = candidates[0];
+        let bestMinutes = Infinity;
+        for (const id of candidates) {
+          const leg = pathFor(from, id, { ...travelOpts, at: start });
+          if (leg.minutes < bestMinutes) {
+            best = id;
+            bestMinutes = leg.minutes;
+          }
+        }
+        return best;
       }
-      return null;
+      return candidates[0];
     }
 
-    function pickSportVenue(start, end) {
+    function poiBefore(at) {
+      const all = blocks
+        .concat(flexible)
+        .filter((b) => b.poiId && b.end <= at + 5)
+        .sort((a, b) => b.end - a.end);
+      return all.length ? all[0].poiId : startPoiId;
+    }
+
+    function pickSportVenue(start, end, fromPoiId) {
+      const gymOnly = sportType === 'badminton' || sportType === 'fitness';
+      const fieldType = ['run', 'football', 'longjump', 'pullup', 'basketball', 'walk'].includes(sportType);
+      const pref = opts.sportPref && opts.sportPref !== 'auto' ? opts.sportPref : null;
+      if (pref && ['field_life', 'field', 'gym'].includes(pref) && venueOpen(pref, start, end)) {
+        const compatible = gymOnly ? pref === 'gym' : fieldType ? pref !== 'gym' : true;
+        const outdoorAllowed = !weather.sport_indoor || (weather.is_hot && !weather.is_wet && start >= 19 * 60 + 30);
+        if (compatible && (pref === 'gym' || outdoorAllowed)) return pref;
+      }
       let order;
-      if (weather.sport_indoor) {
+      if (gymOnly) {
+        order = ['gym'];
+      } else if (fieldType) {
+        order = ['field_life', 'field', 'gym'];
+      } else if (weather.sport_indoor) {
         // 高温天日落后允许回田径场；其余坏天气只去室内
-        order = weather.is_hot && !weather.is_wet && start >= 19 * 60 + 30 ? ['field', 'gym'] : ['gym'];
+        order = weather.is_hot && !weather.is_wet && start >= 19 * 60 + 30
+          ? ['field_life', 'field', 'gym']
+          : ['gym'];
       } else {
-        order = ['field', 'gym'];
+        order = ['field_life', 'field', 'gym'];
       }
+      if (pref && order.includes(pref)) order = [pref, ...order.filter((id) => id !== pref)];
+      const from = fromPoiId || startPoiId;
+      let best = null;
       for (const id of order) {
-        if (venueOpen(id, start, end)) return id;
+        if (!venueOpen(id, start, end)) continue;
+        if (!gymOnly && !weather.sport_indoor && id === 'gym' && (venueOpen('field_life', start, end) || venueOpen('field', start, end))) {
+          continue;
+        }
+        const toVenue = pathFor(from, id, { ...travelOpts, at: start });
+        const fromHome = pathFor(startPoiId, id, { ...travelOpts, at: start });
+        const dinner = nearestPoi(['canteen1', 'canteen2'], id);
+        const after = dinner ? pathFor(id, dinner.id, { ...travelOpts, at: end }).minutes : 0;
+        const score = minWalk
+          ? (toVenue.uncertain ? 999 : toVenue.minutes) * 1.4 + after * 0.4
+          : (toVenue.uncertain ? 999 : toVenue.minutes) * 0.35 + after * 0.2 + (fromHome.uncertain ? 0 : fromHome.minutes) * 0.75;
+        if (!best || score < best.score) best = { id, score };
       }
-      return null;
+      return best ? best.id : null;
     }
 
-    function pickPlayVenue(start, end) {
+    function pickPlayVenue(start, end, fromPoiId) {
       const indoor = weather.play_indoor || (weather.is_hot && start < 18 * 60);
       const order = indoor
         ? ['cafe', 'c11study', 'library']
         : start >= 19 * 60
         ? ['cafe', 'lake']
         : ['lake', 'cafe'];
-      for (const id of order) {
-        if (venueOpen(id, start, end)) return id;
+      const open = order.filter((id) => venueOpen(id, start, end));
+      if (!open.length) return null;
+      if (minWalk) {
+        const from = fromPoiId || startPoiId;
+        let best = open[0];
+        let bestMinutes = Infinity;
+        for (const id of open) {
+          const leg = pathFor(from, id, { ...travelOpts, at: start });
+          if (leg.minutes < bestMinutes) {
+            best = id;
+            bestMinutes = leg.minutes;
+          }
+        }
+        return best;
       }
-      return null;
+      return open[0];
     }
 
     function pushBlock(type, venueId, start, end, reason) {
@@ -1032,7 +1409,7 @@
       let left = Math.min(desire, budget.study);
       let at = windowStart;
       while (left >= 20 && at + 20 <= limit) {
-        const venue = pickStudyVenue(at, Math.min(limit, at + Math.min(left, prefs.max_continuous)));
+        const venue = pickStudyVenue(at, Math.min(limit, at + Math.min(left, prefs.max_continuous)), poiBefore(at));
         if (!venue) {
           warnings.push(`${clock(at)} 附近图书馆与尚学空间都未开放，这一段没有排自习`);
           return;
@@ -1067,13 +1444,13 @@
       if (budget.sport < 25) return null;
       const want = Math.min(budget.sport, 70, limit - windowStart, Math.round(30 + 45 * weights.sport));
       if (want < 25) return null;
-      const venue = pickSportVenue(windowStart, windowStart + want);
+      const venue = pickSportVenue(windowStart, windowStart + want, poiBefore(windowStart));
       if (!venue) {
         warnings.push(`${label}因天气或体育馆闭馆取消，未硬排露天运动`);
         return null;
       }
       const weatherNote = weather.is_wet ? '，雨天改室内' : weather.is_hot ? '，高温改室内/避晒' : weather.is_polluted ? '，污染天改室内' : '';
-      const block = pushBlock('sport', venue, windowStart, windowStart + want, `${label}；运动权重 ${Math.round(weights.sport * 100)}%，留 ${want} 分钟${weatherNote}`);
+      const block = pushBlock('sport', venue, windowStart, windowStart + want, `${label}${sportTypeLabel ? ` · ${sportTypeLabel}` : ''}；运动权重 ${Math.round(weights.sport * 100)}%，留 ${want} 分钟${weatherNote}`);
       if (block) budget.sport -= want;
       return block;
     }
@@ -1082,7 +1459,7 @@
       if (budget.play < 25) return null;
       const want = Math.min(budget.play, 55, limit - windowStart);
       if (want < 25) return null;
-      const venue = pickPlayVenue(windowStart, windowStart + want);
+      const venue = pickPlayVenue(windowStart, windowStart + want, poiBefore(windowStart));
       if (!venue) {
         warnings.push(`${label}因天气没有合适的室内去处，这一段留空`);
         return null;
@@ -1108,7 +1485,7 @@
       }
 
       if (hour < 14.05) {
-        if (end - at >= 25) {
+        if (opts.nap !== false && end - at >= 25) {
           pushBlock('rest', lunch ? lunch.poiId : startPoiId, at, at + 20, '午饭后坐一会儿，给下午留缓冲');
           at += 25;
         }
