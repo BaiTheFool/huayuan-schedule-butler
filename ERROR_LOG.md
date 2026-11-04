@@ -205,6 +205,13 @@
 - 验证：`node golden-path\check-dashboard-reuse.js` 通过 11/11；二次启动为 `refresh-existing` 且 PID 不变；Windows Terminal 数量保持 `0 -> 0`；源码和运行链路均不再出现 `schtasks.exe`。
 - 预防规则：常驻服务的启动方式不得成为业务前置依赖；平台安全策略可能禁用 `schtasks.exe`、WMI、PowerShell 或脚本宿主，启动器应优先使用 Node 自身可跨命令存活的脱离进程能力，并为“服务未启动”返回可恢复错误而不是要求用户永久放宽系统安全策略。
 
+### #29 · 2026-11-04 · 缓存版本参数导致路线页样式和地图资源加载错位（0.16.2）
+- 现象：驾驶舱首页顶部出现裸文字“华”，标题、日期与按钮纵向堆叠，日期输入框只显示“年/月/日”，校园地图无法加载，后续卡片也退回浏览器默认样式。
+- 根因：路线页已把 `styles.css`、`app.js`、校园数据和路线脚本升级为带 `?v=` 的缓存版本地址，但 `dashboard-server.js` 仍只替换不带参数的 `styles.css` / `app.js`。请求因此落到驾驶舱根目录的旧全局样式和应用脚本；Leaflet 的 `vendor/` 相对路径也未改写，地图库直接 404。
+- 解决：驾驶舱模板渲染改为正则改写带任意查询参数的 `styles.css` / `app.js`，并将 `vendor/leaflet.css`、`vendor/leaflet.js` 映射到 `/route-assets/vendor/`；路线页缓存版本同步升级到 `20261104d`。
+- 验证：`node skills\huayuan-live-dashboard\test\smoke.js` 通过 94/94，新增样式、交互脚本和 Leaflet 三个资源路径断言；`node golden-path\check-dashboard-reuse.js` 通过 11/11；真实 Chromium 截图确认页头横向排列、日期完整显示且地图恢复。
+- 预防规则：模板挂载子应用时不能依赖不带查询参数的精确字符串替换；所有 `href` / `src` 重写都要覆盖缓存参数和嵌套静态目录，并至少用一个真实浏览器截图验证布局，而不只检查 HTTP 200。
+
 ---
 
 ## 运行时错误日志（logs/errors.jsonl）使用说明
