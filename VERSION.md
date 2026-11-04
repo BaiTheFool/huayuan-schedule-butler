@@ -1,4 +1,6 @@
-VERSION=0.15.0
+VERSION=0.16.0
+
+### 0.16.0 · 2026-11-04 · feat: campus route v2 - OSRM road geometry, six gates, low-walking preset, C-area dorm routing, custom home
 
 ### 0.15.0 · 2026-10-31 · feat: campus route on AMap standard map with OSM walking paths; fix Edge login fallback
 
