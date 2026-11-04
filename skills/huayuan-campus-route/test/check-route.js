@@ -240,6 +240,33 @@ check('卷王画像的自习时间多于玩咖，运动画像的运动时间多�
   assert.ok(play.summary.play_minutes > grind.summary.play_minutes, '玩咖放松没有更多');
 });
 
+check('自习地点可以指定 A2 或住处', () => {
+  const a2 = R.planDay({ date: '2026-10-29', studyPref: 'a2' });
+  const a2Study = a2.blocks.find((b) => b.type === 'study');
+  assert.ok(a2Study);
+  assert.strictEqual(a2Study.poi_id, 'a2');
+  const home = R.planDay({ date: '2026-10-29', studyPref: 'home' });
+  const homeStudy = home.blocks.find((b) => b.type === 'study');
+  assert.ok(homeStudy);
+  assert.strictEqual(homeStudy.poi_id, 'c11');
+});
+
+check('C8-C17 宿舍先经 C11 再进校园', () => {
+  const plan = R.planDay({ date: '2026-11-02', dormPoiId: 'c12' });
+  assert.strictEqual(plan.stops[0].poiId, 'c12');
+  const c11 = plan.route.points.find((point) => Math.abs(point.lat - 23.05093) < 1e-6 && Math.abs(point.lng - 113.40064) < 1e-6);
+  assert.ok(c11, 'expected route through C11');
+});
+
+check('少走路预设存在并生成完整路线', () => {
+  const walk = R.planDay({ date: '2026-10-29', preset: 'walk' });
+  assert.strictEqual(walk.meta.preset_name, '少走路');
+  assert.ok(walk.summary.walk_minutes > 0);
+  assert.ok(walk.route.points.length > 1);
+  const balanced = R.planDay({ date: '2026-11-02', preset: 'balanced' });
+  assert.ok(walk.summary.walk_minutes <= balanced.summary.walk_minutes, '少走路没有减少步行');
+});
+
 check('周六没有课，仍会排自习、运动和放松', () => {
   const weekend = R.planDay({ date: '2026-10-31', preset: 'balanced' });
   assert.strictEqual(weekend.blocks.filter((b) => b.type === 'class').length, 0);
@@ -415,6 +442,154 @@ check('17:20 下课的晚餐会留出通勤，不产生重叠', () => {
   const dinner = plan.blocks.find((b) => b.type === 'meal' && b.title.includes('晚餐'));
   assert.ok(dinner.start_min >= 17 * 60 + 25);
   assert.strictEqual(plan.validation.ok, true);
+});
+
+check('运动场地偏好会选生活区田径场', () => {
+  const plan = R.planDay({
+    date: '2026-11-02',
+    preset: 'sport',
+    sportPref: 'field_life',
+    timetable: { campus: { key: 'university_town', label: '大学城校区' }, courses: [] },
+  });
+  assert.ok(plan.blocks.some((b) => b.type === 'sport' && b.poi_id === 'field_life'));
+});
+
+check('午餐可指定二饭，晚餐可选外卖并在宿舍吃', () => {
+  const plan = R.planDay({
+    date: '2026-11-02',
+    mealPrefs: { lunch: 'canteen2', dinner: 'takeout', takeoutPlace: 'c11' },
+    timetable: { campus: { key: 'university_town', label: '大学城校区' }, courses: [] },
+  });
+  const lunch = plan.blocks.find((b) => b.type === 'meal' && b.title.includes('午餐'));
+  const dinner = plan.blocks.find((b) => b.type === 'meal' && b.title.includes('晚餐'));
+  assert.strictEqual(lunch.poi_id, 'canteen2');
+  assert.ok(dinner.title.includes('外卖'));
+  assert.strictEqual(dinner.poi_id, 'c11');
+});
+
+check('勾选健身馆后会插入固定运动块，且不再重复排运动', () => {
+  const plan = R.planDay({
+    date: '2026-11-02',
+    gym: { enabled: true, date: '2026-11-02', start: '19:00', minutes: 60 },
+    timetable: { campus: { key: 'university_town', label: '大学城校区' }, courses: [] },
+  });
+  const gym = plan.blocks.find((b) => b.type === 'sport' && b.title === '健身馆');
+  assert.ok(gym);
+  assert.strictEqual(gym.start, '19:00');
+  assert.strictEqual(plan.blocks.filter((b) => b.type === 'sport').length, 1);
+});
+
+check('校外住宿会改变起床、洗漱和睡觉地点', () => {
+  const plan = R.planDay({
+    date: '2026-11-02',
+    dormPoiId: 'offcampus',
+    timetable: { campus: { key: 'university_town', label: '大学城校区' }, courses: [] },
+  });
+  assert.strictEqual(plan.blocks.find((b) => b.type === 'wake').poi_id, 'offcampus');
+  assert.ok(plan.blocks.find((b) => b.type === 'shower').title.includes('住处'));
+  assert.strictEqual(plan.blocks.find((b) => b.type === 'sleep').poi_id, 'offcampus');
+});
+
+check('羽毛球偏好会安排到体育馆', () => {
+  const plan = R.planDay({
+    date: '2026-11-02',
+    preset: 'sport',
+    sportType: 'badminton',
+    timetable: { campus: { key: 'university_town', label: '大学城校区' }, courses: [] },
+  });
+  assert.strictEqual(plan.blocks.find((b) => b.type === 'sport').poi_id, 'gym');
+});
+
+check('跑步偏好会安排到田径场而不是体育馆', () => {
+  const plan = R.planDay({
+    date: '2026-11-02',
+    preset: 'sport',
+    sportType: 'run',
+    timetable: { campus: { key: 'university_town', label: '大学城校区' }, courses: [] },
+  });
+  const sport = plan.blocks.find((b) => b.type === 'sport');
+  assert.ok(['field', 'field_life'].includes(sport.poi_id));
+});
+
+check('自定义校外地址会重算起终点路线', () => {
+  const plan = R.planDay({
+    date: '2026-11-02',
+    home: { lat: 23.0432, lng: 113.4011, address: '校外测试住处' },
+    timetable: { campus: { key: 'university_town', label: '大学城校区' }, courses: [] },
+  });
+  assert.strictEqual(plan.blocks.find((b) => b.type === 'wake').poi_id, 'home_custom');
+  assert.strictEqual(plan.blocks.find((b) => b.type === 'sleep').poi_id, 'home_custom');
+  assert.ok(plan.route.points.length > 2);
+});
+
+check('校内自定义宿舍仍按宿舍热水和门禁安排', () => {
+  const plan = R.planDay({
+    date: '2026-11-02',
+    home: { lat: 23.0521, lng: 113.4017, address: 'E1 学生宿舍', offcampus: false },
+    timetable: { campus: { key: 'university_town', label: '大学城校区' }, courses: [] },
+  });
+  assert.strictEqual(plan.blocks.find((b) => b.type === 'wake').poi_id, 'home_custom');
+  assert.ok(plan.blocks.find((b) => b.type === 'shower').title.includes('宿舍'));
+});
+
+check('校外住处会选总路程最短的校门', () => {
+  const plan = R.planDay({
+    date: '2026-11-02',
+    dormPoiId: 'custom_home',
+    home: { id: 'north-test', address: '北门附近', lat: 23.0545, lng: 113.402, offcampus: true },
+    timetable: { campus: { key: 'university_town', label: '大学城校区' }, courses: [] },
+  });
+  const gatePoint = plan.route.points.find((point) => Math.abs(point.lat - 23.05323) < 1e-6 && Math.abs(point.lng - 113.40319) < 1e-6);
+  assert.ok(gatePoint, 'expected route through north-1 gate');
+});
+
+check('校外住宿选外卖时默认在住处吃，不送回宿舍', () => {
+  const plan = R.planDay({
+    date: '2026-11-02',
+    home: { lat: 23.05146, lng: 113.41378, address: '穗石牌坊', offcampus: true },
+    mealPrefs: { dinner: 'takeout', takeoutPlace: 'home' },
+    timetable: { campus: { key: 'university_town', label: '大学城校区' }, courses: [] },
+  });
+  const dinner = plan.blocks.find((b) => b.type === 'meal' && b.title.includes('晚餐'));
+  assert.ok(dinner.title.includes('外卖'));
+  assert.strictEqual(dinner.poi_id, 'home_custom');
+});
+
+check('午餐可选校外具体地点并接入路线', () => {
+  const plan = R.planDay({
+    date: '2026-11-02',
+    mealPrefs: { lunch: 'offcampus' },
+    mealPlace: { lat: 23.05146, lng: 113.41378, address: '穗石牌坊（东门外）' },
+    timetable: { campus: { key: 'university_town', label: '大学城校区' }, courses: [] },
+  });
+  const lunch = plan.blocks.find((b) => b.type === 'meal' && b.title.includes('午餐'));
+  assert.ok(lunch.title.includes('校外'));
+  assert.strictEqual(lunch.poi_id, 'meal_lunch');
+});
+
+check('六个校门坐标齐全，东门按用户坐标', () => {
+  const gates = DATA.POIS.filter((poi) => poi.category === 'gate' && poi.id !== 'suishi');
+  const ids = gates.map((poi) => poi.id);
+  for (const id of ['eastgate', 'southgate', 'westgate', 'northgate', 'west1gate', 'north1gate']) {
+    assert.ok(ids.includes(id), `missing gate ${id}`);
+  }
+  const east = gates.find((poi) => poi.id === 'eastgate');
+  assert.ok(Math.abs(east.lat - 23.04726) < 1e-6);
+  assert.ok(Math.abs(east.lng - 113.40868) < 1e-6);
+  assert.ok(east.access.includes('开放'));
+});
+
+check('固定时段待办会插入时间轴并在指定地点', () => {
+  const plan = R.planDay({
+    date: '2026-11-02',
+    fixedEvents: [{ title: '小组会议', start: '09:00', end: '10:00', location: '图书馆', lat: 23.046927, lng: 113.405395 }],
+    timetable: { campus: { key: 'university_town', label: '大学城校区' }, courses: [] },
+  });
+  const task = plan.blocks.find((b) => b.type === 'task');
+  assert.ok(task);
+  assert.strictEqual(task.title, '小组会议');
+  assert.strictEqual(task.start, '09:00');
+  assert.strictEqual(task.poi_id, 'event_0');
 });
 
 check('Markdown 导出包含日期、时间轴、热水与依据', () => {

@@ -174,6 +174,14 @@
       source: 'manual',
       notes: raw.notes ? String(raw.notes).slice(0, 300) : null,
       done: Boolean(raw.done),
+      date: raw.date ? String(raw.date).slice(0, 10) : null,
+      start: raw.start ? String(raw.start).slice(0, 5) : null,
+      end: raw.end ? String(raw.end).slice(0, 5) : null,
+      repeat: ['once', 'weekly', 'daily'].includes(raw.repeat) ? raw.repeat : 'once',
+      weekday: Number.isFinite(Number(raw.weekday)) ? Number(raw.weekday) : null,
+      location: raw.location ? String(raw.location).slice(0, 80) : null,
+      lat: Number.isFinite(Number(raw.lat)) ? Number(raw.lat) : null,
+      lng: Number.isFinite(Number(raw.lng)) ? Number(raw.lng) : null,
     };
   }
 

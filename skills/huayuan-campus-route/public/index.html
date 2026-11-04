@@ -6,7 +6,7 @@
   <title>华园一日 · 大学城校园路线</title>
   <meta name="description" content="按课表、食堂、图书馆和宿舍热水时间，生成华南理工大学大学城校区的一日步行路线。" />
   <link rel="stylesheet" href="vendor/leaflet.css" />
-  <link rel="stylesheet" href="styles.css" />
+  <link rel="stylesheet" href="styles.css?v=20261104c" />
   <script>
     window.addEventListener('error', function (event) {
       var box = document.getElementById('jsError');
@@ -33,6 +33,8 @@
           <span class="dot"></span>
           <input id="dateInput" type="date" value="" aria-label="选择日期" />
           <span id="topDate">周四</span>
+          <button type="button" class="link-btn date-jump" id="todayBtn">今天</button>
+          <button type="button" class="link-btn date-jump" id="tomorrowBtn">明天</button>
         </div>
         <button class="btn ghost" id="exportBtn" type="button">导出 Markdown</button>
         <button class="btn ghost" id="printBtn" type="button">打印</button>
@@ -85,8 +87,152 @@
               <button type="button" class="mini-btn" id="useLocationBtn">设为起点</button>
             </div>
             <div class="location-results" id="locationResults" role="listbox" hidden></div>
-            <div class="location-selected" id="locationSelected">未选择楼栋 · 可搜索 82 个校园地点；也可使用设备定位</div>
+            <div class="location-selected" id="locationSelected">未选择楼栋 · 可搜索 84 个校园地点；也可使用设备定位</div>
           </div>
+
+          <details class="prefs-card" id="prefsCard">
+            <summary>三餐 · 健身 · 住宿偏好</summary>
+            <div class="prefs-body">
+              <div class="pref-row">
+                <span>早餐</span>
+                <select id="mealBreakfast" aria-label="早餐偏好">
+                  <option value="auto">自动就近</option>
+                  <option value="canteen1">一饭</option>
+                  <option value="canteen2">二饭</option>
+                  <option value="takeout">外卖</option>
+                  <option value="offcampus">校外地点</option>
+                </select>
+              </div>
+              <div class="pref-row">
+                <span>午餐</span>
+                <select id="mealLunch" aria-label="午餐偏好">
+                  <option value="auto">自动就近</option>
+                  <option value="canteen1">一饭</option>
+                  <option value="canteen2">二饭</option>
+                  <option value="takeout">外卖</option>
+                  <option value="offcampus">校外地点</option>
+                </select>
+              </div>
+              <div class="pref-row">
+                <span>晚餐</span>
+                <select id="mealDinner" aria-label="晚餐偏好">
+                  <option value="auto">自动就近</option>
+                  <option value="canteen1">一饭</option>
+                  <option value="canteen2">二饭</option>
+                  <option value="takeout">外卖</option>
+                  <option value="offcampus">校外地点</option>
+                </select>
+              </div>
+              <div class="pref-row">
+                <span>外卖地点</span>
+                <select id="takeoutPlace" aria-label="外卖用餐地点">
+                  <option value="home">住处（跟住宿）</option>
+                  <option value="c11">C11 宿舍</option>
+                  <option value="c11study">C11 尚学空间</option>
+                  <option value="library">图书馆</option>
+                  <option value="canteen1">一饭</option>
+                  <option value="canteen2">二饭</option>
+                </select>
+              </div>
+              <div class="home-fields" id="mealPlaceFields" hidden>
+                <div class="pref-row">
+                  <span>设置哪一餐</span>
+                  <select id="mealPlaceMeal" aria-label="选择要设置的餐次">
+                    <option value="breakfast">早餐</option>
+                    <option value="lunch">午餐</option>
+                    <option value="dinner">晚餐</option>
+                  </select>
+                </div>
+                <div class="pref-row">
+                  <span>校外用餐地点</span>
+                  <input id="mealPlaceAddress" type="text" maxlength="80" placeholder="如：穗石牌坊 / 大学城南地铁站" />
+                </div>
+                <div class="home-actions">
+                  <button type="button" class="mini-btn" id="geocodeMealBtn">按地址定位</button>
+                  <button type="button" class="link-btn" id="pickMealOnMapBtn">在地图上选点</button>
+                  <span class="home-coord" id="mealPlaceCoord">未定位</span>
+                </div>
+                <p class="pref-hint" id="mealPlaceHint">三餐任选“校外地点”后，这里填堂食地点；路线会把它作为一顿饭的停靠点。</p>
+              </div>
+              <div class="pref-row">
+                <span>喜欢的运动</span>
+                <select id="sportType" aria-label="喜欢的运动">
+                  <option value="auto">自动（按最近田径场）</option>
+                  <option value="run">跑步</option>
+                  <option value="football">足球</option>
+                  <option value="longjump">跳远</option>
+                  <option value="pullup">引体向上</option>
+                  <option value="badminton">羽毛球（体育馆）</option>
+                  <option value="basketball">篮球（生活区球场）</option>
+                  <option value="fitness">健身（体育馆）</option>
+                  <option value="walk">散步</option>
+                </select>
+              </div>
+              <div class="pref-row">
+                <span>自习地点</span>
+                <select id="studyPref" aria-label="自习地点偏好">
+                  <option value="auto">自动（图书馆优先）</option>
+                  <option value="library">图书馆</option>
+                  <option value="a1">A1 教学楼</option>
+                  <option value="a2">A2 教学楼</option>
+                  <option value="a3">A3 教学楼</option>
+                  <option value="a4">A4 教学楼</option>
+                  <option value="a5">A5 教学楼</option>
+                  <option value="home">自己的住处</option>
+                </select>
+              </div>
+              <div class="pref-row">
+                <span>运动场地</span>
+                <select id="sportPref" aria-label="运动场地偏好">
+                  <option value="auto">自动选最近</option>
+                  <option value="field_life">生活区田径场</option>
+                  <option value="field">南侧田径场</option>
+                  <option value="gym">体育馆</option>
+                </select>
+              </div>
+              <div class="pref-divider"></div>
+              <label class="pref-check">
+                <input type="checkbox" id="gymEnabled" />
+                <span>去健身馆（体育馆内）</span>
+              </label>
+              <div class="gym-fields">
+                <input type="date" id="gymDate" aria-label="健身日期" />
+                <input type="time" id="gymStart" value="19:00" step="300" aria-label="健身开始时间" />
+                <select id="gymMinutes" aria-label="健身时长">
+                  <option value="45">45 分钟</option>
+                  <option value="60" selected>60 分钟</option>
+                  <option value="90">90 分钟</option>
+                  <option value="120">120 分钟</option>
+                </select>
+              </div>
+              <div class="pref-divider"></div>
+              <label class="pref-check">
+                <input type="checkbox" id="napEnabled" checked />
+                <span>午饭后午休 20 分钟</span>
+              </label>
+              <div class="pref-divider"></div>
+              <div class="pref-row">
+                <span>住宿 / 休息</span>
+                <select id="homeSelect" aria-label="住宿地点">
+                  <option value="c11">校内 C11 宿舍</option>
+                  <option value="offcampus">校外住处（可填地址）</option>
+                </select>
+              </div>
+              <div class="home-fields" id="homeFields" hidden>
+                <div class="pref-row">
+                  <span>校外地址</span>
+                  <input id="homeAddress" type="text" maxlength="80" placeholder="如：大学城南地铁站 / 穗石村" />
+                </div>
+                <div class="home-actions">
+                  <button type="button" class="mini-btn" id="geocodeHomeBtn">按地址定位</button>
+                  <button type="button" class="link-btn" id="pickHomeOnMapBtn">在地图上选点</button>
+                  <span class="home-coord" id="homeCoord">未定位</span>
+                </div>
+                <p class="pref-hint" id="homeHint">地址会先尝试用 OpenStreetMap 搜索；找不到时点“在地图上选点”，路线按坐标重算。</p>
+              </div>
+              <p class="pref-hint" id="prefsHint">默认住 C11；校外住宿时填写地址或在地图上选点。</p>
+            </div>
+          </details>
 
           <div class="field">
             <span class="label">今天的人格</span>
@@ -95,6 +241,7 @@
               <button type="button" data-preset="balanced" class="active"><span>⚖️</span>均衡</button>
               <button type="button" data-preset="play"><span>🎈</span>玩咖</button>
               <button type="button" data-preset="sport"><span>🏃</span>运动</button>
+              <button type="button" data-preset="walk"><span>🚶</span>少走路</button>
             </div>
           </div>
 
@@ -169,16 +316,36 @@
             <div class="exam-list" id="examList"></div>
 
             <div class="todo-form">
-              <input id="todoTitle" type="text" maxlength="100" placeholder="手动加待办：交实验报告" aria-label="待办标题" />
+              <input id="todoTitle" type="text" maxlength="100" placeholder="手动加待办：交实验报告 / 小组会议" aria-label="待办标题" />
               <div class="todo-row">
-                <input id="todoDate" type="date" aria-label="截止日期" />
-                <input id="todoMinutes" type="number" min="10" max="480" step="10" value="60" aria-label="预计分钟" />
+                <input id="todoDate" type="date" aria-label="日期" />
+                <input id="todoStart" type="time" value="09:00" aria-label="开始时间" />
+                <input id="todoEnd" type="time" value="10:00" aria-label="结束时间" />
+                <select id="todoRepeat" aria-label="重复方式">
+                  <option value="once">一次</option>
+                  <option value="weekly">每周几</option>
+                  <option value="daily">每天</option>
+                </select>
+                <select id="todoWeekday" aria-label="星期几" hidden>
+                  <option value="1">周一</option>
+                  <option value="2">周二</option>
+                  <option value="3">周三</option>
+                  <option value="4">周四</option>
+                  <option value="5">周五</option>
+                  <option value="6">周六</option>
+                  <option value="7">周日</option>
+                </select>
                 <select id="todoPriority" aria-label="优先级">
                   <option value="P1">P1</option>
                   <option value="P2" selected>P2</option>
                   <option value="P0">P0</option>
                   <option value="P3">P3</option>
                 </select>
+              </div>
+              <div class="todo-row">
+                <input id="todoLocation" type="text" maxlength="80" placeholder="在哪里：图书馆 / 一饭 / 自选地点" aria-label="待办地点" />
+                <button type="button" class="link-btn" id="pickTodoOnMapBtn">地图选点</button>
+                <span class="home-coord" id="todoCoord">未定位</span>
                 <button type="button" class="mini-btn" id="addTodoBtn">添加</button>
               </div>
             </div>
@@ -204,6 +371,11 @@
             <span>底图 © 高德地图（联网加载）；校园点位与路线为规划示意</span>
           </div>
           <div class="map-head-right">
+            <button type="button" class="link-btn" id="pickEastGateBtn" hidden>📍 定位东门</button>
+            <button type="button" class="link-btn" id="resetEastGateBtn" hidden>恢复默认东门</button>
+            <button type="button" class="link-btn" id="traceRouteBtn" hidden>✏️ 录入路线</button>
+            <button type="button" class="link-btn" id="finishTraceBtn" hidden>完成录入</button>
+            <button type="button" class="link-btn" id="clearTraceBtn" hidden>清除路线</button>
             <span class="weather-badge" id="weatherBadge">☁️ 多云 26°C</span>
             <div class="legend">
               <span><i style="--c:#3f6ad8"></i>课程</span>
@@ -255,11 +427,11 @@
   <noscript>这个页面需要 JavaScript 才能生成路线。</noscript>
 
   <script src="vendor/leaflet.js"></script>
-  <script src="../data/campus-data.js"></script>
+  <script src="../data/campus-data.js?v=20261104c"></script>
   <script src="../data/exam-catalog.js"></script>
-  <script src="../scripts/route-engine.js"></script>
+  <script src="../scripts/route-engine.js?v=20261104c"></script>
   <script src="../scripts/timetable-import.js"></script>
   <script src="../scripts/task-planner.js"></script>
-  <script src="app.js"></script>
+  <script src="app.js?v=20261104c"></script>
 </body>
 </html>
