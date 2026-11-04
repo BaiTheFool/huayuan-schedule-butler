@@ -11,6 +11,7 @@ const NOW_SCRIPT = path.join(ROOT, 'skills', 'huayuan-browser-session', 'scripts
 const LAUNCH_SCRIPT = path.join(ROOT, 'skills', 'huayuan-live-dashboard', 'scripts', 'launch-dashboard.js');
 const TIMETABLE = path.join(ROOT, 'skills', 'huayuan-campus-route', 'test', 'fixtures', 'jw-university-town.json');
 const PREFERENCES = path.join(ROOT, 'golden-path', 'fixtures', 'preferences.json');
+const LAUNCH_SOURCE = fs.readFileSync(LAUNCH_SCRIPT, 'utf8');
 
 const work = fs.mkdtempSync(path.join(os.tmpdir(), 'huayuan-dashboard-reuse-'));
 const home = path.join(work, 'home');
@@ -92,10 +93,12 @@ async function shutdown(state) {
 
     const terminalsBefore = windowsTerminalCount();
     const launchArgs = ['--now', path.join(output, 'now.json'), '--no-open'];
+    check('驾驶舱启动不再依赖 schtasks 计划任务', !LAUNCH_SOURCE.includes('schtasks.exe'));
     const first = runNode(LAUNCH_SCRIPT, launchArgs, env);
     state = JSON.parse(fs.readFileSync(path.join(home, 'live-dashboard.json'), 'utf8'));
     const firstPid = field(first, 'LIVE_DASHBOARD_PID');
     check('首次启动创建独立驻留服务', field(first, 'LIVE_DASHBOARD_ACTION') === 'started' && Boolean(firstPid), firstPid);
+    check('Windows 使用无窗口脱离进程启动', field(first, 'LIVE_DASHBOARD_LAUNCH_MODE') === 'detached-node');
     check('驾驶舱使用稳定 now 快照', path.resolve(state.nowPath) === path.resolve(path.join(home, 'live-now.json')));
 
     const second = runNode(LAUNCH_SCRIPT, launchArgs, env);

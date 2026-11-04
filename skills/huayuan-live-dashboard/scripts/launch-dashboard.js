@@ -3,7 +3,7 @@
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
-const { spawn, spawnSync } = require('child_process');
+const { spawn } = require('child_process');
 
 const DEFAULT_PORT = 4318;
 const MAX_PORT = 4338;
@@ -147,11 +147,12 @@ async function verifyDashboardPage(port) {
   }
 }
 
-async function reportReady(port, alreadyOpen, action, pid) {
+async function reportReady(port, alreadyOpen, action, pid, launchMode = null) {
   const verified = await verifyDashboardPage(port);
   console.log(`LIVE_DASHBOARD_ALREADY_OPEN:${alreadyOpen ? '1' : '0'}`);
   console.log(`LIVE_DASHBOARD_ACTION:${action}`);
   if (pid) console.log(`LIVE_DASHBOARD_PID:${pid}`);
+  if (launchMode) console.log(`LIVE_DASHBOARD_LAUNCH_MODE:${launchMode}`);
   console.log('LIVE_DASHBOARD_OPEN_REQUIRED:1');
   console.log('LIVE_DASHBOARD_VERIFIED:1');
   console.log('LIVE_DASHBOARD_PREVIEW_TOOL:preview_url');
@@ -161,60 +162,16 @@ async function reportReady(port, alreadyOpen, action, pid) {
 }
 
 function startPersistentServer(serverArgs, cwd) {
-  if (process.platform === 'win32') {
-    const runtimeDir = path.join(stateDir, 'runtime');
-    fs.mkdirSync(runtimeDir, { recursive: true });
-    const scriptPath = path.join(runtimeDir, `dashboard-start-${process.pid}-${Date.now()}.vbs`);
-    const vbsQuote = (value) => `"${String(value).replace(/"/g, '""')}"`;
-    const commandLine = [process.execPath, ...serverArgs]
-      .map((value) => `"${String(value).replace(/"/g, '\\"')}"`)
-      .join(' ');
-    const script = [
-      'Set sh = CreateObject("WScript.Shell")',
-      `sh.Environment("Process")("HUAYUAN_HOME") = ${vbsQuote(stateDir)}`,
-      `sh.CurrentDirectory = ${vbsQuote(cwd)}`,
-      `sh.Run ${vbsQuote(commandLine)}, 0, False`,
-    ].join('\r\n');
-    fs.writeFileSync(scriptPath, `\uFEFF${script}`, 'utf16le');
-    const taskName = `HuayuanDashboard-${process.pid}-${Date.now()}`;
-    const taskAction = `wscript.exe "${scriptPath}"`;
-    const created = spawnSync(
-      'schtasks.exe',
-      ['/Create', '/TN', taskName, '/TR', taskAction, '/SC', 'ONCE', '/ST', '23:59', '/F', '/RL', 'LIMITED'],
-      { encoding: 'utf8', windowsHide: true, timeout: 10000 }
-    );
-    if (created.status !== 0) {
-      fs.rmSync(scriptPath, { force: true });
-      throw new Error(`PERSISTENT_TASK_CREATE_FAILED:${String(created.stderr || created.stdout || '').trim().slice(0, 160)}`);
-    }
-    const started = spawnSync('schtasks.exe', ['/Run', '/TN', taskName], {
-      encoding: 'utf8',
-      windowsHide: true,
-      timeout: 10000,
-    });
-    const cleanup = () => {
-      if (process.env.HUAYUAN_KEEP_LAUNCH_RUNTIME === '1') return;
-      spawnSync('schtasks.exe', ['/Delete', '/TN', taskName, '/F'], {
-        encoding: 'utf8',
-        windowsHide: true,
-        timeout: 10000,
-      });
-      fs.rmSync(scriptPath, { force: true });
-    };
-    if (started.status !== 0) {
-      cleanup();
-      throw new Error(`PERSISTENT_TASK_RUN_FAILED:${String(started.stderr || started.stdout || '').trim().slice(0, 160)}`);
-    }
-    return { pid: null, cleanup };
-  }
   const child = spawn(process.execPath, serverArgs, {
     detached: true,
     stdio: 'ignore',
     windowsHide: true,
     cwd,
+    env: { ...process.env, HUAYUAN_HOME: stateDir },
   });
   child.unref();
-  return { pid: child.pid || null, cleanup() {} };
+  if (!child.pid) throw new Error('DETACHED_SERVER_SPAWN_FAILED');
+  return { pid: child.pid, launchMode: 'detached-node', cleanup() {} };
 }
 
 async function stopOld(state) {
@@ -270,7 +227,13 @@ async function main() {
       }
       const alreadyOpen =
         Boolean(health.browser_alive) && requestedPagePath() === '/' ? '1' : '0';
-      await reportReady(oldState.port, alreadyOpen === '1', 'refresh-existing', health.pid || oldState.pid);
+      await reportReady(
+        oldState.port,
+        alreadyOpen === '1',
+        'refresh-existing',
+        health.pid || oldState.pid,
+        oldState.launchMode || 'existing'
+      );
       return;
     }
   }
@@ -294,7 +257,12 @@ async function main() {
     const ready = await waitForHealth(port);
     persistent.cleanup();
     if (ready) {
-      chosen = { port, token, pid: ready.pid || persistent.pid };
+      chosen = {
+        port,
+        token,
+        pid: ready.pid || persistent.pid,
+        launchMode: persistent.launchMode,
+      };
       break;
     }
   }
@@ -309,6 +277,7 @@ async function main() {
         nowPath,
         onboarding_mode: !nowPath,
         pid: chosen.pid,
+        launchMode: chosen.launchMode,
         now_source: candidateNow,
         mode: 'stable',
         started_at: new Date().toISOString(),
@@ -321,7 +290,7 @@ async function main() {
   const url = dashboardUrl(chosen.port);
   if (!process.argv.includes('--no-open')) openBrowser(url);
   if (!nowPath) console.log('LIVE_DASHBOARD_ONBOARDING_MODE:1');
-  await reportReady(chosen.port, false, 'started', chosen.pid);
+  await reportReady(chosen.port, false, 'started', chosen.pid, chosen.launchMode);
 }
 
 if (require.main === module) {
