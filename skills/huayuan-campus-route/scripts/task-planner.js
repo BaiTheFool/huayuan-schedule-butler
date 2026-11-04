@@ -162,13 +162,15 @@
 
   function normalizeManualTask(raw, index) {
     if (!raw || !String(raw.title || '').trim()) return null;
-    const due = parseDate(raw.due || raw.deadline || raw.due_date);
+    const declaredDue = raw.due || raw.deadline || raw.due_date || null;
+    const due = declaredDue ? parseDate(declaredDue) : null;
     const title = String(raw.title).trim().slice(0, 100);
     return {
       id: String(raw.id || `manual-${Date.now()}-${index || 0}`),
       title,
       due: due ? dueIso(due) : null,
       due_date: due ? dateKey(due) : null,
+      deadline_source: due ? 'declared' : 'unknown',
       priority: /^P[0-3]$/.test(String(raw.priority || '').toUpperCase()) ? String(raw.priority).toUpperCase() : 'P2',
       estimated_minutes: Math.max(10, Math.min(480, Number(raw.estimated_minutes) || 60)),
       source: 'manual',
@@ -211,7 +213,7 @@
   function taskStatus(task, now) {
     const current = parseDate(now || new Date()) || new Date();
     const due = parseDate(task && task.due);
-    if (!due) return { key: 'undated', label: '无截止', days: null, overdue: false };
+    if (!due) return { key: 'undated', label: '截止未知', days: null, overdue: false };
     if (task.done) return { key: 'done', label: '已完成', days: null, overdue: false };
     const days = Math.floor((startOfDay(due) - startOfDay(current)) / DAY);
     if (due < current) return { key: 'overdue', label: '已逾期', days, overdue: true };

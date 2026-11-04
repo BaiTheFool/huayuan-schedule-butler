@@ -185,15 +185,45 @@ check('手动待办会去重、排序，并写进路线自习块', () => {
   assert.ok(plan.summary.task_minutes > 0);
 });
 
+check('未声明截止的手工待办保持未知，不把安排结束时间当成截止', () => {
+  const normalized = TP.normalizeManualTask({
+    id: 'undated',
+    title: '阅读第 3 章',
+    date: '2026-10-29',
+    start: '09:00',
+    end: '10:00',
+  });
+  assert.strictEqual(normalized.due, null);
+  assert.strictEqual(normalized.due_date, null);
+  assert.strictEqual(normalized.deadline_source, 'unknown');
+  assert.strictEqual(TP.taskStatus(normalized, '2026-10-29T08:00').label, '截止未知');
+  const plan = R.planDay({ date: '2026-10-29', tasks: [normalized] });
+  const taskBlock = plan.blocks.find((block) => block.task?.id === 'undated');
+  assert.ok(taskBlock);
+  assert.strictEqual(taskBlock.task.due, null);
+  assert.strictEqual(taskBlock.task.deadline_source, 'unknown');
+});
+
+check('手动待办页提供独立可选截止输入，不再从安排日期自动生成截止', () => {
+  const html = fs.readFileSync(path.join(__dirname, '..', 'public', 'index.html'), 'utf8');
+  const app = fs.readFileSync(path.join(__dirname, '..', 'public', 'app.js'), 'utf8');
+  assert.ok(/id="todoDue" type="datetime-local"/.test(html));
+  assert.ok(/留空即截止未知/.test(html));
+  assert.ok(/const declaredDue = String\(\$\('todoDue'\)\.value/.test(app));
+  assert.ok(!/due: `\$\{date\}T\$\{end\}`/.test(app));
+});
+
 check('任务状态能区分今天/逾期/正常', () => {
   const tasks = [
     { id: 'a', title: '今天', due: '2026-10-29T23:59', estimated_minutes: 30 },
     { id: 'b', title: '逾期', due: '2026-10-28T21:00', estimated_minutes: 30 },
     { id: 'c', title: '以后', due: '2026-11-05T21:00', estimated_minutes: 30 },
+    { id: 'd', title: '未知截止', due: null, estimated_minutes: 30 },
   ];
   assert.strictEqual(TP.taskStatus(tasks[0], '2026-10-29T12:00').key, 'today');
   assert.strictEqual(TP.taskStatus(tasks[1], '2026-10-29T12:00').key, 'overdue');
   assert.strictEqual(TP.taskStatus(tasks[2], '2026-10-29T12:00').key, 'later');
+  assert.strictEqual(TP.taskStatus(tasks[3], '2026-10-29T12:00').key, 'undated');
   assert.strictEqual(TP.summarizeTasks(tasks, '2026-10-29T12:00').today, 1);
 });
 

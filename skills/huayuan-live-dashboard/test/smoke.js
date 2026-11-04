@@ -157,11 +157,11 @@ async function wait(portNumber = port) {
     check(home.status === 200, '首页返回 200');
     check(/CAMPUS DAY ROUTE/.test(html), '首页采用路线 UI');
     check(
-      /href="\/route-assets\/styles\.css\?v=20261104d"/.test(html),
+      /href="\/route-assets\/styles\.css\?v=20261104e"/.test(html),
       '路线样式表带版本参数时仍改写为驾驶舱资源路径'
     );
     check(
-      /src="\/route-assets\/app\.js\?v=20261104d"/.test(html),
+      /src="\/route-assets\/app\.js\?v=20261104e"/.test(html),
       '路线交互脚本带版本参数时仍改写为驾驶舱资源路径'
     );
     check(
@@ -178,6 +178,7 @@ async function wait(portNumber = port) {
     check(/dashboardBriefAction/.test(html), '保留第一动作摘要');
     check(/导入教务课表/.test(html) && /本地文件/.test(html), '课表入口区分教务读取和本地文件');
     check(/id="locationSearch"/.test(html) && /id="locationResults"/.test(html), '首页包含可搜索楼栋选择器');
+    check(/id="todoDue" type="datetime-local"/.test(html) && /留空即截止未知/.test(html), '手动待办截止可留空且不会自动补日期');
     check(/设备定位/.test(html) && !/手机定位/.test(html), '定位文案使用设备而非手机');
     check(/id="copyTimetablePromptBtn"/.test(html) && /id="timetableFallback"/.test(html), '教务读取被系统阻止时有复制指令降级入口');
     check(/dashboard-attention\.css/.test(html) && /dashboard-attention\.js/.test(html), '今日页加载红点引导组件');
@@ -208,6 +209,8 @@ async function wait(portNumber = port) {
     check(/pointerdown/.test(routeApp) && /picker\.contains/.test(routeApp), '下拉栏只在选择器外点击时关闭');
     check(/scheduleLocationPosition/.test(routeApp) && /addEventListener\('scroll', scheduleLocationPosition/.test(routeApp), '页面滚动时下拉栏跟随输入框定位');
     check(/FALLBACK_REQUIRED/.test(routeApp) && /showTimetableFallback/.test(routeApp), 'EPERM 时前端显示对话读取入口');
+    check(/drawRouteSegments\(directSegments/.test(routeApp), '道路服务返回前先绘制直连回退路线');
+    check(/values\s*\.map\(\(order\)/.test(routeApp) && !/×\$\{count\}/.test(routeApp), '同一地点多次停靠并排显示站序号');
     const todoScript = await (await fetch(`http://127.0.0.1:${port}/todo.js`)).text();
     const activityScript = await (await fetch(`http://127.0.0.1:${port}/activities.js`)).text();
     check(/execCommand\('copy'\)/.test(todoScript), '待办复制有本地降级');

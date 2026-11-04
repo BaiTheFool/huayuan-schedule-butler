@@ -58,7 +58,7 @@ for (const name of fs.readdirSync(FIXTURES)) {
 
 console.log('0.8.1 即时排程回归（离线、虚构样例）');
 
-const { assignTasksToStudy } = require(path.join(SCRIPTS, 'schedule-analyze.js'));
+const { assignTasksToStudy, buildTaskPool } = require(path.join(SCRIPTS, 'schedule-analyze.js'));
 
 console.log('\n[1] 任务按实际耗时切片');
 const oneTask = {
@@ -268,6 +268,46 @@ check(
   '休息移到任务完成之后',
   nightRest && nightRest.start >= '21:15',
   nightRest ? `${nightRest.start}-${nightRest.end}` : '无休息段'
+);
+
+console.log('\n[4] 未声明截止的任务保持未知');
+const undatedPool = buildTaskPool({
+  ecourseDoc: {
+    status: 'READ_OK',
+    tasks: [{ title: '阅读第 3 章', course: '软件工程（样例）', task_type: '阅读' }],
+  },
+  rainDoc: { courses: [] },
+  referenceYear: 2026,
+});
+const undatedTask = undatedPool.items.find((item) => item.title === '阅读第 3 章');
+check(
+  '平台任务没有截止字段时 deadline 保持 null',
+  undatedTask && undatedTask.deadline === null && undatedTask.deadline_source === 'unknown',
+  undatedTask ? `${undatedTask.deadline} / ${undatedTask.deadline_display}` : '无任务'
+);
+check(
+  '未知截止明确显示，且不补造日期',
+  undatedTask &&
+    undatedTask.deadline_display === '截止未知' &&
+    undatedTask.confirm_reasons.some((reason) => /未声明截止时间/.test(reason)),
+  undatedTask ? undatedTask.confirm_reasons.join('；') : '无任务'
+);
+const undatedPlan = [
+  {
+    date: '2026-11-04',
+    day_name: '周三',
+    daily_limit_min: 180,
+    planned_minutes: 60,
+    slots: [{ start: '18:00', end: '19:00', minutes: 60, reason: '当前空档' }],
+  },
+];
+assignTasksToStudy(undatedPlan, { items: [undatedTask] }, { bufferMinutes: 10 });
+check(
+  '任务可按耗时排入时段，但排程块不携带伪造截止',
+  undatedPlan[0].slots[0]?.task?.title === '阅读第 3 章' &&
+    undatedPlan[0].slots[0].task.due === null &&
+    undatedPlan[0].slots[0].task.deadline === '截止未知',
+  JSON.stringify(undatedPlan[0].slots[0]?.task || null)
 );
 
 const failed = results.filter((item) => !item.ok);

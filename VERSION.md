@@ -1,4 +1,8 @@
-VERSION=0.16.2
+VERSION=0.16.4
+
+### 0.16.4 · 2026-11-04 · fix: clarify repeated map stops and draw route immediately
+
+### 0.16.3 · 2026-11-04 · fix: keep undeclared task deadlines unknown
 
 ### 0.16.2 · 2026-11-04 · fix: rewrite versioned route assets in dashboard shell
 
