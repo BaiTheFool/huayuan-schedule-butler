@@ -6,7 +6,7 @@
   <title>华园一日 · 大学城校园路线</title>
   <meta name="description" content="按课表、食堂、图书馆和宿舍热水时间，生成华南理工大学大学城校区的一日步行路线。" />
   <link rel="stylesheet" href="vendor/leaflet.css" />
-  <link rel="stylesheet" href="styles.css?v=20261104d" />
+  <link rel="stylesheet" href="styles.css?v=20261104e" />
   <script>
     window.addEventListener('error', function (event) {
       var box = document.getElementById('jsError');
@@ -317,8 +317,13 @@
 
             <div class="todo-form">
               <input id="todoTitle" type="text" maxlength="100" placeholder="手动加待办：交实验报告 / 小组会议" aria-label="待办标题" />
+              <div class="todo-row todo-deadline-row">
+                <label for="todoDue">截止时间（可选）</label>
+                <input id="todoDue" type="datetime-local" aria-label="截止时间，可不填" />
+                <span>留空即截止未知，系统不会自动补日期</span>
+              </div>
               <div class="todo-row">
-                <input id="todoDate" type="date" aria-label="日期" />
+                <input id="todoDate" type="date" aria-label="安排日期" />
                 <input id="todoStart" type="time" value="09:00" aria-label="开始时间" />
                 <input id="todoEnd" type="time" value="10:00" aria-label="结束时间" />
                 <select id="todoRepeat" aria-label="重复方式">
@@ -432,6 +437,6 @@
   <script src="../scripts/route-engine.js?v=20261104d"></script>
   <script src="../scripts/timetable-import.js"></script>
   <script src="../scripts/task-planner.js"></script>
-  <script src="app.js?v=20261104d"></script>
+  <script src="app.js?v=20261104e"></script>
 </body>
 </html>

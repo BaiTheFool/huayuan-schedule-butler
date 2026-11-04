@@ -699,6 +699,7 @@
         id: String(task.id || `task-${index}`),
         title: String(task.title).trim().slice(0, 100),
         due: task.due || null,
+        deadline_source: task.due ? 'declared' : 'unknown',
         priority: /^P[0-3]$/.test(String(task.priority || '').toUpperCase())
           ? String(task.priority).toUpperCase()
           : 'P2',
@@ -730,6 +731,7 @@
         id: task.id,
         title: task.title,
         due: task.due,
+        deadline_source: task.deadline_source,
         priority: task.priority,
         source: task.source,
         course: task.course,

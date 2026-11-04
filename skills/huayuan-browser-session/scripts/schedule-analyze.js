@@ -142,11 +142,11 @@ const PAD = (value) => String(value).padStart(2, '0');
 
 /**
  * 截止时间归一化成可直接比较的 `YYYY-MM-DD HH:MM`。
- * 认不出来就返回 null，并让任务进入"待确认"，绝不用猜的时间去倒推排程。
+ * 没声明或认不出来就返回 null，并明确标成"截止未知"，绝不用猜的时间去倒推排程。
  */
 function normalizeDeadline(raw, referenceYear) {
   const text = raw === undefined || raw === null ? '' : String(raw).trim();
-  if (!text || /待确认|未知|暂无|--/.test(text)) return { iso: null, display: '待确认' };
+  if (!text || /待确认|未知|暂无|--/.test(text)) return { iso: null, display: '截止未知' };
 
   const iso = text.match(/^(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})(?:[\sT]+(\d{1,2}):(\d{2}))?$/);
   if (iso) {
@@ -205,7 +205,8 @@ function makePoolItem(fields) {
     sources: [],
     entries: [],
     deadline: null,
-    deadline_display: '待确认',
+    deadline_display: '截止未知',
+    deadline_source: 'unknown',
     status: 'unfinished',
     needs_confirmation: false,
     confirm_reasons: [],
@@ -239,7 +240,9 @@ function buildTaskPool({ ecourseDoc, rainDoc, referenceYear, userTasks = [], ove
     }
     if (!item.deadline) {
       item.needs_confirmation = true;
-      if (!item.confirm_reasons.includes('未给出截止时间')) item.confirm_reasons.push('未给出截止时间');
+      item.deadline_source = 'unknown';
+      const reason = '未声明截止时间，按截止未知处理，不补造日期';
+      if (!item.confirm_reasons.includes(reason)) item.confirm_reasons.push(reason);
     }
     const key = taskKey(item.title, item.deadline_display);
     const existing = items.get(key);
@@ -285,6 +288,7 @@ function buildTaskPool({ ecourseDoc, rainDoc, referenceYear, userTasks = [], ove
       ],
       deadline: deadline.iso,
       deadline_display: deadline.display,
+      deadline_source: deadline.iso ? 'declared' : 'unknown',
       // 平台自己给了预计耗时就用它；没给才按任务类型估（作业 45 / 测试 60 / 讨论 30）
       estimated_minutes: Number(task.estimated_minutes) > 0 ? Number(task.estimated_minutes) : null,
       status: 'unfinished',
@@ -292,7 +296,9 @@ function buildTaskPool({ ecourseDoc, rainDoc, referenceYear, userTasks = [], ove
     if (!deadline.iso) {
       item.needs_confirmation = true;
       item.confirm_reasons.push(
-        deadline.unparsed ? `截止时间格式无法直接比较（原文「${deadline.display}」）` : '未给出截止时间'
+        deadline.unparsed
+          ? `截止时间格式无法直接比较（原文「${deadline.display}」）`
+          : '未声明截止时间，按截止未知处理，不补造日期'
       );
     }
     push(item);
@@ -320,13 +326,16 @@ function buildTaskPool({ ecourseDoc, rainDoc, referenceYear, userTasks = [], ove
         ],
         deadline: deadline.iso,
         deadline_display: deadline.display,
+        deadline_source: deadline.iso ? 'declared' : 'unknown',
         estimated_minutes: Number(task.estimated_minutes) > 0 ? Number(task.estimated_minutes) : null,
         status: task.is_expired ? 'overdue' : 'unfinished',
       });
       if (!deadline.iso) {
         item.needs_confirmation = true;
         item.confirm_reasons.push(
-          deadline.unparsed ? `截止时间格式无法直接比较（原文「${deadline.display}」）` : '未给出截止时间'
+        deadline.unparsed
+          ? `截止时间格式无法直接比较（原文「${deadline.display}」）`
+          : '未声明截止时间，按截止未知处理，不补造日期'
         );
       }
       push(item);
@@ -2264,4 +2273,5 @@ module.exports = {
   recommendStudy,
   runCheckPlan,
   subtractWindows,
+  buildTaskPool,
 };

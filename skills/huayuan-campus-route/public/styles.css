@@ -903,11 +903,35 @@ input[type="range"]::-moz-range-thumb {
 
 .todo-row {
   display: flex;
+  align-items: center;
+  flex-wrap: wrap;
   gap: 5px;
   margin-top: 5px;
 }
 
-.todo-row input[type="date"] {
+.todo-deadline-row {
+  padding: 6px 7px;
+  border: 1px dashed rgba(47, 107, 79, 0.24);
+  border-radius: 8px;
+  background: rgba(223, 233, 221, 0.34);
+}
+
+.todo-deadline-row label {
+  flex: none;
+  font-size: 9.5px;
+  font-weight: 700;
+  color: var(--green);
+}
+
+.todo-deadline-row span {
+  min-width: 0;
+  font-size: 9px;
+  line-height: 1.35;
+  color: var(--muted);
+}
+
+.todo-row input[type="date"],
+.todo-row input[type="datetime-local"] {
   flex: 1;
   min-width: 0;
   height: 27px;
@@ -916,6 +940,10 @@ input[type="range"]::-moz-range-thumb {
   border-radius: 7px;
   background: rgba(255, 253, 247, 0.84);
   font-size: 10px;
+}
+
+.todo-deadline-row input[type="datetime-local"] {
+  flex: 0 1 176px;
 }
 
 .todo-row input[type="number"] {
@@ -1339,7 +1367,7 @@ input[type="range"]::-moz-range-thumb {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 1px;
+  gap: 3px;
   background: #f26b21;
   color: #fffdf7;
   border: 1.5px solid #fffdf7;
@@ -1348,7 +1376,25 @@ input[type="range"]::-moz-range-thumb {
   box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
 }
 
-.stop-marker small { font-size: 7px; font-weight: 600; }
+.stop-marker.multi {
+  min-width: 0;
+  height: 23px;
+  padding: 2px 4px;
+  border-radius: 11px;
+}
+
+.stop-marker span {
+  min-width: 16px;
+  height: 16px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: rgba(255, 253, 247, 0.18);
+}
+
+.stop-marker.multi span {
+  border: 1px solid rgba(255, 253, 247, 0.68);
+}
 
 .gps-marker {
   position: absolute;

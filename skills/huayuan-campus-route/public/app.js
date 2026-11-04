@@ -181,10 +181,13 @@
     });
   }
 
-  function stopIcon(index, count) {
+  function stopIcon(orders) {
+    const values = Array.isArray(orders) ? orders : [];
     return L.divIcon({
       className: 'stop-marker-wrap',
-      html: `<div class="stop-marker">${index}${count > 1 ? `<small>×${count}</small>` : ''}</div>`,
+      html: `<div class="stop-marker ${values.length > 1 ? 'multi' : ''}">${values
+        .map((order) => `<span>${order}</span>`)
+        .join('')}</div>`,
       iconSize: [0, 0],
       iconAnchor: [0, 0],
     });
@@ -546,6 +549,14 @@
     }
     if (stopPoints.length > 1) {
       const seq = routeSeq;
+      const directSegments = stopPoints.slice(1).map((to, index) => ({
+        leg: [
+          [stopPoints[index].lat, stopPoints[index].lng],
+          [to.lat, to.lng],
+        ],
+        type: to.type || 'default',
+      }));
+      drawRouteSegments(directSegments, false);
       Promise.all(
         stopPoints.slice(0, -1).map((from, index) => {
           const to = stopPoints[index + 1];
@@ -603,15 +614,21 @@
     plan.stops.forEach((stop, index) => {
       const poi = POI.get(stop.poiId);
       if (!poi || poi.id === 'home_custom') return;
-      if (!grouped.has(poi.id)) grouped.set(poi.id, { poi, first: index + 1, count: 0 });
-      grouped.get(poi.id).count += 1;
+      if (!grouped.has(poi.id)) grouped.set(poi.id, { poi, orders: [] });
+      grouped.get(poi.id).orders.push(index + 1);
     });
     for (const item of grouped.values()) {
-      L.marker([item.poi.lat, item.poi.lng], {
-        icon: stopIcon(item.first, item.count),
+      const marker = L.marker([item.poi.lat, item.poi.lng], {
+        icon: stopIcon(item.orders),
         keyboard: false,
+        title: `第 ${item.orders.join('、')} 站`,
         zIndexOffset: 800,
       }).addTo(stopGroup);
+      marker.bindTooltip(`途经：第 ${item.orders.join('、')} 站`, {
+        direction: 'top',
+        offset: [0, -16],
+        opacity: 0.92,
+      });
     }
 
     if (plan.gps && plan.gps.in_campus) {
@@ -1281,7 +1298,7 @@
       ? state.tasks
           .map((task) => {
             const st = TASK.taskStatus(task, now);
-            const due = task.due ? task.due.replace('T', ' ') : '无截止';
+            const due = task.due ? task.due.replace('T', ' ') : '截止未知';
             const source = task.external
               ? task.source_label || '主任务池'
               : task.source === 'exam'
@@ -1361,6 +1378,7 @@
     const date = $('todoDate').value || state.date;
     const start = $('todoStart').value || '09:00';
     const end = $('todoEnd').value || '10:00';
+    const declaredDue = String($('todoDue').value || '').trim();
     const repeat = $('todoRepeat').value || 'once';
     const weekday = repeat === 'weekly' ? Number($('todoWeekday').value) || 1 : null;
     if (end <= start) {
@@ -1378,8 +1396,9 @@
     state.manualTasks.push({
       id: `manual-${Date.now()}`,
       title: title.slice(0, 100),
-      due: `${date}T${end}`,
-      due_date: date,
+      due: declaredDue || null,
+      due_date: declaredDue ? declaredDue.slice(0, 10) : null,
+      deadline_source: declaredDue ? 'declared' : 'unknown',
       start,
       end,
       repeat,
@@ -1396,6 +1415,7 @@
     saveStorage('huayuan.manualTasks', state.manualTasks);
     $('todoTitle').value = '';
     $('todoLocation').value = '';
+    $('todoDue').value = '';
     $('todoCoord').textContent = '未定位';
     state.todoPlace = { address: '', lat: null, lng: null };
     openTaskSection();
