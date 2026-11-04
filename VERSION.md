@@ -1,4 +1,6 @@
-VERSION=0.16.0
+VERSION=0.16.1
+
+### 0.16.1 · 2026-11-04 · fix: launch dashboard without scheduled-task permissions
 
 # 华园日程管家 · 版本记录
 

@@ -198,6 +198,13 @@
 - 解决：手机顶部和“此刻”改用设备本地实时时间，每 30 秒自动重绘；当前活动根据最新路线块按实时分钟判断，不再依赖旧快照的 current 状态。
 - 验证：手机总回归 44/44，新增“不使用 now.now.time 作为当前时间”的源码断言。
 
+### #28 · 2026-11-04 · 计划任务黑名单导致驾驶舱完全无法启动（0.16.1）
+- 现象：WorkBuddy 返回 `LIVE_DASHBOARD_FAILED:PERSISTENT_TASK_CREATE_FAILED`，并提示用户去安全中心把 `schtasks.exe` 移出程序黑名单；否则驾驶舱无法打开。
+- 根因：Windows 启动器把 `schtasks.exe /Create` 注册计划任务写成了常驻服务的必经步骤。该能力只是用于脱离 WorkBuddy 命令进程和隐藏 Node 窗口，并不是驾驶舱服务的业务依赖；安全策略拦截后启动器直接中止。
+- 解决：删除计划任务的创建、运行、删除链路，改用 Node 原生 `detached + unref + windowsHide + stdio: ignore` 启动独立服务；父命令退出后服务仍驻留，不弹终端，后续消息继续复用同一 PID。启动输出新增 `LIVE_DASHBOARD_LAUNCH_MODE:detached-node` 便于诊断。
+- 验证：`node golden-path\check-dashboard-reuse.js` 通过 11/11；二次启动为 `refresh-existing` 且 PID 不变；Windows Terminal 数量保持 `0 -> 0`；源码和运行链路均不再出现 `schtasks.exe`。
+- 预防规则：常驻服务的启动方式不得成为业务前置依赖；平台安全策略可能禁用 `schtasks.exe`、WMI、PowerShell 或脚本宿主，启动器应优先使用 Node 自身可跨命令存活的脱离进程能力，并为“服务未启动”返回可恢复错误而不是要求用户永久放宽系统安全策略。
+
 ---
 
 ## 运行时错误日志（logs/errors.jsonl）使用说明
