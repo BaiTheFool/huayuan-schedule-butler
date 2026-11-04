@@ -8,6 +8,8 @@ VERSION=0.16.4
 
 ### 0.16.1 · 2026-11-04 · fix: launch dashboard without scheduled-task permissions
 
+### 0.16.0 · 2026-11-04 · feat: campus route v2 - OSRM road geometry, six gates, low-walking preset, C-area dorm routing, custom home
+
 # 华园日程管家 · 版本记录
 
 > 本文件是版本的**单一事实源**。机器可读行固定为第一行：`VERSION=x.y.z`。
