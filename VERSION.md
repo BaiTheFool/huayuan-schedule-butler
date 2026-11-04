@@ -1,4 +1,6 @@
-VERSION=0.16.1
+VERSION=0.16.2
+
+### 0.16.2 · 2026-11-04 · fix: rewrite versioned route assets in dashboard shell
 
 ### 0.16.1 · 2026-11-04 · fix: launch dashboard without scheduled-task permissions
 

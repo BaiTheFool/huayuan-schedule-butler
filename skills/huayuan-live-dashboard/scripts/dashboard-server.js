@@ -531,10 +531,10 @@ function dashboardIndexHtml() {
           </div>
         </section>`;
   html = html
-    .replace('href="styles.css"', 'href="/route-assets/styles.css"')
+    .replace(/(\b(?:href|src)=")(?:\.\/)?(styles\.css|app\.js)(\?[^"]*)?"/g, '$1/route-assets/$2$3"')
+    .replace(/(\b(?:href|src)=")vendor\/([^"]+)"/g, '$1/route-assets/vendor/$2"')
     .replaceAll('src="../data/', 'src="/route-data/')
     .replaceAll('src="../scripts/', 'src="/route-scripts/')
-    .replace('src="app.js"', 'src="/route-assets/app.js"')
     .replace('<!-- HUAYUAN_PAGE_NAV -->', pageNav)
     .replace('<!-- HUAYUAN_DASHBOARD_BRIEF -->', brief)
     .replace(

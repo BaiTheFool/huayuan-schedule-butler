@@ -156,6 +156,19 @@ async function wait(portNumber = port) {
     const html = await home.text();
     check(home.status === 200, '首页返回 200');
     check(/CAMPUS DAY ROUTE/.test(html), '首页采用路线 UI');
+    check(
+      /href="\/route-assets\/styles\.css\?v=20261104d"/.test(html),
+      '路线样式表带版本参数时仍改写为驾驶舱资源路径'
+    );
+    check(
+      /src="\/route-assets\/app\.js\?v=20261104d"/.test(html),
+      '路线交互脚本带版本参数时仍改写为驾驶舱资源路径'
+    );
+    check(
+      /href="\/route-assets\/vendor\/leaflet\.css"/.test(html) &&
+        /src="\/route-assets\/vendor\/leaflet\.js"/.test(html),
+      '地图库使用驾驶舱资源路径'
+    );
     check(/id="map"/.test(html), '首页包含校园地图');
     check(/id="wStudy"/.test(html) && /id="wPlay"/.test(html) && /id="wSport"/.test(html), '首页包含三类权重条');
     check(
