@@ -28,12 +28,13 @@ LIVE_DASHBOARD_READY:http://127.0.0.1:<端口>/
 node <本技能目录>\scripts\launch-dashboard.js --no-open
 ```
 
-启动器只创建并验证本地服务，不直接拉起外部浏览器；Windows 驻留进程使用无窗口脱离启动，不依赖 `schtasks.exe` 或计划任务权限。读取输出：
+启动器只创建并验证本地服务，不直接拉起外部浏览器；Windows 优先通过 WMI 在 WorkBuddy 命令作业之外启动隐藏 WScript/Node，不依赖 `schtasks.exe` 或计划任务权限。WMI 不可用时才降级为 detached Node。读取输出：
 
 - `LIVE_DASHBOARD_VERIFIED:1`：目标已确认返回“华园日程”HTML，不是脚本、JSON 或文件附件；
 - `LIVE_DASHBOARD_OPEN_REQUIRED:1`：本轮必须打开，永远为 1；
 - `LIVE_DASHBOARD_ACTION:refresh-existing`：服务已运行，只更新 `live-now.json` 并打开/刷新同一 URL，不得重启服务或再起进程；
-- `LIVE_DASHBOARD_LAUNCH_MODE:detached-node`：本次由无窗口脱离进程启动；
+- `LIVE_DASHBOARD_LAUNCH_MODE:wmi-wscript`：本次已脱离宿主命令作业；
+- `LIVE_DASHBOARD_LAUNCH_MODE:detached-node`：WMI 不可用时的无窗口降级启动；
 - `LIVE_DASHBOARD_PREVIEW_ARGS`：必须原样用于预览工具的 `{"url":"..."}`；
 - `LIVE_DASHBOARD_READY`：驾驶舱完整 URL。
 

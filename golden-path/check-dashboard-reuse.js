@@ -98,7 +98,8 @@ async function shutdown(state) {
     state = JSON.parse(fs.readFileSync(path.join(home, 'live-dashboard.json'), 'utf8'));
     const firstPid = field(first, 'LIVE_DASHBOARD_PID');
     check('首次启动创建独立驻留服务', field(first, 'LIVE_DASHBOARD_ACTION') === 'started' && Boolean(firstPid), firstPid);
-    check('Windows 使用无窗口脱离进程启动', field(first, 'LIVE_DASHBOARD_LAUNCH_MODE') === 'detached-node');
+    const expectedLaunchMode = process.platform === 'win32' ? 'wmi-wscript' : 'detached-node';
+    check('启动器使用可脱离宿主作业的无窗口启动方式', field(first, 'LIVE_DASHBOARD_LAUNCH_MODE') === expectedLaunchMode);
     check('驾驶舱使用稳定 now 快照', path.resolve(state.nowPath) === path.resolve(path.join(home, 'live-now.json')));
 
     const second = runNode(LAUNCH_SCRIPT, launchArgs, env);

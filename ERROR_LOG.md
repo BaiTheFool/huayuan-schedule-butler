@@ -226,6 +226,13 @@
 - 验证：真实 Chromium 截图确认 `1 10`、`3 6 7` 等组合站标和彩色路线同时出现；驾驶舱冒烟新增“先画直连回退线”与“并排站序号”断言。
 - 预防规则：地图标记不得用隐式压缩符号表达多种信息；任何依赖远程道路服务的图层必须先有本地即时回退，再异步增强。
 
+### #32 · 2026-11-05 · 启动器验证成功后服务被 WorkBuddy 回收，4318 假在线（0.16.5）
+- 现象：启动器输出 `LIVE_DASHBOARD_VERIFIED:1` 和 `PID`，但命令结束后状态文件中的 PID 已不存在，4318 没有监听；连续重试仍只得到短暂成功。登录缺失的另一份报告中则明确记录 `declined_noninteractive`，说明可见登录流程根本没有启动。
+- 根因：普通 `child_process.spawn({detached:true})` 能脱离父进程，但仍在 WorkBuddy 为命令创建的子进程作业中；宿主在命令结束后回收整个作业。登录脚本未收到 `--login` 时会按设计拒绝打开可见浏览器，不能用“窗口弹不出来”解释。
+- 解决：Windows 启动器改为调用 WMI `Win32_Process.Create` 创建隐藏 `wscript.exe`，再由 VBScript 以零窗口启动 Node 服务；该链路不继承 WorkBuddy 的命令作业。WMI 不可用时保留 detached Node 降级。可见登录窗口创建后调用 `page.bringToFront()` 置前；登录诊断文档明确区分缺少 `--login` 与浏览器启动失败。
+- 验证：`check-dashboard-reuse.js` 通过 11/11，启动模式为 `wmi-wscript`；短时可见登录实测成功打开专用 Chrome 并完成教务读取 `READ_OK`；服务启动命令结束后继续监听，二次启动复用同一 PID。
+- 预防规则：验证后台服务不能只看启动命令运行期间的 HTTP 200；必须覆盖“父命令结束后仍存活”。WorkBuddy 等宿主可能使用 Job Object 回收全部子进程，常驻服务应从系统级进程创建接口启动，而不是仅依赖 `detached`。
+
 ---
 
 ## 运行时错误日志（logs/errors.jsonl）使用说明

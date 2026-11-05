@@ -17,6 +17,10 @@ const browserSkill = fs.readFileSync(
   path.join(ROOT, 'skills', 'huayuan-browser-session', 'SKILL.md'),
   'utf8'
 );
+const sessionGateway = fs.readFileSync(
+  path.join(ROOT, 'skills', 'huayuan-browser-session', 'scripts', 'session-gateway.js'),
+  'utf8'
+);
 const dashboardLauncher = fs.readFileSync(
   path.join(ROOT, 'skills', 'huayuan-live-dashboard', 'scripts', 'launch-dashboard.js'),
   'utf8'
@@ -31,6 +35,7 @@ check(
   Buffer.byteLength(browserSkill) <= 12 * 1024,
   `${Buffer.byteLength(browserSkill)} B`
 );
+check('可见登录窗口创建后主动置前', /page\.bringToFront\(\)/.test(sessionGateway));
 check('maxTurns 不超过 30', /maxTurns:\s*30\b/.test(agent));
 const agentSkillsMatch = agent.match(/^skills:\s*\[(.*?)\]\s*$/m);
 const agentSkills = agentSkillsMatch
