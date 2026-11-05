@@ -234,6 +234,43 @@ check('周四样例生成 3 节课，且课程时间原样保留', () => {
   assert.deepStrictEqual(classes.map((b) => `${b.start}-${b.end}`), ['08:50-10:25', '10:40-12:15', '14:00-15:35']);
 });
 
+check('当前教学周过滤重复课程记录，不再产生假重叠与错误缓冲', () => {
+  const timetable = {
+    campus: { key: 'university_town', label: '大学城校区', campus_text: '大学城校区' },
+    courses: [
+      {
+        course: '智能配送管理',
+        weekday: 4,
+        start_time: '19:00',
+        end_time: '20:40',
+        classroom: 'A3203',
+        campus: '大学城校区',
+        weeks: { raw: '第14周', list: [14], ranges: [[14, 14]] },
+      },
+      {
+        course: '智能配送管理',
+        weekday: 4,
+        start_time: '19:00',
+        end_time: '21:35',
+        classroom: 'A3203',
+        campus: '大学城校区',
+        weeks: { raw: '4-13周', list: [4, 5, 6, 7, 8, 9, 10, 11, 12, 13], ranges: [[4, 13]] },
+      },
+    ],
+  };
+  const summary = T.summarizeTimetable(timetable, { date: '2026-11-05', weekNumber: 9 });
+  assert.strictEqual(summary.week_number, 9);
+  assert.strictEqual(summary.summary.active, 1);
+  const plan = R.planDay({
+    date: '2026-11-05',
+    timetable,
+    weekNumber: 9,
+    preferences: { daily: { wake: '07:00', sleep: '23:30' } },
+  });
+  assert.strictEqual(plan.blocks.filter((block) => block.type === 'class').length, 1);
+  assert.deepStrictEqual(plan.validation.issues, []);
+});
+
 check('时间轴严格有序且没有重叠', () => {
   for (let i = 1; i < base.blocks.length; i += 1) {
     assert.ok(base.blocks[i].start_min >= base.blocks[i - 1].start_min, '时间没有递增');

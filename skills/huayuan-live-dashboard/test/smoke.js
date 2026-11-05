@@ -22,6 +22,7 @@ fs.writeFileSync(
   nowPath,
   JSON.stringify({
     now: { date: '2026-11-04', time: '14:20', weekday: '周三' },
+    week: { number: 10, source: '用户确认', reliable: true },
     first_action: {
       headline: '先去上课：生产运作管理（样例）（14:30-16:10）',
       next_hint: '下课后做第 6 章作业',
@@ -211,6 +212,7 @@ async function wait(portNumber = port) {
     check(/FALLBACK_REQUIRED/.test(routeApp) && /showTimetableFallback/.test(routeApp), 'EPERM 时前端显示对话读取入口');
     check(/drawRouteSegments\(directSegments/.test(routeApp), '道路服务返回前先绘制直连回退路线');
     check(/values\s*\.map\(\(order\)/.test(routeApp) && !/×\$\{count\}/.test(routeApp), '同一地点多次停靠并排显示站序号');
+    check(/weekContext/.test(routeApp) && /selectedWeekNumber\(\)/.test(routeApp), '路线页使用驾驶舱确认的教学周过滤课程');
     const todoScript = await (await fetch(`http://127.0.0.1:${port}/todo.js`)).text();
     const activityScript = await (await fetch(`http://127.0.0.1:${port}/activities.js`)).text();
     check(/execCommand\('copy'\)/.test(todoScript), '待办复制有本地降级');
@@ -284,6 +286,7 @@ async function wait(portNumber = port) {
     check(routeData.ok === true, '路线上下文 API 正常');
     check(routeData.timetable_available === true, '真实课表自动接入首页');
     check(routeData.timetable_course_count === 1, '真实课表从历史子目录自动发现');
+    check(routeData.week_context?.number === 10 && routeData.week_context?.date === '2026-11-04', '路线上下文携带当前教学周');
     check(routeData.tasks.length === 1, '主任务池自动接入路线');
     check(routeData.major === '软件工程', '专业偏好自动接入路线');
     const timetableStatus = await fetch(`http://127.0.0.1:${port}/api/timetable/status`);

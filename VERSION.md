@@ -1,4 +1,6 @@
-VERSION=0.16.5
+VERSION=0.16.6
+
+### 0.16.6 · 2026-11-05 · fix: filter route classes by confirmed current week
 
 ### 0.16.5 · 2026-11-05 · fix: keep dashboard service outside WorkBuddy command job
 
