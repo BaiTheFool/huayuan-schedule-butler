@@ -162,7 +162,7 @@ async function wait(portNumber = port) {
       '路线样式表带版本参数时仍改写为驾驶舱资源路径'
     );
     check(
-      /src="\/route-assets\/app\.js\?v=20261104e"/.test(html),
+      /src="\/route-assets\/app\.js\?v=20261105a"/.test(html),
       '路线交互脚本带版本参数时仍改写为驾驶舱资源路径'
     );
     check(
