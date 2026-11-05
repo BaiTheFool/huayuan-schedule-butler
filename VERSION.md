@@ -1,4 +1,6 @@
-VERSION=0.16.4
+VERSION=0.16.5
+
+### 0.16.5 · 2026-11-05 · fix: keep dashboard service outside WorkBuddy command job
 
 ### 0.16.4 · 2026-11-04 · fix: clarify repeated map stops and draw route immediately
 

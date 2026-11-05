@@ -3,7 +3,7 @@
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
-const { spawn } = require('child_process');
+const { spawn, spawnSync } = require('child_process');
 
 const DEFAULT_PORT = 4318;
 const MAX_PORT = 4338;
@@ -161,7 +161,7 @@ async function reportReady(port, alreadyOpen, action, pid, launchMode = null) {
   console.log(`LIVE_DASHBOARD_READY:${verified.url}`);
 }
 
-function startPersistentServer(serverArgs, cwd) {
+function startDetachedNode(serverArgs, cwd) {
   const child = spawn(process.execPath, serverArgs, {
     detached: true,
     stdio: 'ignore',
@@ -172,6 +172,70 @@ function startPersistentServer(serverArgs, cwd) {
   child.unref();
   if (!child.pid) throw new Error('DETACHED_SERVER_SPAWN_FAILED');
   return { pid: child.pid, launchMode: 'detached-node', cleanup() {} };
+}
+
+function startOutsideHostJob(serverArgs, cwd) {
+  const runtimeDir = path.join(stateDir, 'runtime');
+  fs.mkdirSync(runtimeDir, { recursive: true });
+  const nonce = `${process.pid}-${Date.now()}`;
+  const scriptPath = path.join(runtimeDir, `dashboard-start-${nonce}.vbs`);
+  const helperPath = path.join(runtimeDir, `dashboard-wmi-${nonce}.ps1`);
+  const wscriptPath = path.join(process.env.SystemRoot || 'C:\\Windows', 'System32', 'wscript.exe');
+  const vbsQuote = (value) => `"${String(value).replace(/"/g, '""')}"`;
+  const commandLine = [process.execPath, ...serverArgs]
+    .map((value) => `"${String(value).replace(/"/g, '""')}"`)
+    .join(' ');
+  const vbs = [
+    'Set sh = CreateObject("WScript.Shell")',
+    `sh.Environment("Process")("HUAYUAN_HOME") = ${vbsQuote(stateDir)}`,
+    `sh.CurrentDirectory = ${vbsQuote(cwd)}`,
+    `sh.Run ${vbsQuote(commandLine)}, 0, False`,
+  ].join('\r\n');
+  const helper = [
+    "$ErrorActionPreference = 'Stop'",
+    '$commandLine = [Environment]::GetEnvironmentVariable("HUAYUAN_WMI_COMMAND", "Process")',
+    '$currentDirectory = [Environment]::GetEnvironmentVariable("HUAYUAN_WMI_CWD", "Process")',
+    '$result = Invoke-CimMethod -ClassName Win32_Process -MethodName Create -Arguments @{ CommandLine = $commandLine; CurrentDirectory = $currentDirectory }',
+    'if ($result.ReturnValue -ne 0) { [Console]::Error.WriteLine("WMI_PROCESS_CREATE_FAILED:" + $result.ReturnValue); exit 2 }',
+    '[Console]::Out.WriteLine("WMI_PROCESS_CREATED:" + $result.ProcessId)',
+  ].join('\r\n');
+  fs.writeFileSync(scriptPath, `\uFEFF${vbs}`, 'utf16le');
+  fs.writeFileSync(helperPath, `\uFEFF${helper}`, 'utf16le');
+  const cleanup = () => {
+    fs.rmSync(scriptPath, { force: true });
+    fs.rmSync(helperPath, { force: true });
+  };
+  const launched = spawnSync(
+    'powershell.exe',
+    ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File', helperPath],
+    {
+      encoding: 'utf8',
+      windowsHide: true,
+      timeout: 15000,
+      env: {
+        ...process.env,
+        HUAYUAN_WMI_COMMAND: `"${wscriptPath}" "${scriptPath}"`,
+        HUAYUAN_WMI_CWD: cwd,
+      },
+    }
+  );
+  if (launched.error || launched.status !== 0) {
+    cleanup();
+    const detail = String(launched.stderr || launched.stdout || launched.error || '').trim().slice(0, 200);
+    throw new Error(`WMI_HIDDEN_LAUNCH_FAILED:${detail}`);
+  }
+  return { pid: null, launchMode: 'wmi-wscript', cleanup };
+}
+
+function startPersistentServer(serverArgs, cwd) {
+  if (process.platform === 'win32' && process.env.HUAYUAN_FORCE_DETACHED_NODE !== '1') {
+    try {
+      return startOutsideHostJob(serverArgs, cwd);
+    } catch (error) {
+      console.error(`LIVE_DASHBOARD_LAUNCH_FALLBACK:${String(error.message || error).split('\n')[0]}`);
+    }
+  }
+  return startDetachedNode(serverArgs, cwd);
 }
 
 async function stopOld(state) {

@@ -526,6 +526,11 @@ async function withBrowserSession(options) {
     result.browser_visibility = 'visible-login';
     context = await launchPersistent(playwright, active.profile_dir, true);
     let page = context.pages()[0] || (await context.newPage());
+    await page.bringToFront().catch(() => {});
+    writer.emit('BROWSER_WINDOW_READY', '专用登录窗口已打开并置前', {
+      browser_visibility: 'visible',
+      user_action: '请在当前窗口完成登录，不要关闭窗口',
+    });
 
     // 提示条用 addInitScript 注入：每次导航（含 CAS 回跳、站点内部跳转）都会重新执行，
     // 所以二维码出现后无论页面怎么跳，顶部那句中文都不会被刷掉。
