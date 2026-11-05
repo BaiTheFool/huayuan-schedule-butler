@@ -31,6 +31,7 @@ const routeDataDir = path.join(routeSkillDir, 'data');
 const routeScriptsDir = path.join(routeSkillDir, 'scripts');
 const browserSkillDir = path.resolve(__dirname, '..', '..', 'huayuan-browser-session');
 const jwTimetableScript = path.join(browserSkillDir, 'scripts', 'jw-timetable.js');
+const { detectSemesterWeek } = require(path.join(browserSkillDir, 'scripts', 'semester-week.js'));
 const API_VERSION = 5;
 const SYNC_INTERVAL_DAYS = 7;
 const SYNC_PROMPT =
@@ -147,14 +148,19 @@ function routeContext() {
     ...task,
     done: Boolean(task.done),
   }));
-  const weekNumber = Number(now && now.week && now.week.number);
+  const liveWeek = detectSemesterWeek({ timetable, now: new Date() });
+  const weekNumber = Number(liveWeek.week || (now && now.week && now.week.number));
   const weekContext =
     Number.isInteger(weekNumber) && weekNumber > 0
       ? {
           number: weekNumber,
-          date: now.now && now.now.date ? String(now.now.date).slice(0, 10) : null,
-          source: now.week.source || null,
-          reliable: now.week.reliable !== false,
+          date: liveWeek.evaluated_date || (now.now && now.now.date ? String(now.now.date).slice(0, 10) : null),
+          source: liveWeek.source || (now.week && now.week.source) || null,
+          reliable: liveWeek.reliable !== false,
+          week_start: liveWeek.week_start || (now.week && now.week.week_start) || null,
+          week_end: liveWeek.week_end || (now.week && now.week.week_end) || null,
+          academic_calendar_id: liveWeek.calendar_id || (now.week && now.week.academic_calendar_id) || null,
+          academic_calendar_label: liveWeek.calendar_label || (now.week && now.week.academic_calendar_label) || null,
         }
       : null;
   return {

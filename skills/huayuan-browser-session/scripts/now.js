@@ -474,6 +474,10 @@ function buildNow({ analysis, preferences, overrides, clock }) {
     source: (analysis.user_overrides && analysis.user_overrides.week_number_source) || null,
     reliable: Boolean(analysis.user_overrides && analysis.user_overrides.week_number_reliable),
     needs_confirmation: Boolean(analysis.user_overrides && analysis.user_overrides.week_number_needs_confirmation),
+    week_start: (analysis.user_overrides && analysis.user_overrides.week_start) || null,
+    week_end: (analysis.user_overrides && analysis.user_overrides.week_end) || null,
+    academic_calendar_id: (analysis.user_overrides && analysis.user_overrides.academic_calendar_id) || null,
+    academic_calendar_label: (analysis.user_overrides && analysis.user_overrides.academic_calendar_label) || null,
     filter: analysis.week_filter
       ? {
           applied: Boolean(analysis.week_filter.applied),

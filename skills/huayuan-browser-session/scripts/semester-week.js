@@ -5,9 +5,10 @@
  *
  * 判定顺序（越靠前越可信）：
  *   1. 命令行 --week-number（等于用户当场明确指定）
- *   2. 用户在初始化时确认过、存在状态层 user-state.json 的 current_week
+ *   2. 固定校历：华南理工大学 2026-2027-1 第 1 周周一 = 2026-09-07
  *   3. 教务校历里明确写着"第 1 周周一"的字段（timetable.semester.first_week_start 等）
- *   4. 都推不出来 —— 返回 needs_confirmation: true，只问用户一次，再用 manage-items.js set-week 存下来
+ *   4. 状态层里保存过的周次（只作为校历不可用时的降级值）
+ *   5. 都推不出来 —— 返回 needs_confirmation: true
  *
  * 不猜：只接受字段名本身就表明"第 1 周"的日期，不拿 semester.start_date 之类的
  * 模糊字段硬算——那可能是注册日、开学典礼日，算出来会整体错一两周。
@@ -17,6 +18,15 @@ const { dateString, parseDateText, readState, writeState } = require('./user-ove
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const WEEK_MS = 7 * DAY_MS;
+const ACADEMIC_CALENDAR = Object.freeze({
+  id: 'scut-2026-2027-1',
+  label: '华南理工大学 2026-2027 学年第一学期',
+  first_week_start: '2026-08-31',
+  higher_grade_start: '2026-08-31',
+  freshman_opening_date: '2026-09-07',
+  freshman_opening_week: 2,
+  source: '华南理工大学校历：高年级 2026-08-31 开始第 1 周；2026 级新生 2026-09-07 入学即第 2 周',
+});
 
 /** 明确表示"第 1 周周一"的字段（按可信度排序） */
 const FIRST_WEEK_FIELDS = [
@@ -40,19 +50,48 @@ function utcDay(date) {
 }
 
 /** 第 1 周周一 + 今天 → 第几周 */
-function weekFromFirstMonday(firstMonday, at) {
+function weekFromFirstMonday(firstMonday, at, weekNumberOffset = 0) {
   const start = toDate(firstMonday);
   const today = toDate(at || new Date());
   if (!start || !today) return null;
   const diff = Math.floor((utcDay(today) - utcDay(start)) / WEEK_MS);
-  const week = diff + 1;
+  const week = diff + 1 + Number(weekNumberOffset || 0);
   if (!Number.isFinite(week) || week < 1 || week > 30) return null;
   return week;
+}
+
+function weekRange(firstMonday, week, weekNumberOffset = 0) {
+  const start = toDate(firstMonday);
+  const number = Number(week);
+  if (!start || !Number.isInteger(number) || number < 1) return null;
+  const naturalWeek = number - Number(weekNumberOffset || 0);
+  if (!Number.isInteger(naturalWeek) || naturalWeek < 1) return null;
+  const weekStart = new Date(start.getFullYear(), start.getMonth(), start.getDate() + (naturalWeek - 1) * 7);
+  const weekEnd = new Date(weekStart.getFullYear(), weekStart.getMonth(), weekStart.getDate() + 6);
+  return { start: dateString(weekStart), end: dateString(weekEnd) };
 }
 
 /** 从教务课表 / 校园门户数据里找"第 1 周周一" */
 function findFirstWeekStart({ timetable = null, campus = null } = {}) {
   const checked = [];
+  if (process.env.HUAYUAN_ACADEMIC_CALENDAR_DISABLED !== '1') {
+    const date = toDate(ACADEMIC_CALENDAR.first_week_start);
+    checked.push({
+      field: 'academic_calendar.first_week_start',
+      value: ACADEMIC_CALENDAR.first_week_start,
+      ok: Boolean(date),
+      source: ACADEMIC_CALENDAR.source,
+    });
+    if (date) {
+      return {
+        date,
+        source: ACADEMIC_CALENDAR.source,
+        checked,
+        calendar: ACADEMIC_CALENDAR,
+        week_number_offset: ACADEMIC_CALENDAR.week_number_offset || 0,
+      };
+    }
+  }
   for (const [name, pick] of FIRST_WEEK_FIELDS) {
     const raw = pick(timetable);
     const date = toDate(raw);
@@ -79,15 +118,30 @@ function findFirstWeekStart({ timetable = null, campus = null } = {}) {
  */
 function detectSemesterWeek({ timetable = null, campus = null, now = new Date() } = {}) {
   const found = findFirstWeekStart({ timetable, campus });
+  const currentDate = toDate(now) || new Date();
   if (found.date) {
-    const week = weekFromFirstMonday(found.date, now);
+    const week = weekFromFirstMonday(
+      found.date,
+      currentDate,
+      found.week_number_offset || (found.calendar && found.calendar.week_number_offset) || 0
+    );
     if (week) {
+      const range = weekRange(
+        found.date,
+        week,
+        found.week_number_offset || (found.calendar && found.calendar.week_number_offset) || 0
+      );
       return {
         week,
         source: `${found.source}（第 1 周周一 ${dateString(found.date)}）`,
         reliable: true,
         needs_confirmation: false,
         first_week_start: dateString(found.date),
+        week_start: range ? range.start : null,
+        week_end: range ? range.end : null,
+        calendar_id: found.calendar ? found.calendar.id : null,
+        calendar_label: found.calendar ? found.calendar.label : null,
+        evaluated_date: dateString(currentDate),
         checked: found.checked,
       };
     }
@@ -98,6 +152,7 @@ function detectSemesterWeek({ timetable = null, campus = null, now = new Date() 
     reliable: false,
     needs_confirmation: true,
     first_week_start: null,
+    evaluated_date: dateString(currentDate),
     checked: found.checked,
     question: '现在是本学期的第几周？（例如：第 10 周）',
     how_to_save: 'node manage-items.js set-week --number N',
@@ -148,31 +203,32 @@ function resolveWeek({ explicit = null, timetable = null, campus = null, now = n
   const stored = storedWeek();
   const detected = detectSemesterWeek({ timetable, campus, now });
 
-  // 教务校历能算出来时以它为准：存过的自动值可能已经过期（隔了一两周）
+  // 固定校历/教务校历能算出来时以它为准：存过的值可能已经过期（隔了一两周）
   if (detected.reliable) {
     if (stored && stored.week === detected.week) {
-      return { week: stored.week, source: `${stored.source}，与教务校历一致`, reliable: true, needs_confirmation: false, saved: true };
-    }
-    if (stored && stored.confirmed_by_user) {
-      // 用户明确说过第几周：以用户为准，但把冲突说出来
       return {
         week: stored.week,
-        source: stored.source,
+        source: `${stored.source}，与系统校历一致`,
         reliable: true,
         needs_confirmation: false,
         saved: true,
-        conflict: `教务校历推算为第 ${detected.week} 周，用户确认的是第 ${stored.week} 周，已按用户确认值计算`,
-        detected_week: detected.week,
+        ...detected,
+        source: `${detected.source}，与状态层一致`,
+      };
+    }
+    if (stored) {
+      return {
+        ...detected,
+        saved: false,
+        stale_stored: stored.week,
+        conflict: stored.confirmed_by_user
+          ? `系统校历推算为第 ${detected.week} 周，状态层记录为第 ${stored.week} 周；按校历时间同步结果计算`
+          : `状态层的第 ${stored.week} 周已过期；按系统校历重新计算为第 ${detected.week} 周`,
       };
     }
     return {
-      week: detected.week,
-      source: detected.source,
-      reliable: true,
-      needs_confirmation: false,
+      ...detected,
       saved: false,
-      stale_stored: stored && stored.week !== detected.week ? stored.week : null,
-      first_week_start: detected.first_week_start,
     };
   }
 
@@ -189,7 +245,7 @@ function resolveWeek({ explicit = null, timetable = null, campus = null, now = n
 
   return {
     week: null,
-    source: '未确认（无法从教务数据可靠识别）',
+    source: '未确认（无法从系统校历或教务数据识别）',
     reliable: false,
     needs_confirmation: true,
     saved: false,
@@ -199,10 +255,12 @@ function resolveWeek({ explicit = null, timetable = null, campus = null, now = n
 }
 
 module.exports = {
+  ACADEMIC_CALENDAR,
   detectSemesterWeek,
   findFirstWeekStart,
   resolveWeek,
   saveSemesterWeek,
   storedWeek,
   weekFromFirstMonday,
+  weekRange,
 };

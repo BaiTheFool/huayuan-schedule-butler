@@ -53,11 +53,11 @@ function readJson(file) {
     return null;
   }
 }
-function run(script, args, { home = HOME, cwd = WORK, scriptPath = SCRIPTS } = {}) {
+function run(script, args, { home = HOME, cwd = WORK, scriptPath = SCRIPTS, env = {} } = {}) {
   const res = spawnSync(process.execPath, [path.join(scriptPath, script), ...args], {
     encoding: 'utf8',
     cwd,
-    env: { ...process.env, HUAYUAN_HOME: home, HUAYUAN_OUTPUT_DIR: OUT },
+    env: { ...process.env, HUAYUAN_HOME: home, HUAYUAN_OUTPUT_DIR: OUT, ...env },
   });
   return { status: res.status, stdout: res.stdout || '', stderr: res.stderr || '', all: `${res.stdout || ''}${res.stderr || ''}` };
 }
@@ -71,6 +71,7 @@ for (const name of fs.readdirSync(FIXTURES)) {
 
 const prefLib = require(path.join(SCRIPTS, 'preferences.js'));
 const nowLib = require(path.join(SCRIPTS, 'now.js'));
+const weekLib = require(path.join(SCRIPTS, 'semester-week.js'));
 
 const TIMETABLE = path.join(OUT, 'jw-timetable.json');
 const RAIN = path.join(OUT, 'rain-fast.json');
@@ -86,6 +87,16 @@ const BASE_ARGS = ['--timetable', TIMETABLE_NOWEEK, '--rain', RAIN, '--prefs', P
 const NOW_ISO = '2026-11-04T14:20:00';
 
 console.log(`0.6.0 行为回归（离线、虚构样例）\n工作目录：${WORK}`);
+
+group('时间同步：高年级 2026-08-31 为第 1 周，新生 2026-09-07 入学为第 2 周');
+check('高年级第 1 周为 2026-08-31', weekLib.weekFromFirstMonday('2026-08-31', '2026-08-31') === 1);
+check('2026 级新生入学周为第 2 周', weekLib.weekFromFirstMonday('2026-08-31', '2026-09-07') === 2);
+const syncedWeek = weekLib.detectSemesterWeek({ now: '2026-11-05' });
+check(
+  '2026-11-05 按教务周次口径自动同步为第 10 周',
+  syncedWeek.week === 10 && syncedWeek.week_start === '2026-11-02' && syncedWeek.week_end === '2026-11-08',
+  JSON.stringify(syncedWeek)
+);
 
 // ── A 偏好来源与确认 ────────────────────────────────────────────────
 group('A 偏好：不许凭空生成，不许把系统默认当成用户说过');
@@ -152,7 +163,11 @@ const UNKNOWN_TASKS = path.join(OUT, 'ecourse-tasks-unknown.json');
 fs.writeFileSync(UNKNOWN_TASKS, JSON.stringify(unknownTaskDoc, null, 2));
 
 // 关键：不带 --week-number（教学周未确认），且 eCourse fixture 本身 unparsed=2（READ_PARTIAL）
-const analyze = run('schedule-analyze.js', [...BASE_ARGS, '--tasks', UNKNOWN_TASKS, '--now', NOW_ISO, '--output-dir', OUT, '--no-validate']);
+const analyze = run(
+  'schedule-analyze.js',
+  [...BASE_ARGS, '--tasks', UNKNOWN_TASKS, '--now', NOW_ISO, '--output-dir', OUT, '--no-validate'],
+  { env: { HUAYUAN_ACADEMIC_CALENDAR_DISABLED: '1' } }
+);
 const analysis = readJson(path.join(OUT, 'schedule-analysis.json')) || {};
 const unconfirmed = analysis.unconfirmed_tasks || [];
 const blockers = (analysis.readiness && analysis.readiness.blockers) || [];
