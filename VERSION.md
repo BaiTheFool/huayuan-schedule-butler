@@ -1,4 +1,6 @@
-VERSION=0.16.6
+VERSION=0.16.7
+
+### 0.16.7 · 2026-11-05 · feat: synchronize teaching weeks from September 7 semester start
 
 ### 0.16.6 · 2026-11-05 · fix: filter route classes by confirmed current week
 

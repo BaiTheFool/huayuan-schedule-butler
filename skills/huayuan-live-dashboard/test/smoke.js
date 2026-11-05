@@ -17,6 +17,7 @@ const timetablePath = path.join(timetableDir, 'jw-timetable.json');
 const preferencesPath = path.join(dir, 'preferences.json');
 const configPath = path.join(dir, 'config.json');
 const userStatePath = path.join(dir, 'user-state.json');
+const { detectSemesterWeek } = require('../../huayuan-browser-session/scripts/semester-week.js');
 
 fs.writeFileSync(
   nowPath,
@@ -286,7 +287,12 @@ async function wait(portNumber = port) {
     check(routeData.ok === true, '路线上下文 API 正常');
     check(routeData.timetable_available === true, '真实课表自动接入首页');
     check(routeData.timetable_course_count === 1, '真实课表从历史子目录自动发现');
-    check(routeData.week_context?.number === 10 && routeData.week_context?.date === '2026-11-04', '路线上下文携带当前教学周');
+    const expectedWeek = detectSemesterWeek({ now: new Date() });
+    check(
+      routeData.week_context?.number === expectedWeek.week &&
+        routeData.week_context?.week_start === expectedWeek.week_start,
+      '路线上下文按校历实时计算当前教学周'
+    );
     check(routeData.tasks.length === 1, '主任务池自动接入路线');
     check(routeData.major === '软件工程', '专业偏好自动接入路线');
     const timetableStatus = await fetch(`http://127.0.0.1:${port}/api/timetable/status`);
