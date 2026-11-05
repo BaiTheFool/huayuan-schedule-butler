@@ -147,6 +147,16 @@ function routeContext() {
     ...task,
     done: Boolean(task.done),
   }));
+  const weekNumber = Number(now && now.week && now.week.number);
+  const weekContext =
+    Number.isInteger(weekNumber) && weekNumber > 0
+      ? {
+          number: weekNumber,
+          date: now.now && now.now.date ? String(now.now.date).slice(0, 10) : null,
+          source: now.week.source || null,
+          reliable: now.week.reliable !== false,
+        }
+      : null;
   return {
     ok: true,
     timetable,
@@ -156,6 +166,7 @@ function routeContext() {
     preferences,
     major: preferences && preferences.major ? preferences.major : null,
     tasks,
+    week_context: weekContext,
   };
 }
 

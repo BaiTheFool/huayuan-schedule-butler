@@ -92,6 +92,7 @@
     timetable: emptyTimetable(),
     timetableInfo: null,
     timetableSource: 'missing',
+    weekContext: null,
     preferences: null,
     exams: null,
     examPlan: null,
@@ -736,6 +737,32 @@
       }));
   }
 
+  function mondayKey(dateText) {
+    const value = new Date(`${String(dateText).slice(0, 10)}T12:00:00`);
+    if (Number.isNaN(value.getTime())) return null;
+    const weekday = value.getDay() || 7;
+    value.setDate(value.getDate() - weekday + 1);
+    return `${value.getFullYear()}-${String(value.getMonth() + 1).padStart(2, '0')}-${String(value.getDate()).padStart(2, '0')}`;
+  }
+
+  function selectedWeekNumber() {
+    const context = state.weekContext;
+    if (context && Number.isInteger(Number(context.number))) {
+      const baseMonday = mondayKey(context.date);
+      const targetMonday = mondayKey(state.date);
+      if (baseMonday && targetMonday) {
+        const offset = Math.round(
+          (new Date(`${targetMonday}T12:00:00`) - new Date(`${baseMonday}T12:00:00`)) / (7 * 86400000)
+        );
+        return Math.max(1, Number(context.number) + offset);
+      }
+      return Number(context.number);
+    }
+    return state.timetableInfo && Number.isInteger(Number(state.timetableInfo.week_number))
+      ? Number(state.timetableInfo.week_number)
+      : null;
+  }
+
   function replan(showToast) {
     refreshTasks();
     const fixedEvents = fixedEventsForDate();
@@ -772,7 +799,7 @@
       sportType: state.sportType,
       nap: state.nap,
       gym: state.gym.enabled ? state.gym : undefined,
-      weekNumber: state.timetableInfo ? state.timetableInfo.week_number : null,
+      weekNumber: selectedWeekNumber(),
       major: state.major || undefined,
       tasks: tasksForRoute(),
       fixedEvents,
@@ -1929,13 +1956,19 @@
 
   function refreshWeekForDate() {
     if (!state.timetable || !TBL) return;
-    const result = TBL.summarizeTimetable(state.timetable, { date: state.date });
+    const result = TBL.summarizeTimetable(state.timetable, {
+      date: state.date,
+      weekNumber: selectedWeekNumber(),
+    });
     if (result.ok) state.timetableInfo = result;
   }
 
   function applyTimetable(raw, source) {
     if (!TBL) return { ok: false, error: 'TIMETABLE_MODULE_MISSING', message: '课表导入模块没加载' };
-    const result = TBL.summarizeTimetable(raw, { date: state.date });
+    const result = TBL.summarizeTimetable(raw, {
+      date: state.date,
+      weekNumber: selectedWeekNumber(),
+    });
     if (!result.ok) return result;
     state.timetable = result.timetable;
     state.timetableInfo = result;
@@ -1951,6 +1984,7 @@
     if (!data || data.ok === false) return false;
     state.preferences = data.preferences || null;
     state.externalTasks = Array.isArray(data.tasks) ? data.tasks : [];
+    state.weekContext = data.week_context || state.weekContext;
     if (data.major && !state.major) {
       state.major = String(data.major).slice(0, 40);
       const input = $('majorInput');

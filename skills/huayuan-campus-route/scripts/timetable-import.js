@@ -154,7 +154,11 @@
       warnings.push('课表没写校区；教室名按 A1–A5 匹配，请确认这份课表确实是大学城校区');
     }
 
-    const week = weekNumberForDate(Array.isArray(raw) ? {} : raw, opts.date);
+    const explicitWeek = Number(opts.weekNumber);
+    const week =
+      Number.isInteger(explicitWeek) && explicitWeek > 0 && explicitWeek <= 30
+        ? explicitWeek
+        : weekNumberForDate(Array.isArray(raw) ? {} : raw, opts.date);
     let missingTime = 0;
     let usable = 0;
     for (const course of courses) {
